@@ -1,5 +1,5 @@
 use std::collections::*;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration SystemTime};
 use std::*;
 use clap::{Arg, App};
 use psutil::*;
@@ -244,6 +244,95 @@ fn main() {
     }
 
     let USER_THEME_DIR = CONFIG_DIR.join("themes");
+
+
+    let CORES = psutil::cpu::cpu_count_physical();
+    let THREADS = psutil::cpu::cpu_count();
+
+    let THREAD_ERROR = 0;
+
+    let DEFAULT_THEME = HashMap::new();
+    DEFAULT_THEME.insert("main_bg", "");
+    DEFAULT_THEME.insert("main_fg" , "#cc",);
+    DEFAULT_THEME.insert("title" , "#ee",);
+    DEFAULT_THEME.insert("hi_fg" , "#969696",);
+    DEFAULT_THEME.insert("selected_bg" , "#7e2626",);
+    DEFAULT_THEME.insert("selected_fg" , "#ee",);
+    DEFAULT_THEME.insert("inactive_fg" , "#40",);
+    DEFAULT_THEME.insert("graph_text" , "#60",);
+    DEFAULT_THEME.insert("meter_bg" , "#40",);
+    DEFAULT_THEME.insert("proc_misc" , "#0de756",);
+    DEFAULT_THEME.insert("cpu_box" , "#3d7b46",);
+    DEFAULT_THEME.insert("mem_box" , "#8a882e",);
+    DEFAULT_THEME.insert("net_box" , "#423ba5",);
+    DEFAULT_THEME.insert("proc_box" , "#923535",);
+    DEFAULT_THEME.insert("div_line" , "#30",);
+    DEFAULT_THEME.insert("temp_start" , "#4897d4",);
+    DEFAULT_THEME.insert("temp_mid" , "#5474e8",);
+    DEFAULT_THEME.insert("temp_end" , "#ff40b6",);
+    DEFAULT_THEME.insert("cpu_start" , "#50f095",);
+    DEFAULT_THEME.insert("cpu_mid" , "#f2e266",);
+    DEFAULT_THEME.insert("cpu_end" , "#fa1e1e",);
+    DEFAULT_THEME.insert("free_start" , "#223014",);
+    DEFAULT_THEME.insert("free_mid" , "#b5e685",);
+    DEFAULT_THEME.insert("free_end" , "#dcff85",);
+    DEFAULT_THEME.insert("cached_start" , "#0b1a29",);
+    DEFAULT_THEME.insert("cached_mid" , "#74e6fc",);
+    DEFAULT_THEME.insert("cached_end" , "#26c5ff",);
+    DEFAULT_THEME.insert("available_start" , "#292107",);
+    DEFAULT_THEME.insert("available_mid" , "#ffd77a",);
+    DEFAULT_THEME.insert("available_end" , "#ffb814",);
+    DEFAULT_THEME.insert("used_start" , "#3b1f1c",);
+    DEFAULT_THEME.insert("used_mid" , "#d9626d",);
+    DEFAULT_THEME.insert("used_end" , "#ff4769",);
+    DEFAULT_THEME.insert("download_start" , "#231a63",);
+    DEFAULT_THEME.insert("download_mid" , "#4f43a3",);
+    DEFAULT_THEME.insert("download_end" , "#b0a9de",);
+    DEFAULT_THEME.insert("upload_start" , "#510554",);
+    DEFAULT_THEME.insert("upload_mid" , "#7d4180",);
+    DEFAULT_THEME.insert("upload_end" , "#dcafde",);
+    DEFAULT_THEME.insert("process_start" , "#80d0a3",);
+    DEFAULT_THEME.insert("process_mid" , "#dcd179",);
+    DEFAULT_THEME.insert("process_end" , "#d45454",);
+
+    let MENUS = HashMap::new();
+
+    let options_hash = HashMap::new();
+        options_hash.insert("normal", (
+            "┌─┐┌─┐┌┬┐┬┌─┐┌┐┌┌─┐",
+            "│ │├─┘ │ ││ ││││└─┐",
+            "└─┘┴   ┴ ┴└─┘┘└┘└─┘"));
+        options_hash.insert("selected", (
+            "╔═╗╔═╗╔╦╗╦╔═╗╔╗╔╔═╗",
+            "║ ║╠═╝ ║ ║║ ║║║║╚═╗",
+            "╚═╝╩   ╩ ╩╚═╝╝╚╝╚═╝"));
+    MENUS.insert("options", options_hash);
+        
+    let help_hash = HashMap::new();
+        help_hash.insert("normal", (
+            "┬ ┬┌─┐┬  ┌─┐",
+            "├─┤├┤ │  ├─┘",
+            "┴ ┴└─┘┴─┘┴  "));
+        help_hash.insert("selected", (
+            "╦ ╦╔═╗╦  ╔═╗",
+            "╠═╣║╣ ║  ╠═╝",
+            "╩ ╩╚═╝╩═╝╩  "));
+    
+    MENUS.insert("help", help_hash);
+
+    let quit_hash = HashMap::new();
+        quit_hash.insert("normal", (
+            "┌─┐ ┬ ┬ ┬┌┬┐",
+            "│─┼┐│ │ │ │ ",
+            "└─┘└└─┘ ┴ ┴ "));
+        quit_hash.insert("selected", (
+            "╔═╗ ╦ ╦ ╦╔╦╗ ",
+            "║═╬╗║ ║ ║ ║  ",
+            "╚═╝╚╚═╝ ╩ ╩  "));
+
+    MENUS.insert("quit", quit_hash);
+        
+
 
 
 
