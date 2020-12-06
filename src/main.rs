@@ -21,7 +21,7 @@ fn main() {
 
     if SYSTEM == "Other"{
         print!("\nUnsupported platform!\n");
-        process::exit(1);
+        std::process::exit(1);
     }
 
     //Argument Parsing
