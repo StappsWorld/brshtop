@@ -88,7 +88,7 @@ fn main() {
 
     let DEFAULT_CONF = string_template::Template::new("#? Config file for bpytop v. {{version}}
 
-    #* Color theme, looks for a .theme file in \"/usr/[local/]share/bpytop/themes\\" and \"~/.config/bpytop/themes\", \"Default\" for builtin default theme.
+    #* Color theme, looks for a .theme file in \"/usr/[local/]share/bpytop/themes\" and \"~/.config/bpytop/themes\", \"Default\" for builtin default theme.
     #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme=\"+monokai\"
     color_theme=\"{{color_theme}}\"
 
@@ -185,6 +185,6 @@ fn main() {
     #* Set loglevel for \"~/.config/bpytop/error.log\" levels are: \"ERROR\" \"WARNING\" \"INFO\" \"DEBUG\".
     #* The level set includes all lower levels, i.e. \"DEBUG\" will show all logging info.
     log_level={{log_level}}
-    ")
+    ");
 
 }
