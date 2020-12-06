@@ -4,6 +4,9 @@ use std::*;
 use clap::{Arg, App};
 use psutil::*;
 use string_template::*;
+use expanduser::expanduser;
+use std::fs::metadata;
+use std::path::*;
 
 
 fn main() {
@@ -78,12 +81,12 @@ fn main() {
     // Variables
 
     let BANNER_SRC = vec![
-	("#ffa50a", "#0fd7ff", "██████╗ ██████╗ ██╗   ██╗████████╗ ██████╗ ██████╗"),
-	("#f09800", "#00bfe6", "██╔══██╗██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔═══██╗██╔══██╗"),
-	("#db8b00", "#00a6c7", "██████╔╝██████╔╝ ╚████╔╝    ██║   ██║   ██║██████╔╝"),
-	("#c27b00", "#008ca8", "██╔══██╗██╔═══╝   ╚██╔╝     ██║   ██║   ██║██╔═══╝ "),
-	("#a86b00", "#006e85", "██████╔╝██║        ██║      ██║   ╚██████╔╝██║"),
-	("#000000", "#000000", "╚═════╝ ╚═╝        ╚═╝      ╚═╝    ╚═════╝ ╚═╝"),
+	("#ffa50a", "#0fd7ff", "██████╗ ██████╗ ███████╗██╗  ██╗████████╗ ██████╗ ██████╗"),
+	("#f09800", "#00bfe6", "██╔══██╗██╔══██╗██╔════╝██║  ██║╚══██╔══╝██╔═══██╗██╔══██╗"),
+	("#db8b00", "#00a6c7", "██████╔╝██████╔╝███████╗███████║   ██║   ██║   ██║██████╔╝"),
+	("#c27b00", "#008ca8", "██╔══██╗██╔══██╗╚════██║██╔══██║   ██║   ██║   ██║██╔═══╝"),
+	("#a86b00", "#006e85", "██████╔╝██║  ██║███████║██║  ██║   ██║   ╚██████╔╝██║"),
+	("#000000", "#000000", "╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝"),
     ];
 
     let DEFAULT_CONF = string_template::Template::new("#? Config file for bpytop v. {{version}}
@@ -186,5 +189,62 @@ fn main() {
     #* The level set includes all lower levels, i.e. \"DEBUG\" will show all logging info.
     log_level={{log_level}}
     ");
+
+    let config_dir_builder = expanduser("~").unwrap().to_str().unwrap().to_owned() + "/.config/brshtop";
+    let CONFIG_DIR = Path::new(config_dir_builder.as_str());
+
+    if !CONFIG_DIR.exists() {
+        match fs::create_dir(CONFIG_DIR){
+            Err(_) => {
+                print!("ERROR!\nNo permission to write to \"{}\" directory!", CONFIG_DIR.to_str().unwrap());
+                std::process::exit(1);
+            }
+            _ => ()
+        }
+        match fs::create_dir(CONFIG_DIR.join("themes")){
+            Err(_) => {
+                print!("ERROR!\nNo permission to write to \"{}\" directory!", CONFIG_DIR.join("themes").to_str().unwrap());
+                std::process::exit(1);
+            }
+            _ => ()
+        }
+    }
+
+    let CONFIG_FILE = CONFIG_DIR.join("bpytop.conf");
+    
+    let mut EXECUTE_PATH;
+    match std::env::current_exe() {
+        Ok(p) => EXECUTE_PATH = p,
+        Err(_) => {
+            print!("ERROR!\n Could not read this applications directory!");
+            std::process::exit(1);
+        }
+    }
+
+    let theme_dir_builder = format!("{}/bpytop-themes", EXECUTE_PATH.to_str().unwrap());
+    let theme_dir_check = Path::new(theme_dir_builder.as_str());
+    let mut THEME_DIR;
+
+    if theme_dir_check.exists(){
+        THEME_DIR = theme_dir_check.clone();
+    } else {
+        let test_directories = vec!["/usr/local/", "/usr/", "/snap/bpytop/current/usr/"];
+
+        for directory in test_directories {
+            let test_directory_builder = directory.to_owned() + "share/bpytop/themes";
+            let test_directory = Path::new(test_directory_builder.as_str());
+
+            if test_directory.exists(){
+                THEME_DIR = test_directory.clone();
+                break;
+            }
+        }
+
+    }
+
+    let USER_THEME_DIR = CONFIG_DIR.join("themes");
+
+
+
 
 }
