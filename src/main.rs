@@ -224,10 +224,10 @@ fn main() {
 
     let theme_dir_builder = format!("{}/bpytop-themes", EXECUTE_PATH.to_str().unwrap());
     let theme_dir_check = Path::new(theme_dir_builder.as_str());
-    let mut THEME_DIR_mut;
+    let mut THEME_DIR;
 
     if theme_dir_check.exists(){
-        THEME_DIR_mut = theme_dir_check.clone();
+        THEME_DIR = theme_dir_check.clone();
     } else {
         let test_directories = vec!["/usr/local/", "/usr/", "/snap/bpytop/current/usr/"];
 
@@ -236,13 +236,12 @@ fn main() {
             let test_directory = Path::new(test_directory_builder.as_str());
 
             if test_directory.exists(){
-                THEME_DIR_mut = test_directory.clone();
+                THEME_DIR = test_directory.clone();
                 break;
             }
         }
 
     }
-    let THEME_DIR = THEME_DIR_mut.clone();
 
     let USER_THEME_DIR = CONFIG_DIR.join("themes");
 
