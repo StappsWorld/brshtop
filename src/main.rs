@@ -1,5 +1,5 @@
 use std::collections::*;
-use std::time::{Duration SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::*;
 use clap::{Arg, App};
 use psutil::*;
@@ -7,6 +7,19 @@ use string_template::*;
 use expanduser::expanduser;
 use std::fs::metadata;
 use std::path::*;
+
+struct TimeIt {
+    pub timers: HashMap<String, u128>,
+    pub paused: HashMap<String, u128>,
+}
+
+impl TimeIt {
+    fn start(&mut self, name : String){
+        if let Some(x) = self.timers.get_mut(&name) {
+            *x = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+        }
+    }
+}
 
 
 fn main() {
@@ -251,7 +264,7 @@ fn main() {
 
     let THREAD_ERROR = 0;
 
-    let DEFAULT_THEME = HashMap::new();
+    let mut DEFAULT_THEME = HashMap::new();
     DEFAULT_THEME.insert("main_bg", "");
     DEFAULT_THEME.insert("main_fg" , "#cc",);
     DEFAULT_THEME.insert("title" , "#ee",);
@@ -295,9 +308,9 @@ fn main() {
     DEFAULT_THEME.insert("process_mid" , "#dcd179",);
     DEFAULT_THEME.insert("process_end" , "#d45454",);
 
-    let MENUS = HashMap::new();
+    let mut MENUS = HashMap::new();
 
-    let options_hash = HashMap::new();
+    let mut options_hash = HashMap::new();
         options_hash.insert("normal", (
             "┌─┐┌─┐┌┬┐┬┌─┐┌┐┌┌─┐",
             "│ │├─┘ │ ││ ││││└─┐",
@@ -308,7 +321,7 @@ fn main() {
             "╚═╝╩   ╩ ╩╚═╝╝╚╝╚═╝"));
     MENUS.insert("options", options_hash);
         
-    let help_hash = HashMap::new();
+    let mut help_hash = HashMap::new();
         help_hash.insert("normal", (
             "┬ ┬┌─┐┬  ┌─┐",
             "├─┤├┤ │  ├─┘",
@@ -320,7 +333,7 @@ fn main() {
     
     MENUS.insert("help", help_hash);
 
-    let quit_hash = HashMap::new();
+    let mut quit_hash = HashMap::new();
         quit_hash.insert("normal", (
             "┌─┐ ┬ ┬ ┬┌┬┐",
             "│─┼┐│ │ │ │ ",
@@ -332,9 +345,15 @@ fn main() {
 
     MENUS.insert("quit", quit_hash);
         
-
-
-
+    let mut MENU_COLORS = HashMap::new();
+    MENU_COLORS.insert("normal", ("#0fd7ff", "#00bfe6", "#00a6c7", "#008ca8"));
+    MENU_COLORS.insert("selected", ("#ffa50a", "#f09800", "#db8b00", "#c27b00"));
+    
+    //Units for floating_humanizer function
+    let mut UNITS = HashMap::new();
+    UNITS.insert("bit", ("bit", "Kib", "Mib", "Gib", "Tib", "Pib", "Eib", "Zib", "Yib", "Bib", "GEb"));
+    UNITS.insert("byte", ("Byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "BiB", "GEB"));
+    
 
 
 }
