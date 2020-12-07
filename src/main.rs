@@ -1,3 +1,5 @@
+mod config;
+use config::*;
 use std::collections::*;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::*;
@@ -15,24 +17,36 @@ struct TimeIt {
 }
 
 impl TimeIt {
+    fn new() -> TimeIt {
+        TimeIt {
+            timers: HashMap::<String, u128>::new(),
+            paused: HashMap::<String, u128>::new(),
+        }
+    }
+
     fn start(&mut self, name : String){
         self.timers.insert(name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis());
     }
 
     fn pause(&mut self, name : String) {
-        if self.timers.contains_key(&name){
-            if let Some(x) = self.paused.get_mut(&name) {
-                *x = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - *x;
-                self.timers.remove(&name);
-            }
+        let name_copy = name.clone();
+        if self.timers.contains_key(&name_copy){
+            self.paused.insert(name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - self.timers.get(&name_copy).unwrap());
+            
         }
     }
 
-    fn stop(&mut self, name : String) {
-        if self.timers.contains_key(&name){
-            if let Some(x) = self.paused.get_mut(&name) {
-                *x = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - *x;
-                self.timers.remove(&name);
+    fn stop(&mut self, name : String, config_dir : PathBuf) {
+        let name_copy = name.clone();
+        if self.timers.contains_key(&name_copy){
+            if let Some(x) = self.timers.get(&name_copy) {
+                let mut total = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - *x;
+                self.timers.remove(&name_copy);
+                if self.paused.contains_key(&name_copy){
+                    total = total + self.paused.get(&name_copy).unwrap(); 
+                    self.paused.remove(&name_copy);
+                }
+                errlog(config_dir, format!("{} completed in {:.6} seconds", name_copy, total));
             }
         }
     }
@@ -63,7 +77,8 @@ fn main() {
     let matches = App::new("brshtop")
     .version(clap::crate_version!())
     .author(("Aristocratos (jakob@qvantnet.com)\n".to_owned() +
-        "Samuel Rembisz <sjrembisz07@gmail.com)").as_str())
+        "Samuel Rembisz <sjrembisz07@gmail.com)" +
+        "Charlie Thomson <charliecthomson@gmail.com").as_str())
     .about("A Rust implementation of a Python implementation of Bashtop")
     .arg(Arg::new("Full Mode")
             .short('f')
@@ -362,6 +377,7 @@ fn main() {
     UNITS.insert("bit", ("bit", "Kib", "Mib", "Gib", "Tib", "Pib", "Eib", "Zib", "Yib", "Bib", "GEb"));
     UNITS.insert("byte", ("Byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "BiB", "GEB"));
     
+
 
 
 }
