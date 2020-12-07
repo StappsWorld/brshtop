@@ -1,6 +1,7 @@
 use std::collections::*;
 use std::path::*;
 use psutil::*;
+use psutil::sensors::*;
 
 pub enum ConfigItem {
     Str(String),
@@ -73,13 +74,14 @@ pub struct Config {
     log_levels: Vec<LogLevel>,
     view_modes: Vec<ViewMode>,
     cpu_sensors: Vec<String>,
+    _initialized: bool,
 } impl Config {
 
     pub fn new( path : PathBuf) -> Self {
 
-        let mut cpu_sensors_mut = vec!["Auto"].iter().map(|s| s.to_string()).collect();
+        let mut cpu_sensors_mut : Vec::<String> = vec!["Auto"].iter().map(|s| s.to_string()).collect();
 
-        if hasattr(psutil, "sensors_temperatures"):
+        /*if hasattr(psutil, "sensors_temperatures"):
                 try:
                     _temps = psutil.sensors_temperatures()
                     if _temps:
@@ -89,19 +91,27 @@ pub struct Config {
                                     cpu_sensors.append("{_name}:{_num if _entry.label == "" else _entry.label}")
                 except:
                     pass
-        
-        let _temps = psutil::temperatures();
-
+        */
+        let _temps = temperatures();
+        let mut num = 1;
         for res in _temps{
             match res {
                 Ok(t) =>{
                     let name = t.unit().to_owned();
-                    if let label_option = t.label() {
-                        
-                    }
+                    let label_option = t.label();
+                    match label_option {
+                        Some(l) => {
+                            cpu_sensors_mut.push(format!("{}:{}",name, l));
+                        },
+                        None => {
+                            cpu_sensors_mut.push(format!("{}:{}",name, num));
+                        },
+                    };
 
+                    num += 1;
                 }
-            }
+                Err(e) => (),
+            };
         }
 
         let keys_unconverted = vec!["color_theme", "update_ms", "proc_sorting", "proc_reversed", "proc_tree", "check_temp", "draw_clock", "background_update", "custom_cpu_name",
@@ -144,24 +154,16 @@ pub struct Config {
             show_init: true,
             view_mode: ViewMode::Full,
             log_level: LogLevel::Warning,
-
             warnings: Vec::<String>::new(),
             info: Vec::<String>::new(),
-
             sorting_options: vec![SortingOption::Pid, SortingOption::Program, SortingOption::Arguments, SortingOption::Threads, SortingOption::User, SortingOption::Memory, SortingOption::Cpu {lazy : true}, SortingOption::Cpu {lazy : false}],
             log_levels: vec![LogLevel::Error, LogLevel::Warning, LogLevel::Error, LogLevel::Debug],
-
             view_modes: vec![ViewMode::Full, ViewMode::Proc, ViewMode::Stat],
-
-            cpu_sensors: ,
-
-            
-
-            changed: bool = False
-            recreate: bool = False
-            config_file: str = ""
-
-            _initialized: bool = False
+            cpu_sensors: cpu_sensors_mut,
+            changed: false,
+            recreate: false,
+            config_file: String::from(""),
+            _initialized: false,
         }
 
     }
