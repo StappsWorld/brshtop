@@ -7,6 +7,7 @@ use string_template::*;
 use expanduser::expanduser;
 use std::fs::metadata;
 use std::path::*;
+use log::LevelFilter;
 
 struct TimeIt {
     pub timers: HashMap<String, u128>,
@@ -15,10 +16,27 @@ struct TimeIt {
 
 impl TimeIt {
     fn start(&mut self, name : String){
-        if let Some(x) = self.timers.get_mut(&name) {
-            *x = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+        self.timers.insert(name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis());
+    }
+
+    fn pause(&mut self, name : String) {
+        if self.timers.contains_key(&name){
+            if let Some(x) = self.paused.get_mut(&name) {
+                *x = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - *x;
+                self.timers.remove(&name);
+            }
         }
     }
+
+    fn stop(&mut self, name : String) {
+        if self.timers.contains_key(&name){
+            if let Some(x) = self.paused.get_mut(&name) {
+                *x = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - *x;
+                self.timers.remove(&name);
+            }
+        }
+    }
+
 }
 
 
@@ -208,32 +226,22 @@ fn main() {
 
     if !CONFIG_DIR.exists() {
         match fs::create_dir(CONFIG_DIR){
-            Err(_) => {
-                print!("ERROR!\nNo permission to write to \"{}\" directory!", CONFIG_DIR.to_str().unwrap());
-                std::process::exit(1);
-            }
-            _ => ()
+            Err(_) => throw_error(format!("ERROR!\nNo permission to write to \"{}\" directory!", CONFIG_DIR.to_str().unwrap()).as_str()),
+            _ => (),
         }
         match fs::create_dir(CONFIG_DIR.join("themes")){
-            Err(_) => {
-                print!("ERROR!\nNo permission to write to \"{}\" directory!", CONFIG_DIR.join("themes").to_str().unwrap());
-                std::process::exit(1);
-            }
-            _ => ()
+            Err(_) => throw_error(format!("ERROR!\nNo permission to write to \"{}\" directory!", CONFIG_DIR.join("themes").to_str().unwrap()).as_str()),
+            _ => (),
         }
     }
 
     let CONFIG_FILE = CONFIG_DIR.join("bpytop.conf");
     
-    let mut EXECUTE_PATH_mut;
+    let mut EXECUTE_PATH = PathBuf::new();
     match std::env::current_exe() {
-        Ok(p) => EXECUTE_PATH_mut = p,
-        Err(_) => {
-            print!("ERROR!\n Could not read this applications directory!");
-            std::process::exit(1);
-        }
+        Ok(p) => EXECUTE_PATH = p,
+        Err(_) => throw_error("ERROR!\n Could not read this applications directory!")
     }
-    let EXECUTE_PATH = EXECUTE_PATH_mut.clone();
 
     let theme_dir_builder = format!("{}/bpytop-themes", EXECUTE_PATH.to_str().unwrap());
     let theme_dir_check = Path::new(theme_dir_builder.as_str());
@@ -356,4 +364,22 @@ fn main() {
     
 
 
+}
+
+fn errlog(config_dir : PathBuf, message : String) -> bool {
+    let error_file = "error.log";
+    let error_dir = config_dir.join(PathBuf::from(error_file));
+    let dir = error_dir.to_str().unwrap();
+
+    match simple_logging::log_to_file(dir, LevelFilter::Debug) {
+        Err(e) => throw_error(format!("ERROR!\nNo permission to write to \"{}\" directory with error {}!", config_dir.to_str().unwrap(), e).as_str()),
+        _ => (),
+    };
+
+    return true;
+}
+
+fn throw_error(message : &str){
+    print!("{}", message);
+    std::process::exit(1);
 }
