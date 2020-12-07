@@ -60,7 +60,7 @@ fn main() {
     }
 
     //Argument Parsing
-    let matches = App::new("brstop")
+    let matches = App::new("brshtop")
     .version(clap::crate_version!())
     .author(("Aristocratos (jakob@qvantnet.com)\n".to_owned() +
         "Samuel Rembisz <sjrembisz07@gmail.com)").as_str())
