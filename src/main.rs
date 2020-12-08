@@ -126,6 +126,8 @@ fn main() {
 
     let DEBUG = arg_debug.is_some();
 
+    let VERSION = clap::crate_version!();
+
     // Variables
 
     let BANNER_SRC = vec![

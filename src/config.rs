@@ -18,12 +18,14 @@ pub enum ConfigItem {
     Error,
 }
 
+#[derive(Clone, Copy)]
 pub enum ViewMode {
     Full,
     Proc,
     Stat,
 }
 
+#[derive(Clone, Copy)]
 pub enum LogLevel {
     Error,
     Warning,
@@ -31,6 +33,7 @@ pub enum LogLevel {
     Debug,
 }
 
+#[derive(Clone, Copy)]
 pub enum SortingOption {
     Pid,
     Program,
@@ -90,7 +93,7 @@ pub struct Config {
     _initialized: bool,
 } impl Config {
 
-    pub fn new( path : PathBuf) -> Result<Self, &'static str> {
+    pub fn new( path : PathBuf, version : String) -> Result<Self, &'static str> {
 
         let mut cpu_sensors_mut : Vec::<String> = vec!["Auto"].iter().map(|s| s.to_string()).collect();
         let _temps = temperatures();
@@ -167,10 +170,56 @@ pub struct Config {
             _initialized: false,
         };
 
-        let conf_dict_mut = match Config::load_config(&mut initializing_config) {
+        let mut conf = match Config::load_config(&mut initializing_config) {
             Ok(d) => d,
             Err(e) => return Err(e)
         };
+
+        if !conf.contains_key(&"version".to_owned()) {
+            initializing_config.recreate = true;
+            initializing_config.info.push("Config file malformatted or mossing, will be recreated on exit!".to_owned());
+        } else  {
+            match conf.get(&"version".to_owned()).unwrap() {
+                ConfigItem::Str(s) => {
+                    if *s != version {
+                        initializing_config.recreate = true;
+                        initializing_config.warnings.push("Config file version and brshtop version missmatch, will be recreated on exit!".to_owned())
+                    }
+                }
+                _ => {
+                    initializing_config.recreate = true;
+                    initializing_config.warnings.push("Config file is malformed, will be recreated on exit!".to_owned())
+                }
+            }
+        }
+
+        for key in initializing_config.keys {
+            if conf.contains_key(&key) {
+                match conf.get(&key).unwrap() {
+                    ConfigItem::Error => {
+                        
+                        initializing_config.recreate = true;
+
+                        let sender = match conf.get(&key).unwrap() {
+                            ConfigItem::Str(s) => ConfigItem::Str(String::from(s)),
+                            ConfigItem::Int(i) => ConfigItem::Int(*i),
+                            ConfigItem::Bool(b) => ConfigItem::Bool(*b),
+                            ConfigItem::ViewMode(v) => ConfigItem::ViewMode(*v),
+                            ConfigItem::LogLevel(l) => ConfigItem::LogLevel(*l),
+                            ConfigItem::SortingOption(s) => ConfigItem::SortingOption(*s),
+                            ConfigItem::Error => ConfigItem::Error,
+                            _ => continue,
+                        };
+
+                        initializing_config.conf_dict.insert(key, sender);
+                    },
+                    _ => {
+                        initializing_config.
+                    }
+                }
+            }
+        }
+        
 
 
         
