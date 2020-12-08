@@ -19,8 +19,7 @@ pub enum ConfigItem {
     LogLevel(LogLevel),
     SortingOption(SortingOption),
     Error,
-}
-impl fmt::Display for ConfigItem {
+} impl fmt::Display for ConfigItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ConfigItem::Str(s) =>  write!(f, "{:?}", s),
@@ -60,6 +59,14 @@ pub enum ViewMode {
     Full,
     Proc,
     Stat,
+} impl fmt::Display for ViewMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ViewMode::Full => write!(f, "{:?}", "full"),
+            ViewMode::Proc => write!(f, "{:?}", "proc"),
+            ViewMode::Stat => write!(f, "{:?}", "stat"),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -68,6 +75,15 @@ pub enum LogLevel {
     Warning,
     Info,
     Debug,
+} impl fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LogLevel::Error => write!(f, "{:?}", "error"),
+            LogLevel::Warning => write!(f, "{:?}", "warning"),
+            LogLevel::Info => write!(f, "{:?}", "info"),
+            LogLevel::Debug => write!(f, "{:?}", "debug"),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -79,56 +95,71 @@ pub enum SortingOption {
     User,
     Memory,
     Cpu { lazy: bool },
+} impl fmt::Display for SortingOption {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SortingOption::Pid => write!(f, "{:?}", "pid"),
+            SortingOption::Program => write!(f, "{:?}", "program"),
+            SortingOption::Arguments => write!(f, "{:?}", "arguments"),
+            SortingOption::Threads => write!(f, "{:?}", "threads"),
+            SortingOption::User => write!(f, "{:?}", "user"),
+            SortingOption::Memory => write!(f, "{:?}", "memory"),
+            SortingOption::Cpu{lazy : b} => match b {
+                true => write!(f, "{:?}", "cpu lazy"),
+                false => write!(f, "{:?}", "cpu"),
+            },
+        }
+    }
 }
 
 
 
 pub struct Config {
-    keys: Vec<String>,
-    conf_dict: HashMap<String, ConfigItem>,
-    attr: HashMap<String, ConfigItem>,
-    color_theme: String,
-    theme_background: bool,
-    update_ms: i64,
-    proc_sorting: SortingOption,
-    proc_reversed: bool,
-    proc_tree: bool,
-    tree_depth: i32,
-    proc_colors: bool,
-    proc_gradient: bool,
-    proc_per_core: bool,
-    proc_mem_bytes: bool,
-    check_temp: bool,
-    cpu_sensor: String,
-    show_coretemp: bool,
-    draw_clock: String,
-    background_update: bool,
-    custom_cpu_name: String,
-    disks_filter: String,
-    update_check: bool,
-    mem_graphs: bool,
-    show_swap: bool,
-    swap_disk: bool,
-    show_disks: bool,
-    net_download: String,
-    net_upload: String,
-    net_color_fixed: bool,
-    net_auto: bool,
-    net_sync: bool,
-    show_battery: bool,
-    show_init: bool,
-    view_mode: ViewMode,
-    log_level: LogLevel,
-    warnings: Vec<String>,
-    info: Vec<String>,
-    changed: bool,
-    config_file: PathBuf,
-    recreate: bool,
-    sorting_options: Vec<SortingOption>,
-    log_levels: Vec<LogLevel>,
-    view_modes: Vec<ViewMode>,
-    cpu_sensors: Vec<String>,
-    _initialized: bool,
+    pub keys: Vec<String>,
+    pub conf_dict: HashMap<String, ConfigItem>,
+    pub attr: HashMap<String, ConfigItem>,
+    pub color_theme: String,
+    pub theme_background: bool,
+    pub update_ms: i64,
+    pub proc_sorting: SortingOption,
+    pub proc_reversed: bool,
+    pub proc_tree: bool,
+    pub tree_depth: i32,
+    pub proc_colors: bool,
+    pub proc_gradient: bool,
+    pub proc_per_core: bool,
+    pub proc_mem_bytes: bool,
+    pub check_temp: bool,
+    pub cpu_sensor: String,
+    pub show_coretemp: bool,
+    pub draw_clock: String,
+    pub background_update: bool,
+    pub custom_cpu_name: String,
+    pub disks_filter: String,
+    pub update_check: bool,
+    pub mem_graphs: bool,
+    pub show_swap: bool,
+    pub swap_disk: bool,
+    pub show_disks: bool,
+    pub net_download: String,
+    pub net_upload: String,
+    pub net_color_fixed: bool,
+    pub net_auto: bool,
+    pub net_sync: bool,
+    pub show_battery: bool,
+    pub show_init: bool,
+    pub view_mode: ViewMode,
+    pub log_level: LogLevel,
+    pub warnings: Vec<String>,
+    pub info: Vec<String>,
+    pub changed: bool,
+    pub config_file: PathBuf,
+    pub recreate: bool,
+    pub sorting_options: Vec<SortingOption>,
+    pub log_levels: Vec<LogLevel>,
+    pub view_modes: Vec<ViewMode>,
+    pub cpu_sensors: Vec<String>,
+    pub _initialized: bool,
 } impl Config {
 
     pub fn new( path : PathBuf, version : String) -> Result<Self, &'static str> {

@@ -1,5 +1,12 @@
 mod config;
 use config::*;
+mod term;
+use term::*;
+mod timeit;
+use timeit::*;
+mod error;
+use error::*;
+
 use std::collections::*;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::*;
@@ -11,52 +18,9 @@ use std::fs::metadata;
 use std::path::*;
 use log::LevelFilter;
 
-struct TimeIt {
-    pub timers: HashMap<String, u128>,
-    pub paused: HashMap<String, u128>,
-} impl TimeIt {
-    fn new() -> TimeIt {
-        TimeIt {
-            timers: HashMap::<String, u128>::new(),
-            paused: HashMap::<String, u128>::new(),
-        }
-    }
-
-    fn start(&mut self, name : String){
-        let local_name = name.clone();
-        self.timers.entry(name).or_insert(0);
-        self.timers.insert(local_name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis());
-    }
-
-    fn pause(&mut self, name : String) {
-        let name_copy = name.clone();
-        let name_copy_2 = name.clone();
-        if self.timers.contains_key(&name_copy){
-            self.paused.entry(name).or_insert(0);
-            self.paused.insert(name_copy, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - self.timers.get(&name_copy_2).unwrap());
-            
-        }
-    }
-
-    fn stop(&mut self, name : String, config_dir : PathBuf) {
-        let name_copy = name.clone();
-        if self.timers.contains_key(&name_copy){
-            if let Some(x) = self.timers.get(&name_copy) {
-                let mut total = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - *x;
-                self.timers.remove(&name_copy);
-                if self.paused.contains_key(&name_copy){
-                    total = total + self.paused.get(&name_copy).unwrap(); 
-                    self.paused.remove(&name_copy);
-                }
-                errlog(config_dir, format!("{} completed in {:.6} seconds", name_copy, total));
-            }
-        }
-    }
-
-}
 
 
-fn main() {
+pub fn main() {
     let errors = vec::Vec::<String>::new();
 
     let SELF_START = SystemTime::now();
@@ -386,24 +350,25 @@ fn main() {
     UNITS.insert("byte", ("Byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "BiB", "GEB"));
     
 
-
-
-}
-
-fn errlog(config_dir : PathBuf, message : String) -> bool {
-    let error_file = "error.log";
-    let error_dir = config_dir.join(PathBuf::from(error_file));
-    let dir = error_dir.to_str().unwrap();
-
-    match simple_logging::log_to_file(dir, LevelFilter::Debug) {
-        Err(e) => throw_error(format!("ERROR!\nNo permission to write to \"{}\" directory with error {}!", config_dir.to_str().unwrap(), e).as_str()),
-        _ => (),
+    let CONFIG = match Config::new(CONFIG_FILE.clone(), VERSION.to_owned()) {
+        Ok(c) => c,
+        Err(e) => {
+            throw_error(e.to_string().as_str());
+            Config::new(CONFIG_FILE.clone(), VERSION.to_owned()).unwrap() //Never reached, but compiler is unhappy, so I bend
+        },
     };
 
-    return true;
+    errlog(CONFIG_DIR, format!("New instance of brshtop version {} started with pid {}", VERSION.to_owned(), std::process::id()));
+    errlog(CONFIG_DIR, format!("Loglevel set to {} (even though, currently, this doesn't work)", CONFIG.log_level));
+
+    let mut arg_output = String::new();
+    for arg in env::args() {
+        arg_output.push_str((arg + " ").as_str());
+    }
+    errlog(CONFIG_DIR, format!("CMD: {}", arg_output));
+
+
+
+
 }
 
-fn throw_error(message : &str){
-    print!("{}", message);
-    std::process::exit(1);
-}
