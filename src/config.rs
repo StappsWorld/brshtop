@@ -50,6 +50,7 @@ pub struct Config {
     keys: Vec<String>,
     conf_dict: HashMap<String, ConfigItem>,
     attr: HashMap<String, ConfigItem>,
+    changed: bool,
     color_theme: String,
     theme_background: bool,
     update_ms: i64,
@@ -128,6 +129,7 @@ pub struct Config {
             keys: keys_unconverted.iter().map(|s| s.to_string()).collect(),
             conf_dict: HashMap::<String, ConfigItem>::new(),
             attr: HashMap::<String, ConfigItem>::new(),
+            changed: false,
             color_theme: "Default".to_string(),
             theme_background: true,
             update_ms: 2000,
@@ -230,7 +232,7 @@ pub struct Config {
                             _ => continue,
                         };
 
-                        initializing_config.attr.insert(key, sender);
+                        initializing_config.setattr(key, sender);
                     }
                 };
             }
@@ -427,11 +429,20 @@ pub struct Config {
                 new_config.insert("cpu_sensor".to_owned(), ConfigItem::Error);
                 self.warnings.push(format!("Config key \"cpu_sensor\" has a malformed value or does not exist!"));
             }
-        }
+        };
 
 
 
         return Ok(new_config);
     }
 
+    pub fn setattr(&mut self, name : String, &value : ConfigItem) {
+        if self._initialized {
+            self.changed = true;
+        }
+        self.attr.insert(name, *value);
+        if !["_initialized", "recreate", "changed"].iter().map(|c| c.to_owned().to_owned()).contains(name) {
+            self.conf_dict.insert(name, value);
+        }
+    }
 }
