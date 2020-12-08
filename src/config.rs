@@ -10,6 +10,7 @@ use std::fmt::{self, Debug, Display};
 
 
 // TODO : Fix macro scope
+#[derive(Clone)]
 pub enum ConfigItem {
     Str(String),
     Int(i64),
@@ -52,6 +53,7 @@ impl fmt::Display for ConfigItem {
         }
     }
 }
+
 
 #[derive(Clone, Copy)]
 pub enum ViewMode {
@@ -163,7 +165,6 @@ pub struct Config {
             keys: keys_unconverted.iter().map(|s| s.to_string()).collect(),
             conf_dict: HashMap::<String, ConfigItem>::new(),
             attr: HashMap::<String, ConfigItem>::new(),
-            changed: false,
             color_theme: "Default".to_string(),
             theme_background: true,
             update_ms: 2000,
@@ -474,9 +475,18 @@ pub struct Config {
         if self._initialized {
             self.changed = true;
         }
-        self.attr.insert(name, *value);
-        if !["_initialized", "recreate", "changed"].iter().map(|c| c.to_owned().to_owned()).contains(name) {
-            self.conf_dict.insert(name, value);
+        let name_copy_1 = name.clone();
+        let value_copy_1 = value.clone();
+        self.attr.insert(name_copy_1, value_copy_1);
+
+        let test_values = vec!["_initialized", "recreate", "changed"];
+        let test_values_converted: Vec<String> = test_values.iter().map(|s| s.to_owned().to_owned()).collect();
+        let name_copy_2 = name.clone();
+        
+        if test_values_converted.contains(&name_copy_2) {
+            let name_copy_3 = name.clone();
+            let value_copy_2 = value.clone();
+            self.conf_dict.insert(name_copy_3, value_copy_2);
         }
     }
 
@@ -486,10 +496,10 @@ pub struct Config {
         }
 
         if self.config_file.is_file() {
-            let vals : HashMap<&str, &str> = self.conf_dict.iter().map(|(key, value)| (key.as_str(), value.to_string().as_str())).collect();
-            match write(self.config_file, DEFAULT_CONF.render(&vals)) {
-                Err(e) => Err(format!("Unable to save the config file with error {}", e.to_string())),
-                _ => Ok(String::from("Saved successfully")),
+            let vals : HashMap<String, String> = self.conf_dict.iter().map(|(key, value)| (key.clone(), value.clone().to_string())).collect();
+            match write(self.config_file.clone(), DEFAULT_CONF.render(&vals.iter().map(|(key, value)| (key.as_str(), value.as_str())).collect())) {
+                Err(e) => return Err(format!("Unable to save the config file with error {}", e.to_string())),
+                _ => return Ok(String::from("Saved successfully")),
             };
         }
         Err(String::from("Default configuration file is not a writable file"))
