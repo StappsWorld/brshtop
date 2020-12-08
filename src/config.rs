@@ -480,14 +480,18 @@ pub struct Config {
         }
     }
 
-    pub fn save_config(&mut self, DEFAULT_CONF: string_template::Template) {
+    pub fn save_config(&mut self, DEFAULT_CONF: string_template::Template) -> Result<String, String> {
         if !self.changed && !self.recreate {
-            return;
+            return Ok(String::from("Nothing needs to be changed"));
         }
 
         if self.config_file.is_file() {
-            match write(self.config_file, DEFAULT_CONF.render(vals))
+            let vals : HashMap<&str, &str> = self.conf_dict.iter().map(|(key, value)| (key.as_str(), value.to_string().as_str())).collect();
+            match write(self.config_file, DEFAULT_CONF.render(&vals)) {
+                Err(e) => Err(format!("Unable to save the config file with error {}", e.to_string())),
+                _ => Ok(String::from("Saved successfully")),
+            };
         }
-        return;
+        Err(String::from("Default configuration file is not a writable file"))
     }
 }
