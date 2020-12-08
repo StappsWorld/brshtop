@@ -1,12 +1,21 @@
 use std::collections::*;
 use std::path::*;
-use psutil::*;
 use psutil::sensors::*;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::prelude::*;
+use lenient_bool::LenientBool;
 
+
+// TODO : Fix macro scope
 pub enum ConfigItem {
     Str(String),
     Int(i64),
     Bool(bool),
+    ViewMode(ViewMode),
+    LogLevel(LogLevel),
+    SortingOption(SortingOption),
+    Error,
 }
 
 pub enum ViewMode {
@@ -14,6 +23,7 @@ pub enum ViewMode {
     Proc,
     Stat,
 }
+
 pub enum LogLevel {
     Error,
     Warning,
@@ -30,6 +40,9 @@ pub enum SortingOption {
     Memory,
     Cpu { lazy: bool },
 }
+
+
+
 pub struct Config {
     keys: Vec<String>,
     conf_dict: HashMap<String, ConfigItem>,
@@ -68,7 +81,7 @@ pub struct Config {
     warnings: Vec<String>,
     info: Vec<String>,
     changed: bool,
-    config_file: String,
+    config_file: PathBuf,
     recreate: bool,
     sorting_options: Vec<SortingOption>,
     log_levels: Vec<LogLevel>,
@@ -77,21 +90,9 @@ pub struct Config {
     _initialized: bool,
 } impl Config {
 
-    pub fn new( path : PathBuf) -> Self {
+    pub fn new( path : PathBuf) -> Result<Self, &'static str> {
 
         let mut cpu_sensors_mut : Vec::<String> = vec!["Auto"].iter().map(|s| s.to_string()).collect();
-
-        /*if hasattr(psutil, "sensors_temperatures"):
-                try:
-                    _temps = psutil.sensors_temperatures()
-                    if _temps:
-                        for _name, _entries in _temps.items():
-                            for _num, _entry in enumerate(_entries, 1):
-                                if hasattr(_entry, "current"):
-                                    cpu_sensors.append("{_name}:{_num if _entry.label == "" else _entry.label}")
-                except:
-                    pass
-        */
         let _temps = temperatures();
         let mut num = 1;
         for res in _temps{
@@ -118,8 +119,8 @@ pub struct Config {
         "proc_colors", "proc_gradient", "proc_per_core", "proc_mem_bytes", "disks_filter", "update_check", "log_level", "mem_graphs", "show_swap",
         "swap_disk", "show_disks", "net_download", "net_upload", "net_auto", "net_color_fixed", "show_init", "view_mode", "theme_background",
         "net_sync", "show_battery", "tree_depth", "cpu_sensor", "show_coretemp"];
-        
-        Config {
+
+        let mut initializing_config = Config {
             keys: keys_unconverted.iter().map(|s| s.to_string()).collect(),
             conf_dict: HashMap::<String, ConfigItem>::new(),
             color_theme: "Default".to_string(),
@@ -162,10 +163,209 @@ pub struct Config {
             cpu_sensors: cpu_sensors_mut,
             changed: false,
             recreate: false,
-            config_file: String::from(""),
+            config_file: path,
             _initialized: false,
+        };
+
+        let conf_dict_mut = match Config::load_config(&mut initializing_config) {
+            Ok(d) => d,
+            Err(e) => return Err(e)
+        };
+
+
+        
+        Ok(initializing_config)
+
+    }
+
+    /// Returns a HashMap<String, ConfigItem> from the configuration file
+    pub fn load_config(&mut self) -> Result<HashMap<String, ConfigItem>, &'static str> {
+        let mut new_config = HashMap::<String, ConfigItem>::new();
+
+        let mut conf_file = PathBuf::new();
+
+        if self.config_file.is_file() {
+            conf_file = self.config_file.clone();
+        } else if PathBuf::from("/etc/brshtop.conf").is_file() {
+            conf_file = PathBuf::from("/etc/brshtop.conf");
+        } else {
+            return Err("Could not find config file.");
         }
 
+        let file = match File::open(conf_file) {
+            Ok(f) => f,
+            Err(e) => return Err("Unable to read config file."),
+        };
+        let mut buf_reader = BufReader::new(file);
+
+       for line in buf_reader.lines(){
+            match line {
+                Ok(l) => {
+                    let mut l_stripped_before = l.clone();
+                    l_stripped_before = l_stripped_before.trim_start().to_owned();
+                    l_stripped_before = l_stripped_before.trim_end().to_owned();
+                    let mut l_stripped_config = l_stripped_before.clone();
+
+                    if l_stripped_config.starts_with("#? Config") {
+
+                        let index_of_version = match l_stripped_config.find("v. ") {
+                            Some(i) => i,
+                            None => return Err("Malformed configuration file."),
+                        };
+
+                        new_config.insert(String::from("version"), ConfigItem::Str(l_stripped_config[(index_of_version + 3 as usize)..].to_owned()));
+                        continue;
+                    }
+
+                    for key in &self.keys {
+                        let mut l_stripped = l_stripped_before.clone();
+                        if l_stripped.starts_with(key) {
+                            l_stripped = l_stripped.replace(&(key.to_owned() + "="), "");
+                            if l_stripped.starts_with('"') {
+                                l_stripped.retain(|c| c != '"');
+                            }
+
+                            match key.as_str() {
+                                "proc_sorting" => {
+                                    let mut to_insert : SortingOption;
+                                    match l_stripped.as_str() {
+                                        "pid" => to_insert = SortingOption::Pid,
+                                        "program" => to_insert = SortingOption::Program,
+                                        "arguments" => to_insert = SortingOption::Arguments,
+                                        "threads" => to_insert = SortingOption::Threads,
+                                        "user" => to_insert = SortingOption::User,
+                                        "memory" => to_insert = SortingOption::Memory,
+                                        "cpu" => to_insert = SortingOption::Cpu{lazy : false},
+                                        "cpu lazy" => to_insert = SortingOption::Cpu{lazy : true},
+                                        _ => {
+                                            self.warnings.push("Config key \"proc_sorted\" didn\'t get an acceptable value!".to_owned());
+                                            new_config.insert(key.to_owned(), ConfigItem::Error);
+                                            continue;
+                                        },
+                                    };
+                                    new_config.insert(key.to_owned(), ConfigItem::SortingOption(to_insert));
+                                    continue;
+                                },
+                                "log_level" => {
+                                    let mut to_insert : LogLevel;
+                                    match l_stripped.as_str() {
+                                        "error" => to_insert = LogLevel::Error,
+                                        "warning" => to_insert = LogLevel::Warning,
+                                        "info" => to_insert = LogLevel::Info,
+                                        "debug" => to_insert = LogLevel::Debug,
+                                        _ => {
+                                            self.warnings.push("Config key \"log_level\" didn\'t get an acceptable value!".to_owned());
+                                            new_config.insert(key.to_owned(), ConfigItem::Error);
+                                            continue;
+                                        }
+                                    };
+                                    new_config.insert(key.to_owned(), ConfigItem::LogLevel(to_insert));
+                                    continue;
+                                },
+                                "view_mode" => {
+                                    let mut to_insert : ViewMode;
+                                    match l_stripped.as_str() {
+                                    "full" => to_insert = ViewMode::Full,
+                                    "proc" => to_insert = ViewMode::Proc,
+                                    "stat" => to_insert = ViewMode::Stat,
+                                    _ => {
+                                        self.warnings.push("Config key \"view_mode\" didn\'t get an acceptable value!".to_owned());
+                                        new_config.insert(key.to_owned(), ConfigItem::Error);
+                                        continue;
+                                    }
+                                    };
+                                    new_config.insert(key.to_owned(), ConfigItem::ViewMode(to_insert));
+                                    continue;
+                                },
+                                _ => (),
+                            }
+
+                            let check_numeric : Vec<bool> = l_stripped.chars().map(|c| c.is_numeric()).collect();
+                            if !check_numeric.contains(&false) {
+                                let i = match l_stripped.parse::<i64>() {
+                                    Ok(i) => i,
+                                    Err(_e) => {
+                                        self.warnings.push(format!("Config key \"{}\" should be an integer (was \"{}\")!", key, l_stripped));
+                                        continue;
+                                    },
+                                  };
+                                
+                                if key == "update_ms" && i < 100 {
+                                    self.warnings.push("Config key \"update_ms\" can\'t be lower than 100!".to_owned());
+                                    new_config.insert(key.to_owned(), ConfigItem::Int(100));
+                                    continue;
+                                }
+
+                                new_config.insert(key.to_owned(), ConfigItem::Int(i));
+                                continue;
+                            }
+
+                            match l_stripped.parse::<LenientBool>(){
+                                Ok(b) => {
+                                    new_config.insert(key.to_owned(), ConfigItem::Bool(b.into()));
+                                    continue;
+                                },
+                                Err(e) => (),
+                            };
+
+                            new_config.insert(key.to_owned(), ConfigItem::Str(l_stripped));
+                           
+                        }
+                    }
+                }
+                Err(e) => return Err("Unable to read config file."),
+            };
+        }
+
+        for net_name in ["net_download", "net_upload"].iter() {
+            if new_config.contains_key(net_name.to_owned()) {
+                match new_config.get(net_name.to_owned()).unwrap() {
+                    ConfigItem::Str(s) => {
+                        match s.chars().next() {
+                            Some(c) => {
+                                if !c.is_numeric() {
+                                    new_config.insert(net_name.to_owned().to_string(), ConfigItem::Error);
+                                    self.warnings.push(format!("Config key \"{}\" didn\'t get an acceptable value!", net_name));
+                                }
+                            }
+                            None => {
+                                new_config.insert(net_name.to_owned().to_string(), ConfigItem::Error);
+                                self.warnings.push(format!("Config key \"{}\" didn\'t get an acceptable value!", net_name));
+                            }
+                        };
+                    }
+                    _ => {
+                        new_config.insert(net_name.to_owned().to_string(), ConfigItem::Error);
+                        self.warnings.push(format!("Config key \"{}\" didn\'t get an acceptable value!", net_name));
+                    }
+                }
+            }
+        }
+
+        match new_config.get("cpu_sensor") {
+            Some(c) => {
+                match c {
+                    ConfigItem::Str(s) => {
+                        if !self.cpu_sensor.contains(s) {
+                            new_config.insert("cpu_sensor".to_owned(), ConfigItem::Error);
+                            self.warnings.push(format!("Config key \"cpu_sensor\" does not contain an available sensor!"));
+                        }
+                    },
+                    _ => {
+                        new_config.insert("cpu_sensor".to_owned(), ConfigItem::Error);
+                        self.warnings.push(format!("Config key \"cpu_sensor\" has a malformed value!"));
+                    }
+                }
+            },
+            None => {
+                new_config.insert("cpu_sensor".to_owned(), ConfigItem::Error);
+                self.warnings.push(format!("Config key \"cpu_sensor\" has a malformed value or does not exist!"));
+            }
+        }
+
+
+
+        return Ok(new_config);
     }
 
 }

@@ -14,9 +14,7 @@ use log::LevelFilter;
 struct TimeIt {
     pub timers: HashMap<String, u128>,
     pub paused: HashMap<String, u128>,
-}
-
-impl TimeIt {
+} impl TimeIt {
     fn new() -> TimeIt {
         TimeIt {
             timers: HashMap::<String, u128>::new(),
@@ -25,13 +23,17 @@ impl TimeIt {
     }
 
     fn start(&mut self, name : String){
-        self.timers.insert(name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis());
+        let local_name = name.clone();
+        self.timers.entry(name).or_insert(0);
+        self.timers.insert(local_name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis());
     }
 
     fn pause(&mut self, name : String) {
         let name_copy = name.clone();
+        let name_copy_2 = name.clone();
         if self.timers.contains_key(&name_copy){
-            self.paused.insert(name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - self.timers.get(&name_copy).unwrap());
+            self.paused.entry(name).or_insert(0);
+            self.paused.insert(name_copy, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - self.timers.get(&name_copy_2).unwrap());
             
         }
     }
@@ -287,49 +289,53 @@ fn main() {
 
     let THREAD_ERROR = 0;
 
-    let mut DEFAULT_THEME = HashMap::new();
-    DEFAULT_THEME.insert("main_bg", "");
-    DEFAULT_THEME.insert("main_fg" , "#cc",);
-    DEFAULT_THEME.insert("title" , "#ee",);
-    DEFAULT_THEME.insert("hi_fg" , "#969696",);
-    DEFAULT_THEME.insert("selected_bg" , "#7e2626",);
-    DEFAULT_THEME.insert("selected_fg" , "#ee",);
-    DEFAULT_THEME.insert("inactive_fg" , "#40",);
-    DEFAULT_THEME.insert("graph_text" , "#60",);
-    DEFAULT_THEME.insert("meter_bg" , "#40",);
-    DEFAULT_THEME.insert("proc_misc" , "#0de756",);
-    DEFAULT_THEME.insert("cpu_box" , "#3d7b46",);
-    DEFAULT_THEME.insert("mem_box" , "#8a882e",);
-    DEFAULT_THEME.insert("net_box" , "#423ba5",);
-    DEFAULT_THEME.insert("proc_box" , "#923535",);
-    DEFAULT_THEME.insert("div_line" , "#30",);
-    DEFAULT_THEME.insert("temp_start" , "#4897d4",);
-    DEFAULT_THEME.insert("temp_mid" , "#5474e8",);
-    DEFAULT_THEME.insert("temp_end" , "#ff40b6",);
-    DEFAULT_THEME.insert("cpu_start" , "#50f095",);
-    DEFAULT_THEME.insert("cpu_mid" , "#f2e266",);
-    DEFAULT_THEME.insert("cpu_end" , "#fa1e1e",);
-    DEFAULT_THEME.insert("free_start" , "#223014",);
-    DEFAULT_THEME.insert("free_mid" , "#b5e685",);
-    DEFAULT_THEME.insert("free_end" , "#dcff85",);
-    DEFAULT_THEME.insert("cached_start" , "#0b1a29",);
-    DEFAULT_THEME.insert("cached_mid" , "#74e6fc",);
-    DEFAULT_THEME.insert("cached_end" , "#26c5ff",);
-    DEFAULT_THEME.insert("available_start" , "#292107",);
-    DEFAULT_THEME.insert("available_mid" , "#ffd77a",);
-    DEFAULT_THEME.insert("available_end" , "#ffb814",);
-    DEFAULT_THEME.insert("used_start" , "#3b1f1c",);
-    DEFAULT_THEME.insert("used_mid" , "#d9626d",);
-    DEFAULT_THEME.insert("used_end" , "#ff4769",);
-    DEFAULT_THEME.insert("download_start" , "#231a63",);
-    DEFAULT_THEME.insert("download_mid" , "#4f43a3",);
-    DEFAULT_THEME.insert("download_end" , "#b0a9de",);
-    DEFAULT_THEME.insert("upload_start" , "#510554",);
-    DEFAULT_THEME.insert("upload_mid" , "#7d4180",);
-    DEFAULT_THEME.insert("upload_end" , "#dcafde",);
-    DEFAULT_THEME.insert("process_start" , "#80d0a3",);
-    DEFAULT_THEME.insert("process_mid" , "#dcd179",);
-    DEFAULT_THEME.insert("process_end" , "#d45454",);
+    let mut DEFAULT_THEME: HashMap<&str, &str> = 
+    [
+        ("main_bg" , ""),
+        ("main_fg" , "#cc"),
+        ("title" , "#ee"),
+        ("hi_fg" , "#969696"),
+        ("selected_bg" , "#7e2626"),
+        ("selected_fg" , "#ee"),
+        ("inactive_fg" , "#40"),
+        ("graph_text" , "#60"),
+        ("meter_bg" , "#40"),
+        ("proc_misc" , "#0de756"),
+        ("cpu_box" , "#3d7b46"),
+        ("mem_box" , "#8a882e"),
+        ("net_box" , "#423ba5"),
+        ("proc_box" , "#923535"),
+        ("div_line" , "#30"),
+        ("temp_start" , "#4897d4"),
+        ("temp_mid" , "#5474e8"),
+        ("temp_end" , "#ff40b6"),
+        ("cpu_start" , "#50f095"),
+        ("cpu_mid" , "#f2e266"),
+        ("cpu_end" , "#fa1e1e"),
+        ("free_start" , "#223014"),
+        ("free_mid" , "#b5e685"),
+        ("free_end" , "#dcff85"),
+        ("cached_start" , "#0b1a29"),
+        ("cached_mid" , "#74e6fc"),
+        ("cached_end" , "#26c5ff"),
+        ("available_start" , "#292107"),
+        ("available_mid" , "#ffd77a"),
+        ("available_end" , "#ffb814"),
+        ("used_start" , "#3b1f1c"),
+        ("used_mid" , "#d9626d"),
+        ("used_end" , "#ff4769"),
+        ("download_start" , "#231a63"),
+        ("download_mid" , "#4f43a3"),
+        ("download_end" , "#b0a9de"),
+        ("upload_start" , "#510554"),
+        ("upload_mid" , "#7d4180"),
+        ("upload_end" , "#dcafde"),
+        ("process_start" , "#80d0a3"),
+        ("process_mid" , "#dcd179"),
+        ("process_end" , "#d45454"),
+    ].iter().cloned().collect();
+
+
 
     let mut MENUS = HashMap::new();
 

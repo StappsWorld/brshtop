@@ -96,6 +96,7 @@ version = "0.0.1"
 dependencies = [
  "clap",
  "expanduser",
+ "lenient_bool",
  "log",
  "psutil",
  "simple-logging",
@@ -306,6 +307,12 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "lenient_bool"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57eeaed462e96d277051c219bf5e2ed22aedf7705d8945d2decb8b2db8fb954d"
 
 [[package]]
 name = "libc"
