@@ -1,10 +1,12 @@
 use std::collections::*;
 use std::path::*;
 use psutil::sensors::*;
-use std::fs::File;
+use std::fs::{File, read, write};
 use std::io::BufReader;
 use std::io::prelude::*;
 use lenient_bool::LenientBool;
+use std::fmt::{self, Debug, Display};
+
 
 
 // TODO : Fix macro scope
@@ -16,6 +18,39 @@ pub enum ConfigItem {
     LogLevel(LogLevel),
     SortingOption(SortingOption),
     Error,
+}
+impl fmt::Display for ConfigItem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ConfigItem::Str(s) =>  write!(f, "{:?}", s),
+            ConfigItem::Int(i) => write!(f, "{:?}", i),
+            ConfigItem::Bool(b) => write!(f, "{:?}", b),
+            ConfigItem::Error => write!(f, "{:?}", "_error_"),
+            ConfigItem::ViewMode(v) => match v {
+                ViewMode::Full => write!(f, "{:?}", "full"),
+                ViewMode::Proc => write!(f, "{:?}", "proc"),
+                ViewMode::Stat => write!(f, "{:?}", "stat"),
+            },
+            ConfigItem::LogLevel(l) => match l {
+                LogLevel::Error => write!(f, "{:?}", "error"),
+                LogLevel::Warning => write!(f, "{:?}", "warning"),
+                LogLevel::Info => write!(f, "{:?}", "info"),
+                LogLevel::Debug => write!(f, "{:?}", "debug"),
+            },
+            ConfigItem::SortingOption(s) => match s {
+                SortingOption::Pid => write!(f, "{:?}", "pid"),
+                SortingOption::Program => write!(f, "{:?}", "program"),
+                SortingOption::Arguments => write!(f, "{:?}", "arguments"),
+                SortingOption::Threads => write!(f, "{:?}", "threads"),
+                SortingOption::User => write!(f, "{:?}", "user"),
+                SortingOption::Memory => write!(f, "{:?}", "memory"),
+                SortingOption::Cpu{lazy : b} => match b {
+                    true => write!(f, "{:?}", "cpu lazy"),
+                    false => write!(f, "{:?}", "cpu"),
+                },
+            },
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -50,7 +85,6 @@ pub struct Config {
     keys: Vec<String>,
     conf_dict: HashMap<String, ConfigItem>,
     attr: HashMap<String, ConfigItem>,
-    changed: bool,
     color_theme: String,
     theme_background: bool,
     update_ms: i64,
@@ -436,7 +470,7 @@ pub struct Config {
         return Ok(new_config);
     }
 
-    pub fn setattr(&mut self, name : String, &value : ConfigItem) {
+    pub fn setattr(&mut self, name : String, value : ConfigItem) {
         if self._initialized {
             self.changed = true;
         }
@@ -444,5 +478,16 @@ pub struct Config {
         if !["_initialized", "recreate", "changed"].iter().map(|c| c.to_owned().to_owned()).contains(name) {
             self.conf_dict.insert(name, value);
         }
+    }
+
+    pub fn save_config(&mut self, DEFAULT_CONF: string_template::Template) {
+        if !self.changed && !self.recreate {
+            return;
+        }
+
+        if self.config_file.is_file() {
+            match write(self.config_file, DEFAULT_CONF.render(vals))
+        }
+        return;
     }
 }
