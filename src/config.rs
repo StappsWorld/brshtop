@@ -49,6 +49,7 @@ pub enum SortingOption {
 pub struct Config {
     keys: Vec<String>,
     conf_dict: HashMap<String, ConfigItem>,
+    attr: HashMap<String, ConfigItem>,
     color_theme: String,
     theme_background: bool,
     update_ms: i64,
@@ -126,6 +127,7 @@ pub struct Config {
         let mut initializing_config = Config {
             keys: keys_unconverted.iter().map(|s| s.to_string()).collect(),
             conf_dict: HashMap::<String, ConfigItem>::new(),
+            attr: HashMap::<String, ConfigItem>::new(),
             color_theme: "Default".to_string(),
             theme_background: true,
             update_ms: 2000,
@@ -193,14 +195,16 @@ pub struct Config {
             }
         }
 
-        for key in initializing_config.keys {
+        let keys_for_loop : Vec<String> = initializing_config.keys.iter().map(|c| c.clone()).collect();
+
+        for key in  keys_for_loop{
             if conf.contains_key(&key) {
                 match conf.get(&key).unwrap() {
                     ConfigItem::Error => {
                         
                         initializing_config.recreate = true;
 
-                        let sender = match conf.get(&key).unwrap() {
+                        let sender = match initializing_config.attr.get(&key).unwrap() {
                             ConfigItem::Str(s) => ConfigItem::Str(String::from(s)),
                             ConfigItem::Int(i) => ConfigItem::Int(*i),
                             ConfigItem::Bool(b) => ConfigItem::Bool(*b),
@@ -214,11 +218,24 @@ pub struct Config {
                         initializing_config.conf_dict.insert(key, sender);
                     },
                     _ => {
-                        initializing_config.
+
+                        let sender = match conf.get(&key).unwrap() {
+                            ConfigItem::Str(s) => ConfigItem::Str(String::from(s)),
+                            ConfigItem::Int(i) => ConfigItem::Int(*i),
+                            ConfigItem::Bool(b) => ConfigItem::Bool(*b),
+                            ConfigItem::ViewMode(v) => ConfigItem::ViewMode(*v),
+                            ConfigItem::LogLevel(l) => ConfigItem::LogLevel(*l),
+                            ConfigItem::SortingOption(s) => ConfigItem::SortingOption(*s),
+                            ConfigItem::Error => ConfigItem::Error,
+                            _ => continue,
+                        };
+
+                        initializing_config.attr.insert(key, sender);
                     }
-                }
+                };
             }
         }
+        initializing_config._initialized = true;
         
 
 
