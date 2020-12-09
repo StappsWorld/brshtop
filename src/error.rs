@@ -1,16 +1,19 @@
 use std::path::*;
-use log::LevelFilter;
+use log::{
+    LevelFilter,
+    debug};
 
 
-pub fn errlog(config_dir : &Path, message : String) {
+pub fn errlog<P: AsRef<Path>>(config_dir: P, message: String) {
     let error_file = "log.log";
-    let error_dir = config_dir.join(PathBuf::from(error_file));
+    let error_dir = config_dir.as_ref().join(PathBuf::from(error_file));
     let dir = error_dir.to_str().unwrap();
 
     match simple_logging::log_to_file(dir, LevelFilter::Debug) {
-        Err(e) => throw_error(format!("ERROR!\nNo permission to write to \"{}\" directory with error {}!", config_dir.to_str().unwrap(), e).as_str()),
+        Err(e) => throw_error(format!("ERROR!\nNo permission to write to \"{}\" directory with error {}!", config_dir.as_ref().to_str().unwrap(), e).as_str()),
         _ => (),
     };
+    debug!("{}", message);
 
     return;
 }

@@ -48,7 +48,7 @@ pub fn main() {
         .version(clap::crate_version!())
         .author(
             ("Aristocratos (jakob@qvantnet.com)\n".to_owned()
-                + "Samuel Rembisz <sjrembisz07@gmail.com)"
+                + "Samuel Rembisz <sjrembisz07@gmail.com)\n"
                 + "Charlie Thomson <charliecthomson@gmail.com")
                 .as_str(),
         )
