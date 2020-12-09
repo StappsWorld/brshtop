@@ -1,4 +1,5 @@
 use crate::error::*;
+mod event;
 use crate::event::Event;
 use std::thread;
 use std::sync::mpsc::*;
