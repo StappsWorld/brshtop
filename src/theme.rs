@@ -1,9 +1,12 @@
 use {
+    from_map::FromMap,
     lazy_static::lazy_static,
     regex::Regex,
     std::{
+        collections::HashMap,
         fs::File,
         io::{self, Read},
+        iter::FromIterator,
         path::Path,
     },
 };
@@ -21,7 +24,7 @@ enum LayerDepth {
     Bg,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Color {
     r: u8,
     g: u8,
@@ -117,6 +120,11 @@ impl Color {
         }
     }
 }
+impl std::default::Default for Color {
+    fn default() -> Self {
+        Self::Default()
+    }
+}
 impl std::fmt::Display for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.escape())
@@ -128,6 +136,8 @@ impl std::fmt::UpperHex for Color {
     }
 }
 
+#[derive(FromMap)]
+#[value_type = "Color"]
 pub struct Theme {
     pub main_bg: Color,
     pub main_fg: Color,
@@ -175,20 +185,30 @@ pub struct Theme {
 impl Theme {
     fn from_str<S: ToString>(s: S) -> Result<Self, String> {
         let s = s.to_string();
-        let map = s
-            .split('\n')
-            .filter(|line| !line.starts_with("#") && THEME_SELECTOR.is_match(line))
-            .map(|line| {
-                let captures = match THEME_SELECTOR.captures(line) {
-                    Some(caps) => caps,
-                    None => unreachable!(),
-                };
-                (
-                    captures.get(1).unwrap().as_str(),
-                    Color::new(captures.get(2).unwrap().as_str()),
-                )
-            });
-        Err("".into())
+        let map: HashMap<String, Color> = HashMap::from_iter(
+            s.split('\n')
+                .filter(|line| !line.starts_with("#") && THEME_SELECTOR.is_match(line))
+                .map(|line: &str| -> Result<(String, Color), String> {
+                    let captures = match THEME_SELECTOR.captures(line) {
+                        Some(caps) => caps,
+                        None => unreachable!(),
+                    };
+                    Ok((
+                        captures.get(1).unwrap().as_str().into(),
+                        Color::new(captures.get(2).unwrap().as_str())?,
+                    ))
+                })
+                .filter(|result| {
+                    if let Err(msg) = result {
+                        // errlog(config_dir: &Path, message: String)
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .map(|res| res.unwrap()),
+        );
+        Ok(Self::from_map(map))
     }
 
     pub fn try_from<R>(mut reader: R) -> Result<Self, String>
