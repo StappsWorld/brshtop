@@ -1,13 +1,9 @@
 use crate::error::*;
+use crate::event::Event;
 use std::thread;
 use std::sync::mpsc::*;
 use terminal_size::{Width, Height, terminal_size};
 
-
-pub enum Event {
-    Flag(bool),
-    Wait,
-}
 
 struct Term {
     pub width: u16,

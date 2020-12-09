@@ -6,6 +6,8 @@ mod timeit;
 use timeit::*;
 mod error;
 use error::*;
+mod event;
+use event::Event;
 
 use std::collections::*;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
