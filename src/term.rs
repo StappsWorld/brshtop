@@ -1,10 +1,11 @@
 use crate::error::*;
 use crate::event::Event;
+use crate::theme::Color;
 use std::sync::mpsc::*;
 use std::thread;
 use terminal_size::{terminal_size, Height, Width};
 
-struct Term {
+pub struct Term {
     pub width: u16,
     pub height: u16,
     pub resized: bool,
@@ -39,5 +40,13 @@ impl Term {
             }
             None => throw_error("Unable to get size of terminal!"),
         };
+    }
+
+    pub fn width() -> u16 {
+        0
+    }
+
+    pub fn fg() -> Color {
+        Color::default()
     }
 }

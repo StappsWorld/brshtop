@@ -1,14 +1,14 @@
 use lenient_bool::LenientBool;
 use psutil::sensors::*;
 use std::collections::*;
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::fs::{read, write, File};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::*;
 
 // TODO : Fix macro scope
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConfigItem {
     Str(String),
     Int(i64),
@@ -18,48 +18,77 @@ pub enum ConfigItem {
     SortingOption(SortingOption),
     Error,
 }
-impl fmt::Display for ConfigItem {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for ConfigItem {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             ConfigItem::Str(s) => write!(f, "{:?}", s),
             ConfigItem::Int(i) => write!(f, "{:?}", i),
             ConfigItem::Bool(b) => write!(f, "{:?}", b),
             ConfigItem::Error => write!(f, "{:?}", "_error_"),
-            ConfigItem::ViewMode(v) => match v {
-                ViewMode::Full => write!(f, "{:?}", "full"),
-                ViewMode::Proc => write!(f, "{:?}", "proc"),
-                ViewMode::Stat => write!(f, "{:?}", "stat"),
-            },
-            ConfigItem::LogLevel(l) => match l {
-                LogLevel::Error => write!(f, "{:?}", "error"),
-                LogLevel::Warning => write!(f, "{:?}", "warning"),
-                LogLevel::Info => write!(f, "{:?}", "info"),
-                LogLevel::Debug => write!(f, "{:?}", "debug"),
-            },
-            ConfigItem::SortingOption(s) => match s {
-                SortingOption::Pid => write!(f, "{:?}", "pid"),
-                SortingOption::Program => write!(f, "{:?}", "program"),
-                SortingOption::Arguments => write!(f, "{:?}", "arguments"),
-                SortingOption::Threads => write!(f, "{:?}", "threads"),
-                SortingOption::User => write!(f, "{:?}", "user"),
-                SortingOption::Memory => write!(f, "{:?}", "memory"),
-                SortingOption::Cpu { lazy: b } => match b {
-                    true => write!(f, "{:?}", "cpu lazy"),
-                    false => write!(f, "{:?}", "cpu"),
-                },
-            },
+            ConfigItem::ViewMode(v) => write!(f, "{:?}", v),
+            ConfigItem::LogLevel(l) => write!(f, "{:?}", l),
+            ConfigItem::SortingOption(s) => write!(f, "{:?}", s),
         }
     }
 }
+impl ConfigItem {
+    fn sorting_option(s: &String) -> Result<Self, String> {
+        Ok(ConfigItem::SortingOption(match s.to_string().as_str() {
+            "pid" => SortingOption::Pid,
+            "program" => SortingOption::Program,
+            "arguments" => SortingOption::Arguments,
+            "threads" => SortingOption::Threads,
+            "user" => SortingOption::User,
+            "memory" => SortingOption::Memory,
+            "cpu" => SortingOption::Cpu { lazy: false },
+            "cpu lazy" => SortingOption::Cpu { lazy: true },
+            bad => {
+                return Err(format!(
+                    r#"Config key "proc_sorted" had an unknown value: {}"#,
+                    bad
+                ));
+            }
+        }))
+    }
 
-#[derive(Clone, Copy)]
+    fn log_level(s: &String) -> Result<Self, String> {
+        Ok(match s.to_string().as_str() {
+            "error" => ConfigItem::LogLevel(LogLevel::Error),
+            "warning" => ConfigItem::LogLevel(LogLevel::Warning),
+            "info" => ConfigItem::LogLevel(LogLevel::Info),
+            "debug" => ConfigItem::LogLevel(LogLevel::Debug),
+            bad => {
+                return Err(format!(
+                    r#"Config key "log_level" had an unknown value: {}"#,
+                    bad
+                ));
+            }
+        })
+    }
+
+    fn view_mode(s: &String) -> Result<Self, String> {
+        Ok(match s.to_string().as_str() {
+            "full" => ConfigItem::ViewMode(ViewMode::Full),
+            "proc" => ConfigItem::ViewMode(ViewMode::Proc),
+            "stat" => ConfigItem::ViewMode(ViewMode::Stat),
+            bad => {
+                return Err(format!(
+                    r#"Config key "view_mode" had an unknown value: {}"#,
+                    bad
+                ));
+            }
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ViewMode {
     Full,
     Proc,
     Stat,
 }
-impl fmt::Display for ViewMode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for ViewMode {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             ViewMode::Full => write!(f, "{:?}", "full"),
             ViewMode::Proc => write!(f, "{:?}", "proc"),
@@ -68,15 +97,15 @@ impl fmt::Display for ViewMode {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LogLevel {
     Error,
     Warning,
     Info,
     Debug,
 }
-impl fmt::Display for LogLevel {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for LogLevel {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             LogLevel::Error => write!(f, "{:?}", "error"),
             LogLevel::Warning => write!(f, "{:?}", "warning"),
@@ -86,7 +115,7 @@ impl fmt::Display for LogLevel {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SortingOption {
     Pid,
     Program,
@@ -96,8 +125,8 @@ pub enum SortingOption {
     Memory,
     Cpu { lazy: bool },
 }
-impl fmt::Display for SortingOption {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for SortingOption {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             SortingOption::Pid => write!(f, "{:?}", "pid"),
             SortingOption::Program => write!(f, "{:?}", "program"),
@@ -154,6 +183,7 @@ pub struct Config {
     pub changed: bool,
     pub config_file: PathBuf,
     pub recreate: bool,
+    // TODO: We probably don't need these
     pub sorting_options: Vec<SortingOption>,
     pub log_levels: Vec<LogLevel>,
     pub view_modes: Vec<ViewMode>,
@@ -162,22 +192,16 @@ pub struct Config {
 }
 impl Config {
     pub fn new(path: PathBuf, version: String) -> Result<Self, &'static str> {
-        let mut cpu_sensors_mut: Vec<String> = vec!["Auto"].iter().map(|s| s.to_string()).collect();
-        let _temps = temperatures();
+        let mut cpu_sensors_mut: Vec<String> = vec!["Auto".into()];
         let mut num = 1;
-        for res in _temps {
+        for res in temperatures() {
             match res {
                 Ok(t) => {
-                    let name = t.unit().to_owned();
-                    let label_option = t.label();
-                    match label_option {
-                        Some(l) => {
-                            cpu_sensors_mut.push(format!("{}:{}", name, l));
-                        }
-                        None => {
-                            cpu_sensors_mut.push(format!("{}:{}", name, num));
-                        }
-                    };
+                    cpu_sensors_mut.push(format!(
+                        "{}-{}",
+                        t.unit(),
+                        t.label().unwrap_or(&num.to_string())
+                    ));
 
                     num += 1;
                 }
@@ -258,6 +282,7 @@ impl Config {
             log_level: LogLevel::Warning,
             warnings: Vec::<String>::new(),
             info: Vec::<String>::new(),
+            // TODO: We probably don't need these
             sorting_options: vec![
                 SortingOption::Pid,
                 SortingOption::Program,
@@ -282,37 +307,27 @@ impl Config {
             _initialized: false,
         };
 
-        let mut conf = match Config::load_config(&mut initializing_config) {
+        let conf = match Config::load_config(&mut initializing_config) {
             Ok(d) => d,
             Err(e) => return Err(e),
         };
 
-        if !conf.contains_key(&"version".to_owned()) {
-            initializing_config.recreate = true;
-            initializing_config
-                .info
-                .push("Config file malformatted or mossing, will be recreated on exit!".to_owned());
-        } else {
-            match conf.get(&"version".to_owned()).unwrap() {
-                ConfigItem::Str(s) => {
-                    if *s != version {
-                        initializing_config.recreate = true;
-                        initializing_config.warnings.push("Config file version and brshtop version missmatch, will be recreated on exit!".to_owned())
-                    }
-                }
-                _ => {
+        match conf.get(&"version".to_owned()) {
+            Some(ConfigItem::Str(s)) => {
+                if *s != version {
                     initializing_config.recreate = true;
-                    initializing_config
-                        .warnings
-                        .push("Config file is malformed, will be recreated on exit!".to_owned())
+                    initializing_config.warnings.push("Config file version and brshtop version mismatch, will be recreated on exit!".to_owned())
                 }
+            }
+            _ => {
+                initializing_config.recreate = true;
+                initializing_config
+                    .warnings
+                    .push("Config file is  or missing, will be recreated on exit!".to_owned())
             }
         }
 
-        let keys_for_loop: Vec<String> =
-            initializing_config.keys.iter().map(|c| c.clone()).collect();
-
-        for key in keys_for_loop {
+        for key in initializing_config.keys.clone() {
             if conf.contains_key(&key) {
                 match conf.get(&key).unwrap() {
                     ConfigItem::Error => {
@@ -326,7 +341,6 @@ impl Config {
                             ConfigItem::LogLevel(l) => ConfigItem::LogLevel(*l),
                             ConfigItem::SortingOption(s) => ConfigItem::SortingOption(*s),
                             ConfigItem::Error => ConfigItem::Error,
-                            _ => continue,
                         };
 
                         initializing_config.conf_dict.insert(key, sender);
@@ -340,7 +354,6 @@ impl Config {
                             ConfigItem::LogLevel(l) => ConfigItem::LogLevel(*l),
                             ConfigItem::SortingOption(s) => ConfigItem::SortingOption(*s),
                             ConfigItem::Error => ConfigItem::Error,
-                            _ => continue,
                         };
 
                         initializing_config.setattr(key, sender);
@@ -357,121 +370,73 @@ impl Config {
     pub fn load_config(&mut self) -> Result<HashMap<String, ConfigItem>, &'static str> {
         let mut new_config = HashMap::<String, ConfigItem>::new();
 
-        let mut conf_file = PathBuf::new();
-
-        if self.config_file.is_file() {
-            conf_file = self.config_file.clone();
+        let conf_file = if self.config_file.is_file() {
+            self.config_file.clone()
         } else if PathBuf::from("/etc/brshtop.conf").is_file() {
-            conf_file = PathBuf::from("/etc/brshtop.conf");
+            PathBuf::from("/etc/brshtop.conf")
         } else {
             return Err("Could not find config file.");
-        }
+        };
 
         let file = match File::open(conf_file) {
             Ok(f) => f,
             Err(e) => return Err("Unable to read config file."),
         };
-        let mut buf_reader = BufReader::new(file);
+        let buf_reader = BufReader::new(file);
 
         for line in buf_reader.lines() {
             match line {
                 Ok(l) => {
-                    let mut l_stripped_before = l.clone();
-                    l_stripped_before = l_stripped_before.trim_start().to_owned();
-                    l_stripped_before = l_stripped_before.trim_end().to_owned();
-                    let mut l_stripped_config = l_stripped_before.clone();
+                    // TODO: split into a separate function please and thank you @me
+                    let stripped = l.trim().to_owned();
 
-                    if l_stripped_config.starts_with("#? Config") {
-                        let index_of_version = match l_stripped_config.find("v. ") {
+                    if stripped.starts_with("#? Config") {
+                        let index_of_version = match stripped.find("v. ") {
                             Some(i) => i,
                             None => return Err("Malformed configuration file."),
                         };
 
                         new_config.insert(
                             String::from("version"),
-                            ConfigItem::Str(
-                                l_stripped_config[(index_of_version + 3 as usize)..].to_owned(),
-                            ),
+                            ConfigItem::Str(stripped.chars().skip(index_of_version + 3).collect()),
                         );
                         continue;
                     }
 
                     for key in &self.keys {
-                        let mut l_stripped = l_stripped_before.clone();
+                        let mut l_stripped = stripped.clone();
                         if l_stripped.starts_with(key) {
                             l_stripped = l_stripped.replace(&(key.to_owned() + "="), "");
                             if l_stripped.starts_with('"') {
                                 l_stripped.retain(|c| c != '"');
                             }
 
-                            match key.as_str() {
-                                "proc_sorting" => {
-                                    let mut to_insert: SortingOption;
-                                    match l_stripped.as_str() {
-                                        "pid" => to_insert = SortingOption::Pid,
-                                        "program" => to_insert = SortingOption::Program,
-                                        "arguments" => to_insert = SortingOption::Arguments,
-                                        "threads" => to_insert = SortingOption::Threads,
-                                        "user" => to_insert = SortingOption::User,
-                                        "memory" => to_insert = SortingOption::Memory,
-                                        "cpu" => to_insert = SortingOption::Cpu { lazy: false },
-                                        "cpu lazy" => to_insert = SortingOption::Cpu { lazy: true },
-                                        _ => {
-                                            self.warnings.push("Config key \"proc_sorted\" didn\'t get an acceptable value!".to_owned());
-                                            new_config.insert(key.to_owned(), ConfigItem::Error);
-                                            continue;
-                                        }
-                                    };
-                                    new_config.insert(
-                                        key.to_owned(),
-                                        ConfigItem::SortingOption(to_insert),
-                                    );
-                                    continue;
-                                }
-                                "log_level" => {
-                                    let mut to_insert: LogLevel;
-                                    match l_stripped.as_str() {
-                                        "error" => to_insert = LogLevel::Error,
-                                        "warning" => to_insert = LogLevel::Warning,
-                                        "info" => to_insert = LogLevel::Info,
-                                        "debug" => to_insert = LogLevel::Debug,
-                                        _ => {
-                                            self.warnings.push("Config key \"log_level\" didn\'t get an acceptable value!".to_owned());
-                                            new_config.insert(key.to_owned(), ConfigItem::Error);
-                                            continue;
-                                        }
-                                    };
-                                    new_config
-                                        .insert(key.to_owned(), ConfigItem::LogLevel(to_insert));
-                                    continue;
-                                }
-                                "view_mode" => {
-                                    let mut to_insert: ViewMode;
-                                    match l_stripped.as_str() {
-                                        "full" => to_insert = ViewMode::Full,
-                                        "proc" => to_insert = ViewMode::Proc,
-                                        "stat" => to_insert = ViewMode::Stat,
-                                        _ => {
-                                            self.warnings.push("Config key \"view_mode\" didn\'t get an acceptable value!".to_owned());
-                                            new_config.insert(key.to_owned(), ConfigItem::Error);
-                                            continue;
-                                        }
-                                    };
-                                    new_config
-                                        .insert(key.to_owned(), ConfigItem::ViewMode(to_insert));
-                                    continue;
-                                }
-                                _ => (),
-                            }
+                            type ConversionFunction = fn(&String) -> Result<ConfigItem, String>;
 
-                            let check_numeric: Vec<bool> =
-                                l_stripped.chars().map(|c| c.is_numeric()).collect();
-                            if !check_numeric.contains(&false) {
+                            let conversion_function: Option<ConversionFunction> = match key.as_str()
+                            {
+                                "proc_sorting" => Some(ConfigItem::sorting_option),
+                                "log_level" => Some(ConfigItem::log_level),
+                                "view_mode" => Some(ConfigItem::view_mode),
+                                _ => None,
+                            };
+
+                            if let Some(f) = conversion_function {
+                                let config_item = match f(&l_stripped) {
+                                    Ok(item) => item,
+                                    Err(e) => {
+                                        self.warnings.push(e);
+                                        ConfigItem::Error
+                                    }
+                                };
+
+                                new_config.insert(key.to_owned(), config_item);
+                            } else if !l_stripped.chars().all(char::is_numeric) {
                                 let i = match l_stripped.parse::<i64>() {
                                     Ok(i) => i,
                                     Err(_e) => {
                                         self.warnings.push(format!(
-                                            "Config key \"{}\" should be an integer (was \"{}\")!",
+                                            "Config key {:?} should be an integer (was {:?})!",
                                             key, l_stripped
                                         ));
                                         continue;
@@ -489,17 +454,18 @@ impl Config {
 
                                 new_config.insert(key.to_owned(), ConfigItem::Int(i));
                                 continue;
+                            } else {
+                                match l_stripped.parse::<LenientBool>() {
+                                    Ok(b) => {
+                                        new_config
+                                            .insert(key.to_owned(), ConfigItem::Bool(b.into()));
+                                        continue;
+                                    }
+                                    Err(e) => (),
+                                };
+
+                                new_config.insert(key.to_owned(), ConfigItem::Str(l_stripped));
                             }
-
-                            match l_stripped.parse::<LenientBool>() {
-                                Ok(b) => {
-                                    new_config.insert(key.to_owned(), ConfigItem::Bool(b.into()));
-                                    continue;
-                                }
-                                Err(e) => (),
-                            };
-
-                            new_config.insert(key.to_owned(), ConfigItem::Str(l_stripped));
                         }
                     }
                 }
@@ -574,58 +540,37 @@ impl Config {
         if self._initialized {
             self.changed = true;
         }
-        let name_copy_1 = name.clone();
-        let value_copy_1 = value.clone();
-        self.attr.insert(name_copy_1, value_copy_1);
+
+        self.attr.insert(name.clone(), value.clone());
 
         let test_values = vec!["_initialized", "recreate", "changed"];
-        let test_values_converted: Vec<String> = test_values
-            .iter()
-            .map(|s| s.to_owned().to_owned())
-            .collect();
-        let name_copy_2 = name.clone();
+        let test_values_converted: Vec<String> =
+            test_values.iter().map(<_ as ToString>::to_string).collect();
 
-        if test_values_converted.contains(&name_copy_2) {
-            let name_copy_3 = name.clone();
-            let value_copy_2 = value.clone();
-            self.conf_dict.insert(name_copy_3, value_copy_2);
+        if test_values_converted.contains(&name) {
+            self.conf_dict.insert(name.clone(), value.clone());
         }
     }
 
-    pub fn save_config(
-        &mut self,
-        DEFAULT_CONF: string_template::Template,
-    ) -> Result<String, String> {
+    pub fn save_config(&mut self) -> std::io::Result<String> {
         if !self.changed && !self.recreate {
-            return Ok(String::from("Nothing needs to be changed"));
+            return Ok("Nothing needs to be changed".into());
         }
 
-        if self.config_file.is_file() {
-            let vals: HashMap<String, String> = self
-                .conf_dict
-                .iter()
-                .map(|(key, value)| (key.clone(), value.clone().to_string()))
-                .collect();
-            match write(
-                self.config_file.clone(),
-                DEFAULT_CONF.render(
-                    &vals
-                        .iter()
-                        .map(|(key, value)| (key.as_str(), value.as_str()))
-                        .collect(),
-                ),
-            ) {
-                Err(e) => {
-                    return Err(format!(
-                        "Unable to save the config file with error {}",
-                        e.to_string()
-                    ))
-                }
-                _ => return Ok(String::from("Saved successfully")),
-            };
-        }
-        Err(String::from(
-            "Default configuration file is not a writable file",
-        ))
+        let vals: HashMap<String, String> = self
+            .conf_dict
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone().to_string()))
+            .collect();
+        write(
+            self.config_file.clone(),
+            crate::DEFAULT_CONF.render(
+                &vals
+                    .iter()
+                    .map(|(key, value)| (key.as_str(), value.as_str()))
+                    .collect(),
+            ),
+        )?;
+        Ok("Saved Successfully".into())
     }
 }
