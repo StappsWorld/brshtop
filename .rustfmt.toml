@@ -1,4 +1,0 @@
-ignore = [
-    "from_map_derive/src/lib.rs",
-    "from_map/src/lib.rs",
-]

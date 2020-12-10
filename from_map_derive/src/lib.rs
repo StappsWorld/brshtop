@@ -82,6 +82,5 @@ pub fn derive_into_query(input: TokenStream) -> TokenStream {
             }
         }
     };
-    println!("{:#?}", gen);
     gen.into()
 }

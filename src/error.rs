@@ -2,6 +2,7 @@ use log::{debug, LevelFilter};
 use std::path::*;
 
 pub fn errlog<P: AsRef<Path>>(config_dir: P, message: String) {
+    // TODO: I know there's a better way to do this
     let error_file = "log.log";
     let error_dir = config_dir.as_ref().join(PathBuf::from(error_file));
     let dir = error_dir.to_str().unwrap();
@@ -25,4 +26,15 @@ pub fn errlog<P: AsRef<Path>>(config_dir: P, message: String) {
 pub fn throw_error(message: &str) {
     print!("{}", message);
     std::process::exit(1);
+}
+
+#[derive(Debug)]
+pub enum Error {
+    Io(std::io::Error),
+    Theme(String),
+}
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Self::Io(err)
+    }
 }

@@ -1,5 +1,6 @@
 mod brshtop;
 mod config;
+mod consts;
 mod error;
 mod event;
 mod term;
@@ -8,6 +9,7 @@ mod timeit;
 
 use {
     config::Config,
+    consts::*,
     error::{errlog, throw_error},
 };
 
@@ -23,8 +25,12 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use string_template::*;
+use theme::Theme;
 
 pub fn main() {
+    let mut b = brshtop::Brshtop::new();
+    b._init();
+
     let errors = Vec::<String>::new();
 
     let SELF_START = SystemTime::now();
@@ -432,5 +438,5 @@ pub fn main() {
     for arg in env::args() {
         arg_output.push_str((arg + " ").as_str());
     }
-    errlog(CONFIG_DIR, format!("CMD: {}", arg_output));
+    // errlog(CONFIG_DIR, format!("CMD: {}", arg_output));
 }
