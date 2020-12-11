@@ -1,5 +1,5 @@
 use {
-    from_map::FromMap,
+    from_map::{FromMap, FromMapDefault},
     lazy_static::lazy_static,
     regex::Regex,
     std::{
@@ -135,51 +135,98 @@ impl std::fmt::UpperHex for Color {
         write!(f, "#{:X}{:X}{:X}", self.r, self.g, self.b)
     }
 }
+impl From<String> for Color {
+    // This is unsafe lol
+    fn from(s: String) -> Self {
+        Self::new(s).unwrap()
+    }
+}
 
-#[derive(FromMap, Debug)]
+#[derive(FromMapDefault, FromMap, Debug)]
 #[value_type = "Color"]
 pub struct Theme {
     pub main_bg: Color,
+    #[default("#cc")]
     pub main_fg: Color,
+    #[default("#ee")]
     pub title: Color,
+    #[default("#969696")]
     pub hi_fg: Color,
+    #[default("#7e2626")]
     pub selected_bg: Color,
+    #[default("#ee")]
     pub selected_fg: Color,
+    #[default("#40")]
     pub inactive_fg: Color,
+    #[default("#60")]
     pub proc_misc: Color,
+    #[default("#40")]
     pub cpu_box: Color,
+    #[default("#0de756")]
     pub mem_box: Color,
+    #[default("#3d7b46")]
     pub net_box: Color,
+    #[default("#8a882e")]
     pub proc_box: Color,
+    #[default("#423ba5")]
     pub div_line: Color,
+    #[default("#923535")]
     pub temp_start: Color,
+    #[default("#30")]
     pub temp_mid: Color,
+    #[default("#4897d4")]
     pub temp_end: Color,
+    #[default("#5474e8")]
     pub cpu_start: Color,
+    #[default("#ff40b6")]
     pub cpu_mid: Color,
+    #[default("#50f095")]
     pub cpu_end: Color,
+    #[default("#f2e266")]
     pub free_start: Color,
+    #[default("#fa1e1e")]
     pub free_mid: Color,
+    #[default("#223014")]
     pub free_end: Color,
+    #[default("#b5e685")]
     pub cached_start: Color,
+    #[default("#dcff85")]
     pub cached_mid: Color,
+    #[default("#0b1a29")]
     pub cached_end: Color,
+    #[default("#74e6fc")]
     pub available_start: Color,
+    #[default("#26c5ff")]
     pub available_mid: Color,
+    #[default("#292107")]
     pub available_end: Color,
+    #[default("#ffd77a")]
     pub used_start: Color,
+    #[default("#ffb814")]
     pub used_mid: Color,
+    #[default("#3b1f1c")]
     pub used_end: Color,
+    #[default("#d9626d")]
     pub download_start: Color,
+    #[default("#ff4769")]
     pub download_mid: Color,
+    #[default("#231a63")]
     pub download_end: Color,
+    #[default("#4f43a3")]
     pub upload_start: Color,
+    #[default("#b0a9de")]
     pub upload_mid: Color,
+    #[default("#510554")]
     pub upload_end: Color,
+    #[default("#7d4180")]
     pub graph_text: Color,
+    #[default("#dcafde")]
     pub meter_bg: Color,
+    #[default("#80d0a3")]
     pub process_start: Color,
+    #[default("#dcd179")]
     pub process_mid: Color,
+    #[default("#d45454")]
     pub process_end: Color,
 }
 impl Theme {
@@ -208,7 +255,7 @@ impl Theme {
                 })
                 .map(|res| res.unwrap()),
         );
-        Ok(Self::from_map(map))
+        Ok(Self::from_map_default(map))
     }
 
     pub fn new<R>(mut reader: R) -> Result<Self, String>
@@ -230,61 +277,6 @@ impl Theme {
 
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Result<Self, String>, io::Error> {
         Ok(Self::new(File::open(path)?))
-    }
-}
-impl Default for Theme {
-    fn default() -> Self {
-        let def = [
-            ("main_bg", ""),
-            ("main_fg", "#cc"),
-            ("title", "#ee"),
-            ("hi_fg", "#969696"),
-            ("selected_bg", "#7e2626"),
-            ("selected_fg", "#ee"),
-            ("inactive_fg", "#40"),
-            ("graph_text", "#60"),
-            ("meter_bg", "#40"),
-            ("proc_misc", "#0de756"),
-            ("cpu_box", "#3d7b46"),
-            ("mem_box", "#8a882e"),
-            ("net_box", "#423ba5"),
-            ("proc_box", "#923535"),
-            ("div_line", "#30"),
-            ("temp_start", "#4897d4"),
-            ("temp_mid", "#5474e8"),
-            ("temp_end", "#ff40b6"),
-            ("cpu_start", "#50f095"),
-            ("cpu_mid", "#f2e266"),
-            ("cpu_end", "#fa1e1e"),
-            ("free_start", "#223014"),
-            ("free_mid", "#b5e685"),
-            ("free_end", "#dcff85"),
-            ("cached_start", "#0b1a29"),
-            ("cached_mid", "#74e6fc"),
-            ("cached_end", "#26c5ff"),
-            ("available_start", "#292107"),
-            ("available_mid", "#ffd77a"),
-            ("available_end", "#ffb814"),
-            ("used_start", "#3b1f1c"),
-            ("used_mid", "#d9626d"),
-            ("used_end", "#ff4769"),
-            ("download_start", "#231a63"),
-            ("download_mid", "#4f43a3"),
-            ("download_end", "#b0a9de"),
-            ("upload_start", "#510554"),
-            ("upload_mid", "#7d4180"),
-            ("upload_end", "#dcafde"),
-            ("process_start", "#80d0a3"),
-            ("process_mid", "#dcd179"),
-            ("process_end", "#d45454"),
-        ];
-
-        let map: HashMap<String, Color> = def
-            .iter()
-            .map(|(field, colstr)| (field.to_string(), Color::new(colstr).unwrap()))
-            .collect();
-
-        Self::from_map(map)
     }
 }
 /*
