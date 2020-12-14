@@ -259,25 +259,6 @@ impl Theme {
         Ok(Self::from_map_default(map))
     }
 
-    pub fn gradient(&self) -> HashMap<String, Vec<String>> {
-        let gradients = vec![
-            "temp",
-            "cpu",
-            "free",
-            "cached",
-            "available",
-            "used",
-            "download",
-            "upload",
-            "proc",
-            "proc_color",
-            "process",
-        ];
-
-        for name in gradients.iter().map(<_ as ToString>::to_string) {}
-        HashMap::new()
-    }
-
     pub fn new<R>(mut reader: R) -> Result<Self, String>
     where
         R: Read,

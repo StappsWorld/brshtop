@@ -8,7 +8,13 @@ use thread_control::*;
 
 
 
-
+pub trait CollTrait {
+    fn init(tx_build : Sender<Event>, rx_build : Receiver<Event>);
+    fn start(&mut self, CONFIG : Config, b : Box, t : TimeIt);
+    fn stop(&mut self);
+    fn _runner(&mut self, CONFIG : Config, b : Box, t : TimeIt, m : Menu, d : Draw);
+    fn collect(&mut self, collecters : Vec<CollTrait>, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool);
+}
 
 pub struct Collector {
     pub stopping: bool,
@@ -28,9 +34,9 @@ pub struct Collector {
     pub collect_interrupt: bool,
     pub proc_interrupt: bool,
     pub use_draw_list: bool,
-} impl Collector {
+} impl Collector for CollTrait {
 
-    pub fn init(tx_build : Sender<Event>, rx_build : Receiver<Event>) {
+    fn init(tx_build : Sender<Event>, rx_build : Receiver<Event>) {
         let (tx_build, rx_build) = channel();
         let (flag_build, control_build) = make_pair();
         let mut collecter_initialize = Collector {
@@ -48,20 +54,20 @@ pub struct Collector {
             collect_done = Event::Flag(false),
             collect_idle = Event::Flag(true),
             collect_done = Event::Flag(false),
-            collect_queue = Vec::<Collector>::new(),
+            collect_queue = Vec::<CollTrait>::new(),
             collect_interrupt = false,
             proc_interrupt = false,
             use_draw_list = false,
         };
     }
 
-    pub fn start(&mut self, CONFIG : Config, b : Box, t : TimeIt) {
+    fn start(&mut self, CONFIG : Config, b : Box, t : TimeIt) {
         self.stopping = false;
         self.thread = mpsc::spawn(|| _runner(&self, b, t));
         self.started = true;
     }
 
-    pub fn stop(&mut self) {
+    fn stop(&mut self) {
         while !this.stopping {
             if this.started && this.flag.alive() {
                 this.stopping = true;
@@ -80,13 +86,13 @@ pub struct Collector {
         }
     }
 
-    pub fn _runner(&mut self, b : Box, t : TimeIt) {
+    fn _runner(&mut self, CONFIG : Config, b : Box, t : TimeIt, m : Menu, d : Draw) {
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
 
         while !self.stopping {
-            if CONFIG.draw_clock && CONFIG.update_ms != 1000{
+            if CONFIG.draw_clock && CONFIG.update_ms != 1000 {
                 b.draw_clock();
             }
             this.collect_run = Event::Wait;
@@ -110,11 +116,59 @@ pub struct Collector {
                     collector.collect();
                 }
                 collector.draw();
+
+                if self.use_draw_list {
+                    draw_buffers.push(collector.buffer);
+                }
+
+                if self.collect_interrupt {
+                    break;
+                }
+
             }
+
+            if DEBUG && !debugged {
+                t.stop("Collect and draw");
+                debugged = true;
+            }
+
+            if self.draw_now && !m.active && !self.collect_interrupt {
+                if self.use_draw_list {
+                    d.out(draw_buffers);
+                } else {
+                    d.out;
+                }
+            }
+
+            if CONFIG.draw_clock && CONFIG.update_ms == 1000 {
+                b.draw_clock();
+            }
+
+            self.collect_idle = Event::Flag(true);
+            self.collect_done = Event::Flag(true);
 
         }
         
 
+    }
+
+    /// Setup collect quee for _runner, default: {draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False}
+    fn collect(&mut self, collecters : Vec<CollTrait>, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool) {
+        self.collect_interrupt = interrupt;
+        self.proc_interrupt = proc_interrupt;
+        self.collect_idle = Event::Wait;
+        self.collect_idle.wait();
+        self.collect_interrupt = false;
+        self.proc_interrupt = false;
+        self.use_draw_list = false;
+        self.draw_now = draw_now;
+        self.redraw = redraw;
+        self.only_draw = only_draw;
+
+        if collectors.capacity() > 0 {
+            self.collect_queue = collectors;
+            self.use_draw_list = true;
+        }
     }
 
 }
