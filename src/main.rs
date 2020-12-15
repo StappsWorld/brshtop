@@ -4,6 +4,7 @@ mod config;
 mod consts;
 mod error;
 mod event;
+mod graph;
 mod mv;
 mod symbol;
 mod term;

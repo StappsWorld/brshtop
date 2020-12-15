@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 lazy_static! {
-    pub static ref graph_up: HashMap<i32, &'static str> = {
+    static ref __graph_up: HashMap<u32, &'static str> = {
         let mut map = HashMap::new();
         map.insert(0, " ");
         map.insert(1, "⢀");
@@ -32,12 +32,12 @@ lazy_static! {
         map.insert(44, "⣿");
         map
     };
-    pub static ref graph_up_small: HashMap<i32, &'static str> = {
-        let mut map = graph_up.clone();
+    static ref __graph_up_small: HashMap<u32, &'static str> = {
+        let mut map = __graph_up.clone();
         map.insert(0, "\033[1C");
         map
     };
-    pub static ref graph_down: HashMap<i32, &'static str> = {
+    static ref __graph_down: HashMap<u32, &'static str> = {
         let mut map = HashMap::new();
         map.insert(00, " ");
         map.insert(01, "⠈");
@@ -66,17 +66,17 @@ lazy_static! {
         map.insert(44, "⣿");
         map
     };
-    pub static ref graph_down_small: HashMap<i32, &'static str> = {
-        let mut map = graph_down.clone();
+    static ref __graph_down_small: HashMap<u32, &'static str> = {
+        let mut map = __graph_down.clone();
         map.insert(0, "\033[1C");
         map
     };
-    pub static ref ok: String = format!(
+    static ref __ok: String = format!(
         "{}√{}",
         Color::fg("#30ff50").unwrap(),
         Color::fg("#cc").unwrap()
     );
-    pub static ref fail: String = format!(
+    static ref __fail: String = format!(
         "{}!{}",
         Color::fg("#ff3050").unwrap(),
         Color::fg("#cc").unwrap()
@@ -98,3 +98,22 @@ pub const title_left: &'static str = "┤";
 pub const title_right: &'static str = "├";
 pub const div_up: &'static str = "┬";
 pub const div_down: &'static str = "┴";
+
+pub fn graph_up() -> HashMap<u32, &'static str> {
+    __graph_up.clone()
+}
+pub fn graph_up_small() -> HashMap<u32, &'static str> {
+    __graph_up_small.clone()
+}
+pub fn graph_down() -> HashMap<u32, &'static str> {
+    __graph_down.clone()
+}
+pub fn graph_down_small() -> HashMap<u32, &'static str> {
+    __graph_down_small.clone()
+}
+pub fn ok() -> String {
+    __ok.clone()
+}
+pub fn fail() -> String {
+    __fail.clone()
+}
