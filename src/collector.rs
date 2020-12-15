@@ -4,6 +4,8 @@ use crate::event::Event;
 use crate::Config;
 use crate::Error::*;
 use thread_control::*;
+use std::path::*;
+
 
 
 
@@ -12,7 +14,7 @@ pub trait CollTrait {
     fn init(tx_build : Sender<Event>, rx_build : Receiver<Event>);
     
     /// Setup collect queue for runner, default: {draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False}
-    fn collect(&mut self, collectors : Vec<CollTrait>, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool);
+    fn collect<P: AsRef<Path>>(&mut self, collectors : Vec<dyn CollTrait>, CONFIG_DIR : P, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool);
     
     fn draw(&mut self);
 }
@@ -66,7 +68,7 @@ pub struct Collector {
 
     
 
-    fn collect(&mut self, collectors : Vec<CollTrait>, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool) {
+    fn collect<P: AsRef<Path>>(&mut self, collectors : Vec<dyn CollTrait>, CONFIG : Config, CONFIG_DIR : P, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool) {
         self.collect_interrupt = interrupt;
         self.proc_interrupt = proc_interrupt;
         self.collect_idle = Event::Wait;
