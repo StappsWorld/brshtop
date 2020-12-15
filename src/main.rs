@@ -5,6 +5,7 @@ mod consts;
 mod error;
 mod event;
 mod mv;
+mod symbol;
 mod term;
 mod theme;
 mod timeit;

@@ -1,5 +1,6 @@
 use {
     from_map::{FromMap, FromMapDefault},
+    gradient::Gradient,
     lazy_static::lazy_static,
     regex::Regex,
     std::{
@@ -142,7 +143,7 @@ impl From<String> for Color {
     }
 }
 
-#[derive(FromMapDefault, FromMap, Debug)]
+#[derive(FromMapDefault, FromMap, Debug, Gradient)]
 #[value_type = "Color"]
 pub struct Theme {
     pub main_bg: Color,
