@@ -10,6 +10,8 @@ mod symbol;
 mod term;
 mod theme;
 mod timeit;
+mod collector;
+mod cpucollector;
 
 use {
     config::Config,

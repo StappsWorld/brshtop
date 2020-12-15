@@ -1,27 +1,10 @@
-use crate::Collector::*;
+use crate::collector::*;
 use which::which;
 use psutil::sensors::*;
 
 
 
 pub struct CpuCollector {
-    pub stopping: bool,
-    pub started: bool,
-    pub draw_now: bool,
-    pub redraw: bool,
-    pub only_draw: bool,
-    pub tx: Sender<Event>,
-    pub rx: Reciever<Event>,
-    pub thread: Option<thread::JoinHandle<()>>,
-    pub flag: Flag,
-    pub control: Control,
-    pub collect_run : Event,
-    pub collect_idle: Event,
-    pub collect_done: Event,
-    pub collect_queue: Vec,
-    pub collect_interrupt: bool,
-    pub proc_interrupt: bool,
-    pub use_draw_list: bool,
     pub cpu_usage: Vec<Vec<u32>>,
     pub cpu_temp: Vec<Vec<u32>>,
     pub cpu_temp_high: i32,
@@ -35,7 +18,7 @@ pub struct CpuCollector {
     pub got_sensors: bool,
     pub sensor_swap: bool,
     pub cpu_temp_only: bool,
-} impl CpuCollector for CollTrait {
+} impl CollTrait for CpuCollector {
 
     fn init(THREADS : u64) {
 
@@ -47,24 +30,6 @@ pub struct CpuCollector {
         }
 
         let mut CpuCollector_initialize = CpuCollector {
-            stopping = false,
-            started = false,
-            draw_now = false,
-            redraw = false,
-            only_draw = false,
-            tx = tx_build,
-            rx = rx_build,
-            flag = flag_build,
-            control = control_build,
-            thread = None,
-            collect_run = Event::Flag(false),
-            collect_done = Event::Flag(false),
-            collect_idle = Event::Flag(true),
-            collect_done = Event::Flag(false),
-            collect_queue = Vec::<CollTrait>::new(),
-            collect_interrupt = false,
-            proc_interrupt = false,
-            use_draw_list = false,
             cpu_usage: cpu_usage_mut,
             cpu_temp: cpu_temp_mut,
             cpu_temp_high: 0,
@@ -81,7 +46,10 @@ pub struct CpuCollector {
         };
     }
 
-    fn get_sensors(&mut self, CONFIG : Config, SYSTEM : String) {
+    
+} impl CpuCollector {
+
+    pub fn get_sensors(&mut self, CONFIG : Config, SYSTEM : String) {
         self.sensor_method = String::from("");
 
         if SYSTEM == "MacOS" {
@@ -152,7 +120,7 @@ pub struct CpuCollector {
         }
     }
 
-    fn collect(&mut self, collecters : Vec<CollTrait>, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool, t : Term) {
+    pub fn collect(&mut self, collecters : Vec<CollTrait>, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool, t : Term) {
         
         match psutil::cpu::CpuPercentCollector::cpu_percent() {
             Some(p) =>self.cpu_usage[0].push(format!("{:.2}", p)),
@@ -165,4 +133,5 @@ pub struct CpuCollector {
         
         
     }
+
 }
