@@ -10,10 +10,11 @@ use thread_control::*;
 
 pub trait CollTrait {
     fn init(tx_build : Sender<Event>, rx_build : Receiver<Event>);
-    fn start(&mut self, CONFIG : Config, b : Box, t : TimeIt);
-    fn stop(&mut self);
-    fn _runner(&mut self, CONFIG : Config, b : Box, t : TimeIt, m : Menu, d : Draw);
+    
+    /// Setup collect queue for runner, default: {draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False}
     fn collect(&mut self, collecters : Vec<CollTrait>, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool);
+    
+    fn draw(&mut self);
 }
 
 pub struct Collector {
@@ -30,7 +31,8 @@ pub struct Collector {
     pub collect_run : Event,
     pub collect_idle: Event,
     pub collect_done: Event,
-    pub collect_queue: Vec,
+    pub collect_queue: Vec<CollTrait>,
+    default_collect_queue: Vec<CollTrait>,
     pub collect_interrupt: bool,
     pub proc_interrupt: bool,
     pub use_draw_list: bool,
@@ -112,7 +114,7 @@ pub struct Collector {
                 t.start("Collect and draw");
             }
 
-            while self.collect_queue {
+            while self.collect_queue.capacity() > 0 {
                 let collector = self.collect_queue.pop();
                 if !self.only_draw {
                     collector.collect();
@@ -154,7 +156,6 @@ pub struct Collector {
 
     }
 
-    /// Setup collect quee for _runner, default: {draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False}
     fn collect(&mut self, collecters : Vec<CollTrait>, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool) {
         self.collect_interrupt = interrupt;
         self.proc_interrupt = proc_interrupt;

@@ -18,3 +18,4 @@ terminal_size = "0.1.15"
 lazy_static = "1.4.0"
 regex = "1.4.2"
 from_map = { version = '0.1.0', path = "./from_map" }
+which = "4.0.2"
