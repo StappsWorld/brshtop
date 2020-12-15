@@ -55,16 +55,18 @@ pub struct Collector {
             collect_idle = Event::Flag(true),
             collect_done = Event::Flag(false),
             collect_queue = Vec::<CollTrait>::new(),
+            default_collect_queue = Vec::<CollTrait>::new(),
             collect_interrupt = false,
             proc_interrupt = false,
             use_draw_list = false,
         };
     }
 
-    fn start(&mut self, CONFIG : Config, b : Box, t : TimeIt) {
+    fn start(&mut self, CONFIG : Config, b : Box, t : TimeIt, m : Menu, d : Draw) {
         self.stopping = false;
         self.thread = mpsc::spawn(|| _runner(&self, b, t));
         self.started = true;
+        self.default_collect_queue = vec!{b, t, m, d};
     }
 
     fn stop(&mut self) {
@@ -168,7 +170,11 @@ pub struct Collector {
         if collectors.capacity() > 0 {
             self.collect_queue = collectors;
             self.use_draw_list = true;
+        } else {
+            self.collect_queue = self.default_collect_queue.copy();
         }
+
+        self.collect_run = Event::Flag(true);
     }
 
 }
