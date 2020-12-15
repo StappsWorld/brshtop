@@ -3,11 +3,14 @@ use which::which;
 use psutil::sensors::*;
 use subprocess::Exec;
 use crate::Config;
-use std::iter::Enumerate;
+use std::{
+    iter::Enumerate,
+    path::*,
+    collections::HashMap,
+};
 use crate::error;
 use sys_info::*;
 use std::time::SystemTime;
-use std::path::*;
 use hhmmss::Hhmmss;
 
 
@@ -185,6 +188,25 @@ pub struct CpuCollector {
             };
 
             self.got_sensors = self.sensor_method.chars.count() > 0;
+        }
+    }
+
+    pub fn collect_temps(&mut self, CONFIG : Config) {
+        let mut temp : i32 = 1000;
+        let mut cores : Vec<String> = Vec::<String>::new();
+        let mut core_dict : HashMap<i32, i32> = HashMap::<i32, i32>::new();
+        let mut entry_int : i32 = 0;
+        let mut cpu_type : String = String::from("");
+        let mut c_max : i32 = 0;
+        let mut s_name : String = String::from("_-_");
+        let mut s_label : String = String::from("_-_");
+
+        if self.sensor_method == "psutil" {
+            if CONFIG.cpu_sensor != "Auto" {
+                let mut splitter = CONFIG.cpu_sensor.splitn(2, ":");
+                s_name = splitter.next().unwrap();
+                s_label = splitter.next().unwrap();
+            }
         }
     }
 
