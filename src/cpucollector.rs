@@ -405,8 +405,12 @@ impl CpuCollector {
             
             if core_dict.len() > 0 {
                 if temp == 1000 {
-                    temp = 
+                    temp = (core_dict.values().into_iter().sum() / core_dict.len()).floor();
                 }
+                if self.cpu_temp_high == 0 || self.cpu_temp_crit == 0 {
+                    (self.cpu_temp_high, self.cpu_temp_crit) = (80, 95);
+                }
+                self.cpu_temp[0].append(temp);
             }
         }
     }
