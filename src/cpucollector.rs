@@ -1,19 +1,13 @@
 use crate::collector::*;
-use which::which;
-use psutil::sensors::*;
-use subprocess::Exec;
-use crate::Config;
-use std::{
-    iter::Enumerate,
-    path::*,
-    collections::HashMap,
-};
 use crate::error;
-use sys_info::*;
-use std::time::SystemTime;
+use crate::Config;
 use hhmmss::Hhmmss;
-
-
+use psutil::sensors::*;
+use std::time::SystemTime;
+use std::{collections::HashMap, iter::Enumerate, path::*};
+use subprocess::Exec;
+use sys_info::*;
+use which::which;
 
 pub struct CpuCollector {
     pub cpu_usage: Vec<Vec<u32>>,
@@ -29,10 +23,9 @@ pub struct CpuCollector {
     pub got_sensors: bool,
     pub sensor_swap: bool,
     pub cpu_temp_only: bool,
-} impl CollTrait for CpuCollector {
-
-    fn init(THREADS : u64) {
-
+}
+impl CollTrait for CpuCollector {
+    fn init(THREADS: u64) {
         let mut cpu_usage_mut = Vec::<Vec<u32>>::new();
         let mut cpu_temp_mut = Vec::<Vec<u32>>::new();
         for _ in 0..THREADS + 1 {
@@ -57,10 +50,20 @@ pub struct CpuCollector {
         };
     }
 
-    fn collect<P: AsRef<Path>>(&mut self, collectors : Vec<dyn CollTrait>, CONFIG : Config,  CONFIG_DIR : P, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool, t : Term) {
-        
+    fn collect<P: AsRef<Path>>(
+        &mut self,
+        collectors: Vec<dyn CollTrait>,
+        CONFIG: Config,
+        CONFIG_DIR: P,
+        draw_now: bool,
+        interrupt: bool,
+        proc_interrupt: bool,
+        redraw: bool,
+        only_draw: bool,
+        t: Term,
+    ) {
         match psutil::cpu::CpuPercentCollector::cpu_percent() {
-            Some(p) =>self.cpu_usage[0].push(format!("{:.2}", p)),
+            Some(p) => self.cpu_usage[0].push(format!("{:.2}", p)),
             None => (),
         }
 
@@ -71,9 +74,15 @@ pub struct CpuCollector {
         let cpu_percentages = match psutil::cpu::CpuPercentCollector::new() {
             Ok(p) => match p.cpu_percent_percpu() {
                 Ok(p) => p,
-                Err(e) => error::errlog(CONFIG_DIR,format!("Unable to collect CPU percentages! (error {})", e).as_str()),
+                Err(e) => error::errlog(
+                    CONFIG_DIR,
+                    format!("Unable to collect CPU percentages! (error {})", e).as_str(),
+                ),
             },
-            Err(e) => error::errlog(CONFIG_DIR,format!("Unable to collect CPU percentages! (error {})", e).as_str()),
+            Err(e) => error::errlog(
+                CONFIG_DIR,
+                format!("Unable to collect CPU percentages! (error {})", e).as_str(),
+            ),
         };
 
         for (n, thread) in cpu_percentages.iter().enumerate() {
@@ -85,16 +94,24 @@ pub struct CpuCollector {
 
         let cpu_frequency = match psutil::cpu::cpu_freq() {
             Ok(f) => f.current(),
-            Err(e) => error::errlog(CONFIG_DIR,format!("Unable to collect CPU frequency! (error {})", e).as_str()),
+            Err(e) => error::errlog(
+                CONFIG_DIR,
+                format!("Unable to collect CPU frequency! (error {})", e).as_str(),
+            ),
         };
 
         self.cpu_freq = cpu_frequency;
 
         let lavg = match sys_info::loadavg() {
-            Ok(l) => [format!("{:.2}", l.one).parse::<f64>().unwrap(),
-            format!("{:.2}", l.five).parse::<f64>().unwrap(),
-            format!("{:.2}", l.fifteen).parse::<f64>().unwrap()],
-            Err(e) => error::errlog(CONFIG_DIR,format!("Unable to collect load average! (error {})", e).as_str()),
+            Ok(l) => [
+                format!("{:.2}", l.one).parse::<f64>().unwrap(),
+                format!("{:.2}", l.five).parse::<f64>().unwrap(),
+                format!("{:.2}", l.fifteen).parse::<f64>().unwrap(),
+            ],
+            Err(e) => error::errlog(
+                CONFIG_DIR,
+                format!("Unable to collect load average! (error {})", e).as_str(),
+            ),
         };
 
         self.load_avg = lavg;
@@ -107,38 +124,46 @@ pub struct CpuCollector {
                 ela.pop();
                 ela.pop();
                 ela
-            },
-            Err(e) => error::errlog(CONFIG_DIR, "Error finding the boot time of this system...".to_owned()),
+            }
+            Err(e) => error::errlog(
+                CONFIG_DIR,
+                "Error finding the boot time of this system...".to_owned(),
+            ),
         };
 
         if CONFIG.check_temp && self.got_sensors {
             self.collect_temps();
         }
-        
     }
-
-    
-} impl CpuCollector {
-
-    pub fn get_sensors(&mut self, CONFIG : Config, SYSTEM : String) {
+}
+impl CpuCollector {
+    pub fn get_sensors(&mut self, CONFIG: Config, SYSTEM: String) {
         self.sensor_method = String::from("");
 
         if SYSTEM == "MacOS" {
             match which("coretemp") {
                 Ok() => {
-                    let output = Exec::shell("coretemp -p").capture()?.stdout_str().to_owned();
+                    let output = Exec::shell("coretemp -p")
+                        .capture()?
+                        .stdout_str()
+                        .to_owned();
                     match output.trim().replace("-", "").parse::<f64>() {
                         Some(n) => self.sensor_method = "coretemp",
                         None => match which("osx-cpu-temp") {
                             Ok() => {
-                                let output = Exec::shell("osx-cpu-temp").capture()?.stdout_str().to_owned();
+                                let output = Exec::shell("osx-cpu-temp")
+                                    .capture()?
+                                    .stdout_str()
+                                    .to_owned();
                                 match output.trim_end() {
-                                    Some(s) => if s.ends_with("°C") {
-                                        self.sensor_method = "osx-cpu-temp";
-                                    },
+                                    Some(s) => {
+                                        if s.ends_with("°C") {
+                                            self.sensor_method = "osx-cpu-temp";
+                                        }
+                                    }
                                     None => (),
                                 };
-                            },
+                            }
                             Err() => (),
                         },
                     }
@@ -151,7 +176,7 @@ pub struct CpuCollector {
             for res in temperatures() {
                 match res {
                     Ok(temp) => {
-                        if temp.unit().to_lowercase().starts_with("cpu"){
+                        if temp.unit().to_lowercase().starts_with("cpu") {
                             self.sensor_method = "psutil";
                             break;
                         }
@@ -165,25 +190,32 @@ pub struct CpuCollector {
                                         break;
                                     }
                                 }
-                            },
+                            }
                             None => (),
                         };
-                    },
+                    }
                     Err(e) => (),
                 };
             }
         }
 
         if self.sensor_method == "" && SYSTEM == "Linux" {
-            let output : Option<String> = match which("vcgencmd") {
-                Some(s) => Some(Exec::shell("vcgencmd measure_temp").capture()?.stdout_str().to_owned()),
+            let output: Option<String> = match which("vcgencmd") {
+                Some(s) => Some(
+                    Exec::shell("vcgencmd measure_temp")
+                        .capture()?
+                        .stdout_str()
+                        .to_owned(),
+                ),
                 None => None,
             };
 
             match output {
-                Some(s) => if s.trim().endswith("'C"){
-                    self.sensor_method = "vcgencmd";
-                },
+                Some(s) => {
+                    if s.trim().endswith("'C") {
+                        self.sensor_method = "vcgencmd";
+                    }
+                }
                 None => (),
             };
 
@@ -191,15 +223,15 @@ pub struct CpuCollector {
         }
     }
 
-    pub fn collect_temps(&mut self, CONFIG : Config) {
-        let mut temp : i32 = 1000;
-        let mut cores : Vec<String> = Vec::<String>::new();
-        let mut core_dict : HashMap<i32, i32> = HashMap::<i32, i32>::new();
-        let mut entry_int : i32 = 0;
-        let mut cpu_type : String = String::from("");
-        let mut c_max : i32 = 0;
-        let mut s_name : String = String::from("_-_");
-        let mut s_label : String = String::from("_-_");
+    pub fn collect_temps(&mut self, CONFIG: Config, THREADS : u64) {
+        let mut temp: i32 = 1000;
+        let mut cores: Vec<String> = Vec::<String>::new();
+        let mut core_dict: HashMap<i32, i32> = HashMap::<i32, i32>::new();
+        let mut entry_int: i32 = 0;
+        let mut cpu_type: String = String::from("");
+        let mut c_max: i32 = 0;
+        let mut s_name: String = String::from("_-_");
+        let mut s_label: String = String::from("_-_");
 
         if self.sensor_method == "psutil" {
             if CONFIG.cpu_sensor != "Auto" {
@@ -207,8 +239,175 @@ pub struct CpuCollector {
                 s_name = splitter.next().unwrap();
                 s_label = splitter.next().unwrap();
             }
+
+            let mut num = 1;
+            for res in psutil::sensors::temperatures() {
+                match res {
+                    Ok(s) => {
+                        let mut sensor = s.clone();
+
+                        match sensor.unit() {
+                            Some(name) => {
+                                let label = sensor.label().unwrap();
+
+                                if name == s_name
+                                    && (sensor.label().unwrap_or("error_in_label") == s_label || String::from(num) == s_label.to_owned())
+                                    && sensor.current() > 0 {
+                                    
+                                        if label.starts_with("Package") {
+                                            cpu_type = String::from("intel");
+                                        } else if label.starts_with("Tdie") {
+                                            cpu_type = String::from("ryzen");
+                                        } else {
+                                            cpu_type = String::from("other");
+                                        }
+
+                                        // TODO : Allow for fahrenheit and celsius
+                                        match sensor.high() {
+                                            Some(t) => {
+                                                if t.celsius() > 1 {
+                                                    self.cpu_temp_high = t.celsius().round() as i32;
+                                                } else {
+                                                    self.cpu_temp_high = 80;
+                                                }
+                                            }
+                                            None => self.cpu_temp_high = 80,
+                                        }
+
+                                        match sensor.critical() {
+                                            Some(t) => {
+                                                if t.celsius() > 1 {
+                                                    self.cpu_temp_crit = t.celsius().round() as i32;
+                                                } else {
+                                                    self.cpu_temp_crit = 95;
+                                                }
+                                            }
+                                            None => self.cpu_temp_crit = 95,
+                                        }
+                                } else if (label.starts_with("Package") || label.starts_with("Tdie"))
+                                    && vec!["", "other"].iter().any(|&s| s.to_owned() == cpu_type)
+                                    && s_name == "_-_"
+                                    && sensor.current().celsius().round() > 0 {
+                                        
+                                        if self.cpu_temp_high == 0 || self.sensor_swap || cpu_type == "other" {
+                                            self.sensor_swap = false;
+                                            match sensor.high() {
+                                                Some(t) => {
+                                                    if t > 1 {
+                                                        self.cpu_temp_high = t.celsius().round();
+                                                    } else {
+                                                        self.cpu_temp_high = 80
+                                                    }
+                                                }
+                                                None => self.cpu_temp_high = 80,
+                                            }
+
+                                            match sensor.critical() {
+                                                Some(t) => {
+                                                    if t > 1 {
+                                                        self.cpu_temp_crit = t.celsius().round();
+                                                    } else {
+                                                        self.cpu_temp_crit = 95;
+                                                    }
+                                                },
+                                                None =>  self.cpu_temp_crit = 95,
+                                            }
+
+                                            if label.starts_with("Package") {
+                                                cpu_type = "intel";
+                                            } else {
+                                                cpu_type = "ryzen";
+                                            }
+                                        }
+                                } else if (label.starts_with("Core")
+                                || label.starts_with("Tccd")
+                                || label.starts_with("CPU")
+                                || name.to_owned().to_lowercase().starts_with("cpu"))
+                                && sensor.current().celsius() > 0 {
+                                    if label.starts_with("Core")
+                                    || label.starts_with("Tccd") {
+                                        entry_int = label.replace("Core", "").replace("Tccd", "").parse::<i32>();
+
+                                        if core_dict.contains_key(entry_int) && cpu_type != "ryzen" {
+                                            if c_max == 0 {
+                                                let mut largest = 0;
+                                                for (key, val) in core_dict {
+                                                    if key > largest{
+                                                        largest = key.clone();
+                                                    }
+                                                }
+                                                c_max == largest + 1;
+                                            }
+                                            if c_max < (THREADS / 2).floor() && !core_dict.contains_key(entry_int + c_max) {
+                                                core_dict.insert(entry_int + c_max, sensor.current().celsius().round());
+                                            }
+                                            continue;
+                                        } else if core_dict.contains(entry_int) {
+                                            continue;
+                                        }
+                                        core_dict.set(entry_int, sensor.current().celsius().round());
+                                        continue;
+                                    } else if vec!["intel", "ryzen"].contains(cpu_type) {
+                                        continue;
+                                    }
+
+                                    if cpu_type == "" {
+                                        cpu_type = String::from("other");
+                                        if self.cpu_temp_high == 0 || self.sensor_swap {
+                                            self.sensor_swap = false;
+                                            
+                                            match sensor.high() {
+                                                Some(t) => {
+                                                    if t.celsius() > 1 {
+                                                        self.cpu_temp_high = t.celsius().round();
+                                                    } else {
+                                                        self.cpu_temp_high = match name {
+                                                            "cpu_thermal" => 60,
+                                                            _ => 80,
+                                                        };
+                                                    }
+                                                },
+                                                None => self.cpu_temp_high = match name {
+                                                    "cpu_thermal" => 60,
+                                                    _ => 80,
+                                                },
+                                            }
+
+                                            match sensor.critical() {
+                                                Some(t) => {
+                                                    if t.celsius() > 1 {
+                                                        self.cpu_temp_crit = t.celsius().round();
+                                                    } else {
+                                                        self.cpu_temp_crit = match name {
+                                                            "cpu_thermal" => 80,
+                                                            _ => 95,
+                                                        };
+                                                    }
+                                                },
+                                                None => self.cpu_temp_crit = match name {
+                                                    "cpu_thermal" => 80,
+                                                    _ => 95,
+                                                },
+                                            }
+                                        }
+                                        temp = sensor.current().celsius().round();
+                                    }
+                                    cores.append(sensor.current().celsius().round());
+                                }
+                            }
+                            None => (),
+                        }
+                    }
+                    Err(e) => (),
+                }
+                num += 1;
+            }
+            
+            if core_dict.len() > 0 {
+                if temp == 1000 {
+                    temp = 
+                }
+            }
         }
     }
-
-
 }
