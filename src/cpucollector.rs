@@ -62,6 +62,8 @@ impl CollTrait for CpuCollector {
         redraw: bool,
         only_draw: bool,
         t: Term,
+        CORES: u64,
+        CORE_MAP: Vec<i32>,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -83,7 +85,8 @@ impl CollTrait for CpuCollector {
                         CONFIG_DIR,
                         format!("Unable to collect CPU percentages! (error {})", e),
                     );
-                    vec![-1.0]
+                    self.got_sensors = false;
+                    return;
                 }
             },
             Err(e) => {
@@ -124,7 +127,7 @@ impl CollTrait for CpuCollector {
             Err(e) => {
                 error::errlog(
                     CONFIG_DIR,
-                    format!("Unable to collect CPU frequencies! (error {})", e),
+                    format!("Unable to collect load average! (error {})", e),
                 );
                 vec![-1.0]
             }
@@ -154,7 +157,7 @@ impl CollTrait for CpuCollector {
         };
 
         if CONFIG.check_temp && self.got_sensors {
-            self.collect_temps(CONFIG, THREADS);
+            self.collect_temps(CONFIG, CONFIG_DIR, THREADS, CORES, CORE_MAP);
         }
     }
 }
@@ -243,7 +246,15 @@ impl CpuCollector {
         }
     }
 
-    pub fn collect_temps(&mut self, CONFIG: Config, THREADS: u64) {
+    pub fn collect_temps<P: AsRef<Path>>(
+        &mut self,
+        CONFIG: Config,
+        CONFIG_DIR: P,
+        THREADS: u64,
+        CORES: u64,
+        CORE_MAP: Vec<i32>,
+        cpu_box: CpuBox,
+    ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
         let mut core_dict: HashMap<i32, i32> = HashMap::<i32, i32>::new();
@@ -346,8 +357,11 @@ impl CpuCollector {
                             && sensor.current().celsius() > 0.0
                         {
                             if label.starts_with("Core") || label.starts_with("Tccd") {
-                                entry_int =
-                                    label.replace("Core", "").replace("Tccd", "").parse::<i32>().unwrap();
+                                entry_int = label
+                                    .replace("Core", "")
+                                    .replace("Tccd", "")
+                                    .parse::<i32>()
+                                    .unwrap();
 
                                 if core_dict.contains_key(&entry_int) && cpu_type != "ryzen" {
                                     if c_max == 0 {
@@ -371,7 +385,8 @@ impl CpuCollector {
                                 } else if core_dict.contains_key(&entry_int) {
                                     continue;
                                 }
-                                core_dict.insert(entry_int, sensor.current().celsius().round() as i32);
+                                core_dict
+                                    .insert(entry_int, sensor.current().celsius().round() as i32);
                                 continue;
                             } else if vec!["intel", "ryzen"].contains(&(cpu_type.as_str())) {
                                 continue;
@@ -439,6 +454,209 @@ impl CpuCollector {
                     self.cpu_temp_crit = 95;
                 }
                 self.cpu_temp.get(0).unwrap().push(temp as u32);
+                if cpu_type == String::from("ryzen") {
+                    let ccds: i32 = core_dict.len() as i32;
+                    let cores_per_ccd: i32 = (CORES / ccds as u64) as i32;
+                    let mut z: i32 = 1;
+
+                    for x in 0..THREADS as usize {
+                        if x == CORES as usize {
+                            z = 1;
+                        }
+                        if CORE_MAP[x] + 1 > cores_per_ccd * z {
+                            z += 1;
+                        }
+                        if core_dict.contains_key(&z) {
+                            self.cpu_temp[x + 1].push(core_dict[&CORE_MAP[x]] as u32);
+                        }
+                    }
+                } else {
+                    for x in 0..THREADS as usize {
+                        if core_dict.contains_key(&CORE_MAP[x]) {
+                            self.cpu_temp[x + 1].push(core_dict[&CORE_MAP[x]] as u32);
+                        }
+                    }
+                }
+            } else if cores.len() == (THREADS / 2) as usize {
+                self.cpu_temp[0].push(temp as u32);
+                let mut n = 1;
+                for t in cores {
+                    match self.cpu_temp.get(n) {
+                        Some(u) => u.push(t.parse::<u32>().unwrap()),
+                        None => break,
+                    }
+                    match self.cpu_temp.get((THREADS / 2) as usize + n) {
+                        Some(u) => u.push(t.parse::<u32>().unwrap()),
+                        None => break,
+                    }
+
+                    n += 1;
+                }
+            } else {
+                self.cpu_temp[0].push(temp as u32);
+                if cores.len() > 1 {
+                    let mut n = 1;
+                    for t in cores {
+                        match self.cpu_temp.get(n) {
+                            Some(u) => u.push(t.parse::<u32>().unwrap()),
+                            None => break,
+                        }
+                        n += 1;
+                    }
+                }
+            }
+        } else {
+            match self.sensor_method.as_str() {
+                "coretemp" => {
+                    let coretemp_p = match Exec::shell("coretemp -p").capture() {
+                        Ok(o) => o.stdout_str().to_owned().trim().parse::<u32>().unwrap(),
+                        Err(e) => {
+                            error::errlog(
+                                CONFIG_DIR,
+                                format!(
+                                    "Error getting temperature data for this system... (error {})",
+                                    e
+                                ),
+                            );
+                            self.got_sensors = false;
+                            cpu_box.calc_size();
+                            return;
+                        }
+                    };
+
+                    temp = if coretemp_p > 0 { coretemp_p } else { 0 };
+
+                    let coretemp: Vec<u32> = match Exec::shell("coretemp").capture() {
+                        Ok(o) => o
+                            .stdout_str()
+                            .to_owned()
+                            .trim()
+                            .split(" ")
+                            .map(|s: &str| s.parse::<u32>().unwrap_or(0))
+                            .collect()
+                            .map(|u: u32| if u > 0 { u } else { 0 })
+                            .collect(),
+                        Err(e) => {
+                            error::errlog(
+                                CONFIG_DIR,
+                                format!(
+                                    "Error getting temperature data for this system... (error {})",
+                                    e
+                                ),
+                            );
+                            self.got_sensors = false;
+                            cpu_box.calc_size();
+                            return;
+                        }
+                    };
+
+                    cores = coretemp.iter().map(|u| u.to_string()).collect();
+
+                    if cores.len() == (THREADS as usize / 2) {
+                        self.cpu_temp[0].push(temp as u32);
+
+                        let mut n = 1;
+                        for t in cores {
+                            match self.cpu_temp.get(n) {
+                                Some(u) => u.push(t.parse::<u32>().unwrap()),
+                                None => break,
+                            }
+                            match self.cpu_temp.get((THREADS / 2) as usize + n) {
+                                Some(u) => u.push(t.parse::<u32>().unwrap()),
+                                None => break,
+                            }
+
+                            n += 1;
+                        }
+                    } else {
+                        cores.insert(0, temp.to_string());
+
+                        for (n, t) in cores.iter().enumerate() {
+                            match self.cpu_temp.get(n) {
+                                Some(u) => u.push(t.parse::<u32>().unwrap()),
+                                None => break,
+                            }
+                        }
+                    }
+
+                    if self.cpu_temp_high == 0 {
+                        self.cpu_temp_high = 85;
+                        self.cpu_temp_crit = 100;
+                    }
+                }
+                "osx-cpu-temp" => {
+                    let cpu_temp = match Exec::shell("osx-cpu-temp").capture() {
+                        Ok(o) => {
+                            let mut setter = o.stdout_str().to_owned().trim().to_owned();
+                            setter.pop();
+                            setter.pop();
+                            setter.parse::<f64>().unwrap().round() as u32
+                        }
+                        Err(e) => {
+                            error::errlog(
+                                CONFIG_DIR,
+                                format!(
+                                    "Error getting temperature data for this system... (error {})",
+                                    e
+                                ),
+                            );
+                            self.got_sensors = false;
+                            cpu_box.calc_size();
+                            return;
+                        }
+                    };
+
+                    temp = if cpu_temp > 0 { cpu_temp as i32 } else { 0 };
+
+                    if self.cpu_temp_high == 0 {
+                        self.cpu_temp_high = 85;
+                        self.cpu_temp_crit = 100;
+                    }
+                }
+                "vcgencmd" => {
+                    let vcgencmd = match Exec::shell("vcgencmd measure_temp").capture() {
+                        Ok(o) => {
+                            let mut setter = o.stdout_str().to_owned().trim()[5..].to_owned();
+                            setter.pop();
+                            setter.pop();
+                            setter.parse::<f64>().unwrap().round() as u32
+                        },
+                        Err(e) => {
+                            error::errlog(
+                                CONFIG_DIR,
+                                format!(
+                                    "Error getting temperature data for this system... (error {})",
+                                    e
+                                ),
+                            );
+                            self.got_sensors = false;
+                            cpu_box.calc_size();
+                            return;
+                        }
+                    };
+
+                    temp = if vcgencmd > 0 { vcgencmd as i32 } else { 0 };
+
+                    if self.cpu_temp_high == 0 {
+                        self.cpu_temp_high = 60;
+                        self.cpu_temp_crit = 80;
+                    }
+                }
+            }
+
+            if cores.len() == 0 {
+                self.cpu_temp[0].push(temp as u32);
+            }
+        }
+
+        if core_dict.len() == 0 && cores.len() <= 1 {
+            self.cpu_temp_only = true;
+        }
+        if self.cpu_temp[0].len() > 5 {
+            for n in 0..self.cpu_temp.len() {
+                if self.cpu_temp[n].len() == 0 {
+                    self.cpu_temp.remove(n);
+                }
             }
         }
     }
