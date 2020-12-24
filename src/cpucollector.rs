@@ -64,6 +64,7 @@ impl CollTrait for CpuCollector {
         t: Term,
         CORES: u64,
         CORE_MAP: Vec<i32>,
+        cpu_box : CpuBox,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -160,6 +161,10 @@ impl CollTrait for CpuCollector {
             self.collect_temps(CONFIG, CONFIG_DIR, THREADS, CORES, CORE_MAP);
         }
     }
+
+    fn draw(&mut self) {
+        self.cpu_box.draw_fg();
+    }
 }
 impl CpuCollector {
     pub fn get_sensors(&mut self, CONFIG: Config, SYSTEM: String) {
@@ -253,7 +258,6 @@ impl CpuCollector {
         THREADS: u64,
         CORES: u64,
         CORE_MAP: Vec<i32>,
-        cpu_box: CpuBox,
     ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
@@ -519,7 +523,7 @@ impl CpuCollector {
                                 ),
                             );
                             self.got_sensors = false;
-                            cpu_box.calc_size();
+                            self.cpu_box.calc_size();
                             return;
                         }
                     };
@@ -545,7 +549,7 @@ impl CpuCollector {
                                 ),
                             );
                             self.got_sensors = false;
-                            cpu_box.calc_size();
+                            self.cpu_box.calc_size();
                             return;
                         }
                     };
@@ -601,7 +605,7 @@ impl CpuCollector {
                                 ),
                             );
                             self.got_sensors = false;
-                            cpu_box.calc_size();
+                            self.cpu_box.calc_size();
                             return;
                         }
                     };
@@ -630,7 +634,7 @@ impl CpuCollector {
                                 ),
                             );
                             self.got_sensors = false;
-                            cpu_box.calc_size();
+                            self.cpu_box.calc_size();
                             return;
                         }
                     };
