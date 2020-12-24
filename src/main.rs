@@ -31,7 +31,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use string_template::*;
-use theme::Theme;
+use theme::{Theme, Color};
 
 pub fn main() {
     let mut b = brshtop::Brshtop::new();
@@ -311,4 +311,9 @@ pub fn main() {
         arg_output.push_str((arg + " ").as_str());
     }
     // errlog(CONFIG_DIR, format!("CMD: {}", arg_output));
+}
+
+/// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
+pub fn create_box(x : i32, y : i32, width : i32, height : i32, title : String, title2 : String, line_color : Color, title_color : Color, fill : bool, box : Box) -> String {
+
 }
