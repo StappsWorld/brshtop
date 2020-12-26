@@ -6,8 +6,11 @@ use crate::fx::*;
 use crate::collector::*;
 use crate::*;
 use std::sync::mpsc::*;
-use std::thread;
+use std::{thread, io};
 use terminal_size::{terminal_size, Height, Width};
+use termios::*;
+use std::os::unix::io::{RawFd, AsRawFd};
+
 
 pub struct Term {
     pub width: u16,
@@ -15,8 +18,8 @@ pub struct Term {
     pub resized: bool,
     pub _w: u16,
     pub _h: u16,
-    pub fg: String,
-    pub bg: String,
+    pub fg: Color,
+    pub bg: Color,
     pub hide_cursor: String,
     pub show_cursor: String,
     pub alt_screen: String,
@@ -38,8 +41,8 @@ impl Term {
             resized: false,
             _w : 0,
             _h : 0,
-            fg : "",  // Default foreground color,
-            bg : "",  // Default background color,
+            fg : Color::Default(),  // Default foreground color,
+            bg : Color::Default(),  // Default background color,
             hide_cursor : "\033[?25l",  // Hide terminal cursor,
             show_cursor : "\033[?25h",  // Show terminal cursor,
             alt_screen : "\033[?1049h", // Switch to alternate screen,
@@ -93,8 +96,8 @@ impl Term {
                 create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 3, String::from("resizing"), "".to_owned(), Color::Green(), Color::White(), true, Box::None),
                 format!("{}{}{}{}Width : {}   Height: {}{}{}{}",
                     mv::right(120),
-                    Color::default(),
-                    Color::black_bg(),
+                    Color::Default(),
+                    Color::BlackBg(),
                     fx::bold,
                     self._w,
                     self._h,
@@ -106,9 +109,9 @@ impl Term {
                 draw.now(self.clear);
                 draw.now(
                     create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 5, String::from("warning"), "".to_owned(), Color::Red(), Color::White(), true, Box::None),
-                    format!("{}{}{}{}Width: {}{}   ", Mv::right(12), Color::default(), Color::black_bg(), Fx::b, if self._w < 80 {Color::Red()} else {Color::Green()}, self._w),
-                    format!("{}Height: {}{}{}{}", Color::default(), if self._h < 24 {Color::Red()} else {Color::Green()}, self._h, self::bg, self::fg),
-                    format!("{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}", Mv::to((self._h / 2) as i32, (self._w / 2) as i32 - 23), Color::default(), Color::black_bg(), Fx::ub, self.bg, self.fg)
+                    format!("{}{}{}{}Width: {}{}   ", Mv::right(12), Color::default(), Color::BlackBg(), Fx::b, if self._w < 80 {Color::Red()} else {Color::Green()}, self._w),
+                    format!("{}Height: {}{}{}{}", Color::Default(), if self._h < 24 {Color::Red()} else {Color::Green()}, self._h, self::bg, self::fg),
+                    format!("{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}", Mv::to((self._h / 2) as i32, (self._w / 2) as i32 - 23), Color::Default(), Color::BlackBg(), Fx::ub, self.bg, self.fg)
                 );
                 self.winch = Event::Wait;
                 self.winch.wait(0.3);
@@ -156,11 +159,63 @@ impl Term {
         return;
     }
 
-    pub fn width() -> u16 {
-        0
+    /// Toggle input echo
+    pub fn echo<P: AsRef<Path>>(on : bool, CONFIG_DIR : P) {
+        let fd = io::stdin().as_raw_fd();
+
+        let mut termios = match Termios::from_fd(fd) {
+            Ok(t) => t,
+            Err(e) => {
+                error::errlog(
+                    CONFIG_DIR,
+                    format!(
+                        "Error getting Termios data... (error {})",
+                        e
+                    ),
+                );
+            }
+        };
+
+        if on {
+            termios.c_lflag |= termios::os::linux::ECHO;
+        } else {
+            termios.c_lflag &= !termios::os::linux::ECHO;
+        }
+
+        match tcsetattr(fd, os::target::TCSANOW, &termios) {
+            Ok(s) => (),
+            Err(e) => error::errlog(
+                CONFIG_DIR,
+                format!(
+                    "Error setting Termios data... (error {})",
+                    e
+                ),
+            )
+        }
     }
 
-    pub fn fg() -> Color {
-        Color::default()
+    pub fn title(text : String) -> String {
+        let out : String = match os::env::var("TERMINAL_TITLE") {
+            Ok(o) => o,
+            Err(e) => {
+                error::errlog(
+                    CONFIG_DIR,
+                    format!(
+                        "Error setting Termios data... (error {})",
+                        e
+                    )
+                );
+                return;
+            }
+        };
+
+        if text == String::from("") {
+            out.push_str(" ");
+        } else {
+            out.push_str(text);
+        }
+        
+        format!("\033]0;{}\a", out)
     }
+    
 }
