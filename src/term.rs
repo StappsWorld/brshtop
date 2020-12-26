@@ -93,8 +93,8 @@ impl Term {
                 create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 3, String::from("resizing"), "".to_owned(), Color::Green(), Color::White(), true, Box::None),
                 format!("{}{}{}{}Width : {}   Height: {}{}{}{}",
                     mv::right(120),
-                    Colors::default(),
-                    Colors::black_bg(),
+                    Color::default(),
+                    Color::black_bg(),
                     fx::bold,
                     self._w,
                     self._h,
@@ -105,10 +105,10 @@ impl Term {
             while self._w < 80 || self._h < 24 {
                 draw.now(self.clear);
                 draw.now(
-                    create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 5, String::from("warning"), "".to_owned(), Colors::Red(), Colors::White(), true, Box::None),
-                    format!("{}{}{}{}Width: {}{}   ", Mv::right(12), Colors::default(), Colors::black_bg(), Fx::b, if self._w < 80 {Colors::Red()} else {Colors::Green()}, self._w),
-                    format!("{}Height: {}{}{}{}", Colors::default(), if self._h < 24 {Colors::Red()} else {Colors::Green()}, self._h, self::bg, self::fg),
-                    format!("{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}", Mv::to((self._h / 2) as i32, (self._w / 2) as i32 - 23), Colors::default(), Colors::black_bg(), Fx::ub, self.bg, self.fg)
+                    create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 5, String::from("warning"), "".to_owned(), Color::Red(), Color::White(), true, Box::None),
+                    format!("{}{}{}{}Width: {}{}   ", Mv::right(12), Color::default(), Color::black_bg(), Fx::b, if self._w < 80 {Color::Red()} else {Color::Green()}, self._w),
+                    format!("{}Height: {}{}{}{}", Color::default(), if self._h < 24 {Color::Red()} else {Color::Green()}, self._h, self::bg, self::fg),
+                    format!("{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}", Mv::to((self._h / 2) as i32, (self._w / 2) as i32 - 23), Color::default(), Color::black_bg(), Fx::ub, self.bg, self.fg)
                 );
                 self.winch = Event::Wait;
                 self.winch.wait(0.3);
