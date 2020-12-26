@@ -1,6 +1,8 @@
 use crate::error::*;
 use crate::event::Event;
 use crate::theme::Color;
+use crate::mv::*;
+use crate::fx::*;
 use crate::collector::*;
 use crate::*;
 use std::sync::mpsc::*;
@@ -56,7 +58,7 @@ impl Term {
     }
 
     ///Updates width and height and sets resized flag if terminal has been resized
-    pub fn refresh(&mut self, args: Vec<String>, collector : Collector, init : Init, cpu_box : CpuBox, draw : Draw, force: bool) {
+    pub fn refresh(&mut self, args: Vec<String>, collector : Collector, init : Init, cpu_box : CpuBox, draw : Draw, force: bool, mv : Mv, fx : Fx) {
         if self.resized {
             self.winch.send(Event::Flag(true));
             return;
@@ -89,7 +91,25 @@ impl Term {
             self.width = self._w;
             self.height = self._h;
             draw.now(term.clear());
-            draw.now(create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 3, String::from("resizing"), "".to_owned(), Color::Green(), Color::White(), true, Box::None)
+            draw.now(
+                create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 3, String::from("resizing"), "".to_owned(), Color::Green(), Color::White(), true, Box::None),
+                format!("{}{}{}{}Width : {}   Height: {}{}{}{}",
+                    mv::right(120),
+                    Colors::default,
+                    Colors::black_bg,
+                    fx::bold,
+                    self._w,
+                    self._h,
+                    fx::ub,
+                    self.bg,
+                    self.fg));
+
+            while self._w < 80 || self._h < 24 {
+                draw.now(self.clear);
+                draw.now(
+                    format!()
+                )
+            }
         }
     }
 
