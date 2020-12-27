@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::os::unix::io::RawFd;
-use nix::{fcntl, libc::O_NONBLOCK};
+use nix::{fcntl, libc::(O_NONBLOCK as i32)};
 
 pub struct Nonblocking {
     pub stream : File,
@@ -33,7 +33,7 @@ impl Nonblocking {
             }
         };
 
-        match fcntl::fcntl(self.fd, fcntl::FcntlArg::F_SETFL(fcntl::OFlag{bits : self.orig_fl.unwrap() | O_NONBLOCK})) {
+        match fcntl::fcntl(self.fd, fcntl::FcntlArg::F_SETFL(fcntl::OFlag{bits : self.orig_fl.unwrap() | O_NONBLOCK as i32})) {
             Ok(_) => (),
             Err(e) => {
                 error::errlog(
