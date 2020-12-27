@@ -9,7 +9,6 @@ use std::sync::mpsc::*;
 use std::{thread, io};
 use terminal_size::{terminal_size, Height, Width};
 use termios::*;
-use std::os::unix::io::{RawFd, AsRawFd};
 
 
 pub struct Term {
@@ -173,6 +172,7 @@ impl Term {
                         e
                     ),
                 );
+                return;
             }
         };
 

@@ -1,18 +1,20 @@
-//mod banner;
+mod banner;
 mod brshtop;
 mod config;
 mod consts;
 mod error;
 mod event;
-//mod graph;
+mod graph;
 mod mv;
 mod symbol;
-//mod term;
+mod term;
 mod theme;
 mod timeit;
-//mod collector;
-//mod cpucollector;
+mod collector;
+mod cpucollector;
 mod fx;
+mod raw;
+mod nonblocking;
 
 use {
     config::Config,
