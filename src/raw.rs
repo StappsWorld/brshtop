@@ -11,19 +11,20 @@ pub struct Raw {
 }
 impl Raw {
     pub fn new(s : File) {
+        let usable_fd = s.as_raw_fd();
         Raw {
             stream : s,
             fd : s.as_raw_fd(),
-            original_stty : Termios::from_fd(fd),
+            original_stty : Termios::from_fd(usable_fd),
         }
     }
 
     pub fn enter(&mut self) {
         termios::tcgetattr(self.fd, self.original_stty);
-        
+
     }
 
     pub fn exit(&mut self) {
-
+        
     }
 }

@@ -1,6 +1,8 @@
+use crate::error;
 use std::fs::File;
+use std::path::Path;
 use std::os::unix::io::RawFd;
-use nix::{fcntl, libc::(O_NONBLOCK as i32)};
+use nix::{fcntl, libc::O_NONBLOCK};
 
 pub struct Nonblocking {
     pub stream : File,
@@ -18,7 +20,7 @@ impl Nonblocking {
     }
 
 
-    pub fn enter(&mut self){
+    pub fn enter<P: AsRef<Path>>(&mut self, CONFIG_DIR : P){
         self.orig_fl = match fcntl::fcntl(self.fd, fcntl::FcntlArg::F_GETFL){
             Ok(o) => Some(o),
             Err(e) => {

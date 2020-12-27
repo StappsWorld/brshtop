@@ -92,7 +92,15 @@ impl Term {
             self.height = self._h;
             draw.now(term.clear());
             draw.now(
-                create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 3, String::from("resizing"), "".to_owned(), Color::Green(), Color::White(), true, Box::None),
+                create_box((self._w / 2) as i32 - 25,
+                    (self._h / 2) as i32 - 2,
+                    50, 3, 
+                    String::from("resizing"), 
+                    "".to_owned(), 
+                    Color::Green(), 
+                    Color::White(), 
+                    true, 
+                    Box::None),
                 format!("{}{}{}{}Width : {}   Height: {}{}{}{}",
                     mv::right(120),
                     Color::Default(),
@@ -194,8 +202,8 @@ impl Term {
         }
     }
 
-    pub fn title(text : String) -> String {
-        let out : String = match os::env::var("TERMINAL_TITLE") {
+    pub fn title<P: AsRef<Path>>(text : String, CONFIG_DIR : P) -> String {
+        let out : String = match std::env::var("TERMINAL_TITLE") {
             Ok(o) => o,
             Err(e) => {
                 error::errlog(

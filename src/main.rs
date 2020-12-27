@@ -22,6 +22,7 @@ use {
     error::{errlog, throw_error},
 };
 
+use nix;
 use clap::{App, Arg};
 use expanduser::expanduser;
 use log::LevelFilter;
@@ -316,8 +317,8 @@ pub fn main() {
     // errlog(CONFIG_DIR, format!("CMD: {}", arg_output));
 }
 
-/*
+
 /// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
 pub fn create_box(x : i32, y : i32, width : i32, height : i32, title : String, title2 : String, line_color : Color, title_color : Color, fill : bool, box : Box) -> String {
 
-}*/
+}
