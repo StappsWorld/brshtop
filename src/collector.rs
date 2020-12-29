@@ -10,9 +10,7 @@ use std::path::*;
 
 
 
-pub trait CollTrait {
-    fn init(tx_build : Sender<Event>, rx_build : Receiver<Event>);
-    
+pub trait CollTrait {    
     /// Setup collect queue for runner, default: {draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False}
     fn collect<P: AsRef<Path>>(&mut self, collectors : Vec<dyn CollTrait>, CONFIG_DIR : P, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool);
     
@@ -33,12 +31,40 @@ pub struct Collector {
     pub collect_run : Event,
     pub collect_idle: Event,
     pub collect_done: Event,
-    pub collect_queue: Vec<CollTrait>,
-    pub default_collect_queue: Vec<CollTrait>,
+    pub collect_queue: Vec<Box<CollTrait>>,
+    pub default_collect_queue: Vec<Box<CollTrait>>,
     pub collect_interrupt: bool,
     pub proc_interrupt: bool,
     pub use_draw_list: bool,
 } impl CollTrait for Collector{
+
+    
+
+    
+
+    fn collect<P: AsRef<Path>>(&mut self, collectors : Vec<Box<dyn CollTrait>>, CONFIG : Config, CONFIG_DIR : P, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool) {
+        self.collect_interrupt = interrupt;
+        self.proc_interrupt = proc_interrupt;
+        self.collect_idle = Event::Wait;
+        self.collect_idle.wait(-1);
+        self.collect_interrupt = false;
+        self.proc_interrupt = false;
+        self.use_draw_list = false;
+        self.draw_now = draw_now;
+        self.redraw = redraw;
+        self.only_draw = only_draw;
+
+        if collectors.capacity() > 0 {
+            self.collect_queue = collectors;
+            self.use_draw_list = true;
+        } else {
+            self.collect_queue = self.default_collect_queue.clone();
+        }
+
+        self.collect_run = Event::Flag(true);
+    }
+
+} impl Collector {
 
     fn init(tx_build : Sender<Event>, rx_build : Receiver<Event>) {
         let (tx_build, rx_build) = channel();
@@ -57,40 +83,14 @@ pub struct Collector {
             collect_run : Event::Flag(false),
             collect_done : Event::Flag(false),
             collect_idle : Event::Flag(true),
-            collect_done : Event::Flag(false),
-            collect_queue : Vec::<CollTrait>::new(),
-            default_collect_queue : Vec::<CollTrait>::new(),
+            collect_queue : Vec::<Box<CollTrait>>::new(),
+            default_collect_queue : Vec::<Box<CollTrait>>::new(),
             collect_interrupt : false,
             proc_interrupt : false,
             use_draw_list : false,
         };
     }
 
-    
-
-    fn collect<P: AsRef<Path>>(&mut self, collectors : Vec<dyn CollTrait>, CONFIG : Config, CONFIG_DIR : P, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool) {
-        self.collect_interrupt = interrupt;
-        self.proc_interrupt = proc_interrupt;
-        self.collect_idle = Event::Wait;
-        self.collect_idle.wait(-1);
-        self.collect_interrupt = false;
-        self.proc_interrupt = false;
-        self.use_draw_list = false;
-        self.draw_now = draw_now;
-        self.redraw = redraw;
-        self.only_draw = only_draw;
-
-        if collectors.capacity() > 0 {
-            self.collect_queue = collectors;
-            self.use_draw_list = true;
-        } else {
-            self.collect_queue = self.default_collect_queue.copy();
-        }
-
-        self.collect_run = Event::Flag(true);
-    }
-
-} impl Collector {
     pub fn start(&mut self, CONFIG : Config, b : Box, t : TimeIt, m : Menu, d : Draw) {
         self.stopping = false;
         self.thread = thread::spawn(|| self.runner(&self, b, t));

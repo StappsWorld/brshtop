@@ -1,5 +1,5 @@
 use {
-    crate::{mv, theme::Color, BANNER_SRC},
+    crate::{mv, theme::Color, BANNER_SRC, term::Term},
     lazy_static::lazy_static,
 };
 lazy_static! {
@@ -62,17 +62,18 @@ pub fn draw_banner(
     mut col: u32, /*TODO: Same*/
     center: bool,
     now: bool,
+    term : Term
 ) -> String {
     let mut out = String::new();
     if center {
-        col = crate::term::Term::width() as u32 / 2 - BANNER_META.length as u32 / 2;
+        col = term.width as u32 / 2 - BANNER_META.length as u32 / 2;
     }
 
     for (n, o) in BANNER_META.out.iter().enumerate() {
         out.push_str(&format!("{}{}", mv::to(line + n as u32, col), o))
     }
 
-    out.push_str(&crate::term::Term::fg().to_string());
+    out.push_str(&term.fg.to_string());
 
     if now {
         // TODO:
