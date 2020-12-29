@@ -1,20 +1,12 @@
-use std::*;
-use std::sync::mpsc::*;
-use crate::event::Event;
-use crate::Config;
-use crate::Error::*;
-use thread_control::*;
+use crate::{cpucollector::CpuCollector, event::Event, Config, Error::*};
 use std::path::*;
+use std::sync::mpsc::*;
+use std::*;
+use thread_control::*;
 
-
-
-
-
-pub trait CollTrait {    
-    /// Setup collect queue for runner, default: {draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False}
-    fn collect<P: AsRef<Path>>(&mut self, collectors : Vec<dyn CollTrait>, CONFIG_DIR : P, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool);
-    
-    fn draw(&mut self);
+#[derive(Clone)]
+pub enum Collectors {
+    CpuCollector(CpuCollector),
 }
 
 pub struct Collector {
@@ -28,25 +20,56 @@ pub struct Collector {
     pub thread: Option<thread::JoinHandle<()>>,
     pub flag: Flag,
     pub control: Control,
-    pub collect_run : Event,
+    pub collect_run: Event,
     pub collect_idle: Event,
     pub collect_done: Event,
-    pub collect_queue: Vec<Box<CollTrait>>,
-    pub default_collect_queue: Vec<Box<CollTrait>>,
+    pub collect_queue: Vec<Collectors>,
+    pub default_collect_queue: Vec<Collectors>,
     pub collect_interrupt: bool,
     pub proc_interrupt: bool,
     pub use_draw_list: bool,
-} impl CollTrait for Collector{
+}
+impl Collector {
+    pub fn new(tx_build: Sender<Event>, rx_build: Receiver<Event>) {
+        let (tx_build, rx_build) = channel();
+        let (flag_build, control_build) = make_pair();
+        let mut collecter_initialize = Collector {
+            stopping: false,
+            started: false,
+            draw_now: false,
+            redraw: false,
+            only_draw: false,
+            tx: tx_build,
+            rx: rx_build,
+            flag: flag_build,
+            control: control_build,
+            thread: None,
+            collect_run: Event::Flag(false),
+            collect_done: Event::Flag(false),
+            collect_idle: Event::Flag(true),
+            collect_queue: Vec::<Collectors>::new(),
+            default_collect_queue: Vec::<Collectors>::new(),
+            collect_interrupt: false,
+            proc_interrupt: false,
+            use_draw_list: false,
+        };
+    }
 
-    
-
-    
-
-    fn collect<P: AsRef<Path>>(&mut self, collectors : Vec<Box<dyn CollTrait>>, CONFIG : Config, CONFIG_DIR : P, draw_now : bool, interrupt : bool, proc_interrupt : bool, redraw : bool, only_draw : bool) {
+    pub fn collect<P: AsRef<Path>>(
+        &mut self,
+        collectors: Vec<Collectors>,
+        CONFIG: Config,
+        CONFIG_DIR: P,
+        draw_now: bool,
+        interrupt: bool,
+        proc_interrupt: bool,
+        redraw: bool,
+        only_draw: bool,
+    ) {
         self.collect_interrupt = interrupt;
         self.proc_interrupt = proc_interrupt;
         self.collect_idle = Event::Wait;
-        self.collect_idle.wait(-1);
+        self.collect_idle.wait(-1.0);
         self.collect_interrupt = false;
         self.proc_interrupt = false;
         self.use_draw_list = false;
@@ -54,7 +77,7 @@ pub struct Collector {
         self.redraw = redraw;
         self.only_draw = only_draw;
 
-        if collectors.capacity() > 0 {
+        if collectors.len() > 0 {
             self.collect_queue = collectors;
             self.use_draw_list = true;
         } else {
@@ -64,38 +87,11 @@ pub struct Collector {
         self.collect_run = Event::Flag(true);
     }
 
-} impl Collector {
-
-    fn init(tx_build : Sender<Event>, rx_build : Receiver<Event>) {
-        let (tx_build, rx_build) = channel();
-        let (flag_build, control_build) = make_pair();
-        let mut collecter_initialize = Collector {
-            stopping : false,
-            started : false,
-            draw_now : false,
-            redraw : false,
-            only_draw : false,
-            tx : tx_build,
-            rx : rx_build,
-            flag : flag_build,
-            control : control_build,
-            thread : None,
-            collect_run : Event::Flag(false),
-            collect_done : Event::Flag(false),
-            collect_idle : Event::Flag(true),
-            collect_queue : Vec::<Box<CollTrait>>::new(),
-            default_collect_queue : Vec::<Box<CollTrait>>::new(),
-            collect_interrupt : false,
-            proc_interrupt : false,
-            use_draw_list : false,
-        };
-    }
-
-    pub fn start(&mut self, CONFIG : Config, b : Box, t : TimeIt, m : Menu, d : Draw) {
+    pub fn start(&mut self, CONFIG: Config, b: Box, t: TimeIt, m: Menu, d: Draw) {
         self.stopping = false;
         self.thread = thread::spawn(|| self.runner(&self, b, t));
         self.started = true;
-        self.default_collect_queue = vec!{b, t, m, d};
+        self.default_collect_queue = vec![b, t, m, d];
     }
 
     pub fn stop(&mut self) {
@@ -112,12 +108,11 @@ pub struct Collector {
                         break;
                     }
                 }
-                
             }
         }
     }
 
-    pub fn runner(&mut self, CONFIG : Config, DEBUG : bool, b : Box, t : TimeIt, m : Menu, d : Draw) {
+    pub fn runner(&mut self, CONFIG: Config, DEBUG: bool, b: Box, t: TimeIt, m: Menu, d: Draw) {
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
@@ -155,7 +150,6 @@ pub struct Collector {
                 if self.collect_interrupt {
                     break;
                 }
-
             }
 
             if DEBUG && !debugged {
@@ -177,10 +171,6 @@ pub struct Collector {
 
             self.collect_idle = Event::Flag(true);
             self.collect_done = Event::Flag(true);
-
         }
-        
-
     }
 }
-

@@ -1,4 +1,4 @@
-use crate::{mv, symbol, theme::Color};
+use crate::{mv, symbol, theme::Color, term::Term};
 use maplit::hashmap;
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
@@ -38,6 +38,7 @@ impl Graph {
         height: usize,
         color: Option<C>,
         data: Vec<usize>, // TODO: Data type
+        term : Term,
     ) -> Self
     where
         C: Into<Color>,
@@ -77,7 +78,7 @@ impl Graph {
             last: 0,
         };
 
-        graph._refresh_data();
+        graph._refresh_data(term);
 
         graph
     }
@@ -92,9 +93,9 @@ impl Graph {
         };
         self
     }
-    pub fn max_value(mut self, max_value: usize) -> Self {
+    pub fn max_value(mut self, max_value: usize, term : Term) -> Self {
         self.max_value = max_value;
-        self._refresh_data();
+        self._refresh_data(term);
         self
     }
     pub fn offset(mut self, offset: usize) -> Self {
@@ -106,7 +107,7 @@ impl Graph {
         self
     }
 
-    fn _refresh_data(&mut self) {
+    fn _refresh_data(&mut self, term : Term) {
         let value_width = (self._data.len() as f32 / 2.).ceil() as usize;
 
         self._data = if self._data.is_empty() {
@@ -137,9 +138,10 @@ impl Graph {
             self.graphs.get_mut(&false).unwrap().push(filler.clone());
         }
 
-        self._create(true);
+        self._create(true, term);
     }
-    fn _create(&mut self, new: bool) {
+
+    fn _create(&mut self, new: bool, term : Term) {
         let mut value = hashmap! {
             "left" => 0,
             "right" => 0,
@@ -258,11 +260,11 @@ impl Graph {
         }
 
         if !self.colors.is_empty() {
-            self.out.push_str(&crate::term::Term::fg().to_string())
+            self.out.push_str(&term.fg.to_string())
         }
     }
 
-    fn _call(&mut self, value: Option<usize>) -> String {
+    fn _call(&mut self, value: Option<usize>, term : Term) -> String {
         if let Some(value) = value {
             self.current = !self.current;
 
@@ -303,17 +305,17 @@ impl Graph {
                 } else {
                     100
                 }];
-                self._refresh_data();
+                self._refresh_data(term);
             }
 
-            self._create(false);
+            self._create(false, term);
         }
 
         self.out.clone()
     }
 
-    pub fn add(&mut self, value: Option<usize>) -> String {
-        self._call(value)
+    pub fn add(&mut self, value: Option<usize>, term : Term) -> String {
+        self._call(value, term)
     }
 }
 impl Display for Graph {

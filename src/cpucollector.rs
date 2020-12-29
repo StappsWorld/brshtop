@@ -1,7 +1,4 @@
-use crate::collector::*;
-use crate::error;
-use crate::config;
-use crate::term;
+use crate::{collector::*, config::Config, error, term::Term, collector::Collectors};
 use hhmmss::Hhmmss;
 use psutil::sensors::*;
 use std::time::SystemTime;
@@ -25,8 +22,8 @@ pub struct CpuCollector {
     pub sensor_swap: bool,
     pub cpu_temp_only: bool,
 }
-impl CollTrait for CpuCollector {
-    fn init(THREADS: u64) {
+impl CpuCollector {
+    pub fn new(THREADS: u64) -> Self {
         let mut cpu_usage_mut = Vec::<Vec<u32>>::new();
         let mut cpu_temp_mut = Vec::<Vec<u32>>::new();
         for _ in 0..THREADS + 1 {
@@ -49,11 +46,12 @@ impl CollTrait for CpuCollector {
             sensor_swap: false,
             cpu_temp_only: false,
         };
-    }
 
+        CpuCollector_initialize
+    }
     fn collect<P: AsRef<Path>>(
         &mut self,
-        collectors: Vec<dyn CollTrait>,
+        collectors: Vec<Collectors>,
         CONFIG: Config,
         THREADS: u64,
         CONFIG_DIR: P,
@@ -65,7 +63,7 @@ impl CollTrait for CpuCollector {
         t: Term,
         CORES: u64,
         CORE_MAP: Vec<i32>,
-        cpu_box : CpuBox,
+        cpu_box: CpuBox,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -75,7 +73,7 @@ impl CollTrait for CpuCollector {
             Err(_) => (),
         }
 
-        if self.cpu_usage[0] > t.width * 4 {
+        if self.cpu_usage[0].len() > (t.width * 4) as usize {
             self.cpu_usage[0].remove(0);
         }
 
@@ -102,7 +100,7 @@ impl CollTrait for CpuCollector {
 
         for (n, thread) in cpu_percentages.iter().enumerate() {
             self.cpu_usage[n].push(format!("{:.2}", *thread as u32));
-            if self.cpu_usage[n].capacity() > t.width * 2 {
+            if self.cpu_usage[n].len() > (t.width * 2) as usize {
                 self.cpu_usage[n].remove(0);
             }
         }
@@ -166,8 +164,7 @@ impl CollTrait for CpuCollector {
     fn draw(&mut self) {
         self.cpu_box.draw_fg();
     }
-}
-impl CpuCollector {
+
     pub fn get_sensors(&mut self, CONFIG: Config, SYSTEM: String) {
         self.sensor_method = String::from("");
 
@@ -625,7 +622,7 @@ impl CpuCollector {
                             setter.pop();
                             setter.pop();
                             setter.parse::<f64>().unwrap().round() as u32
-                        },
+                        }
                         Err(e) => {
                             error::errlog(
                                 CONFIG_DIR,
@@ -663,6 +660,24 @@ impl CpuCollector {
                     self.cpu_temp.remove(n);
                 }
             }
+        }
+    }
+} impl Clone for CpuCollector {
+    fn clone(&mut self) -> Self {
+        CpuCollector {
+            cpu_usage: self.cpu_usage.clone(),
+            cpu_temp: self.cpu_temp.clone(),
+            cpu_temp_high: self.cpu_temp_high.clone(),
+            cpu_temp_crit: self.cpu_temp_crit.clone(),
+            freq_error: self.freq_error.clone(),
+            cpu_freq: self.cpu_freq.clone(),
+            load_avg: self.load_avg.clone(),
+            uptime: self.uptime.clone(),
+            buffer: self.buffer.clone(),
+            sensor_method: self.sensor_method.clone(),
+            got_sensors: self.got_sensors.clone(),
+            sensor_swap: self.sensor_swap.clone(),
+            cpu_temp_only: self.cpu_temp_only.clone(),
         }
     }
 }

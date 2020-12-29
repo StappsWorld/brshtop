@@ -1,8 +1,8 @@
 use crate::error::*;
 use crate::event::Event;
 use crate::theme::Color;
-use crate::mv::*;
-use crate::fx;
+use crate::mv;
+use crate::fx::Fx;
 use crate::collector::*;
 use crate::*;
 use std::sync::mpsc::*;
@@ -60,7 +60,7 @@ impl Term {
     }
 
     ///Updates width and height and sets resized flag if terminal has been resized
-    pub fn refresh(&mut self, args: Vec<String>, collector : Collector, init : Init, cpu_box : CpuBox, draw : Draw, force: bool, mv : Mv, fx : Fx, key : Key, menu : Menu, box_class : Box, timer : Timer, term : Term) {
+    pub fn refresh(&mut self, args: Vec<String>, collector : Collector, init : Init, cpu_box : CpuBox, draw : Draw, force: bool, fx : Fx, key : Key, menu : Menu, box_class : Box, timer : Timer, term : Term) {
         if self.resized {
             self.winch = Event::Flag(true);
             return;
