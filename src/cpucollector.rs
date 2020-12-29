@@ -1,6 +1,7 @@
 use crate::collector::*;
 use crate::error;
-use crate::Config;
+use crate::config;
+use crate::term;
 use hhmmss::Hhmmss;
 use psutil::sensors::*;
 use std::time::SystemTime;

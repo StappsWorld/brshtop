@@ -1,7 +1,7 @@
 use crate::error;
 use std::fs::File;
 use std::path::Path;
-use std::os::unix::io::RawFd;
+use std::os::unix::io::{RawFd, AsRawFd};
 use nix::{fcntl, libc::O_NONBLOCK};
 
 pub struct Nonblocking {
@@ -11,10 +11,10 @@ pub struct Nonblocking {
 }
 impl Nonblocking {
 
-    pub fn new(s : File) {
+    pub fn new(s : File) -> Self {
         Nonblocking {
             stream : s,
-            fd : s.as_raw_fd(),
+            fd : s.as_raw_fd().clone(),
             orig_fl : None,
         }
     }

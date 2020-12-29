@@ -2,13 +2,15 @@ use crate::error::*;
 use crate::event::Event;
 use crate::theme::Color;
 use crate::mv::*;
-use crate::fx::*;
+use crate::fx;
 use crate::collector::*;
 use crate::*;
 use std::sync::mpsc::*;
 use std::{thread, io};
 use terminal_size::{terminal_size, Height, Width};
 use termios::*;
+use std::os::unix::io::{RawFd, AsRawFd};
+
 
 
 pub struct Term {
@@ -32,7 +34,7 @@ pub struct Term {
 }
 impl Term {
 
-    pub fn new() {
+    pub fn new() -> Self {
         let (winch_s_mut, winch_r_mut) = channel::<Event>();
         Term {
             width: 0,
@@ -42,23 +44,23 @@ impl Term {
             _h : 0,
             fg : Color::Default(),  // Default foreground color,
             bg : Color::Default(),  // Default background color,
-            hide_cursor : "\033[?25l",  // Hide terminal cursor,
-            show_cursor : "\033[?25h",  // Show terminal cursor,
-            alt_screen : "\033[?1049h", // Switch to alternate screen,
-            normal_screen : "\033[?1049l",  // Switch to normal screen,
-            clear : "\033[2J\033[0;0f",  // Clear screen and set cursor to position 0,0,
+            hide_cursor : String::from("\033[?25l"),  // Hide terminal cursor,
+            show_cursor : String::from("\033[?25h"),  // Show terminal cursor,
+            alt_screen : String::from("\033[?1049h"), // Switch to alternate screen,
+            normal_screen : String::from("\033[?1049l"),  // Switch to normal screen,
+            clear : String::from("\033[2J\033[0;0f"),  // Clear screen and set cursor to position 0,0,
             // Enable reporting of mouse position on click and release,
-            mouse_on : "\033[?1002h\033[?1015h\033[?1006h",
-            mouse_off : "\033[?1002l",  // Disable mouse reporting,
+            mouse_on : String::from("\033[?1002h\033[?1015h\033[?1006h"),
+            mouse_off : String::from("\033[?1002l"),  // Disable mouse reporting,
             // Enable reporting of mouse position at any movement,
-            mouse_direct_on : "\033[?1003h",
-            mouse_direct_off : "\033[?1003l",  // Disable direct mouse reporting,
+            mouse_direct_on : String::from("\033[?1003h"),
+            mouse_direct_off : String::from("\033[?1003l"),  // Disable direct mouse reporting,
             winch : Event::Flag(false),
         }
     }
 
     ///Updates width and height and sets resized flag if terminal has been resized
-    pub fn refresh(&mut self, args: Vec<String>, collector : Collector, init : Init, cpu_box : CpuBox, draw : Draw, force: bool, mv : Mv, fx : Fx, key : Key, menu : Menu, box_class : Box, timer : Timer) {
+    pub fn refresh(&mut self, args: Vec<String>, collector : Collector, init : Init, cpu_box : CpuBox, draw : Draw, force: bool, mv : Mv, fx : Fx, key : Key, menu : Menu, box_class : Box, timer : Timer, term : Term) {
         if self.resized {
             self.winch = Event::Flag(true);
             return;
@@ -90,7 +92,7 @@ impl Term {
             collector.collect_interrupt = true;
             self.width = self._w;
             self.height = self._h;
-            draw.now(term.clear());
+            draw.now(self.clear);
             draw.now(
                 create_box((self._w / 2) as i32 - 25,
                     (self._h / 2) as i32 - 2,
@@ -116,9 +118,9 @@ impl Term {
                 draw.now(self.clear);
                 draw.now(
                     create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 5, String::from("warning"), "".to_owned(), Color::Red(), Color::White(), true, Box::None),
-                    format!("{}{}{}{}Width: {}{}   ", Mv::right(12), Color::default(), Color::BlackBg(), Fx::b, if self._w < 80 {Color::Red()} else {Color::Green()}, self._w),
-                    format!("{}Height: {}{}{}{}", Color::Default(), if self._h < 24 {Color::Red()} else {Color::Green()}, self._h, self::bg, self::fg),
-                    format!("{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}", Mv::to((self._h / 2) as i32, (self._w / 2) as i32 - 23), Color::Default(), Color::BlackBg(), Fx::ub, self.bg, self.fg)
+                    format!("{}{}{}{}Width: {}{}   ", mv::right(12), Color::default(), Color::BlackBg(), fx::b, if self._w < 80 {Color::Red()} else {Color::Green()}, self._w),
+                    format!("{}Height: {}{}{}{}", Color::Default(), if self._h < 24 {Color::Red()} else {Color::Green()}, self._h, self.bg, self.fg),
+                    format!("{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}", mv::to((self._h / 2) as u32, (self._w / 2) as u32 - 23), Color::Default(), Color::BlackBg(), fx::ub, self.bg, self.fg)
                 );
                 self.winch = Event::Wait;
                 self.winch.wait(0.3);
@@ -168,7 +170,7 @@ impl Term {
 
     /// Toggle input echo
     pub fn echo<P: AsRef<Path>>(on : bool, CONFIG_DIR : P) {
-        let fd = io::stdin().as_raw_fd();
+        let fd = io::stdin().as_raw_fd().clone();
 
         let mut termios = match Termios::from_fd(fd) {
             Ok(t) => t,
@@ -191,7 +193,7 @@ impl Term {
         }
 
         match tcsetattr(fd, os::target::TCSANOW, &termios) {
-            Ok(s) => (),
+            Ok(_) => (),
             Err(e) => error::errlog(
                 CONFIG_DIR,
                 format!(
@@ -213,17 +215,17 @@ impl Term {
                         e
                     )
                 );
-                return;
+                return String::default();
             }
         };
 
         if text == String::from("") {
             out.push_str(" ");
         } else {
-            out.push_str(text);
+            out.push_str(text.as_str());
         }
         
-        format!("\033]0;{}\a", out)
+        format!("\033]0;{}{}", out, ascii_utils::table::BEL)
     }
     
 }
