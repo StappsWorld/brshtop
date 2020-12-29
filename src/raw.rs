@@ -1,18 +1,19 @@
 use crate::error::*;
-use std::fs::File;
+use std::io::Stdin;
 use nix::fcntl;
 use termios::*;
 use std::os::unix::io::{RawFd, AsRawFd};
+use pancurses;
 
 
 pub struct Raw {
-    pub stream : File,
+    pub stream : Stdin,
     pub fd : RawFd,
     pub original_stty : Termios,
 }
 impl Raw {
-    pub fn new(s : File) -> Self {
-        let usable_fd = s.as_raw_fd();
+    pub fn new(s : Stdin) -> Self {
+        let usable_fd = s.as_raw_fd().clone();
         let tty = match Termios::from_fd(usable_fd) {
             Ok(t) => t,
             Err(e) => {
@@ -29,10 +30,10 @@ impl Raw {
 
     pub fn enter(&mut self) {
         termios::tcgetattr(self.fd, &mut self.original_stty);
-
+        pancurses::cbreak();
     }
 
     pub fn exit(&mut self) {
-        
+        termios::tcsetattr(self.fd, termios::os::linux::TCSANOW, &self.original_stty);
     }
 }
