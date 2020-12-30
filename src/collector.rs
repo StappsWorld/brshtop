@@ -1,8 +1,22 @@
-use crate::{cpucollector::CpuCollector, event::Event, Config, Error::*};
-use std::path::*;
-use std::sync::mpsc::*;
-use std::*;
-use thread_control::*;
+use {
+    crate::{
+        brshtop_box::BrshtopBox,
+        Config, 
+        cpucollector::CpuCollector,
+        draw::Draw,
+        event::Event, 
+        Error::*,
+        menu::Menu,
+        timeit::TimeIt,
+    },
+    std::{
+        *,
+        path::*,
+        sync::mpsc::*,
+        time::Duration,
+    },
+    thread_control::*,
+};
 
 #[derive(Clone)]
 pub enum Collectors {
@@ -87,11 +101,11 @@ impl Collector {
         self.collect_run = Event::Flag(true);
     }
 
-    pub fn start(&mut self, CONFIG: Config, b: Box, t: TimeIt, m: Menu, d: Draw) {
+    pub fn start(&mut self, CONFIG: Config, DEBUG : bool, collectors : Vec<Collectors>, brshtop_box : BrshtopBox, timeit : TimeIt, menu : Menu, draw : Draw) {
         self.stopping = false;
-        self.thread = thread::spawn(|| self.runner(&self, b, t));
+        self.thread = thread::spawn(|| self.runner(&self, CONFIG, DEBUG, brshtop_box, timeit, menu, draw));
         self.started = true;
-        self.default_collect_queue = vec![b, t, m, d];
+        self.default_collect_queue = collectors.clone();
     }
 
     pub fn stop(&mut self) {
@@ -99,12 +113,12 @@ impl Collector {
             if self.started && self.flag.alive() {
                 self.stopping = true;
                 self.started = false;
-                self.collect_queue = Vec::<Collector>::new();
+                self.collect_queue = Vec::<Collectors>::new();
                 self.collect_idle = Event::Flag(true);
                 self.collect_done = Event::Flag(true);
                 let now = time::SystemTime::now();
                 while self.control.is_done() {
-                    if now.elapsed().unwrap() > 5 {
+                    if now.elapsed().unwrap() > Duration::new(5, 0) {
                         break;
                     }
                 }
@@ -112,14 +126,14 @@ impl Collector {
         }
     }
 
-    pub fn runner(&mut self, CONFIG: Config, DEBUG: bool, b: Box, t: TimeIt, m: Menu, d: Draw) {
+    pub fn runner(&mut self, CONFIG: Config, DEBUG: bool, brshtop_box: BrshtopBox, timeit: TimeIt, menu: Menu, draw: Draw) {
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
 
         while !self.stopping {
-            if CONFIG.draw_clock && CONFIG.update_ms != 1000 {
-                b.draw_clock();
+            if CONFIG.draw_clock != String::default() && CONFIG.update_ms != 1000 {
+                brshtop_box.draw_clock();
             }
             self.collect_run = Event::Wait;
             self.collect_run.wait(0.1);
@@ -133,18 +147,25 @@ impl Collector {
             self.collect_done = Event::Flag(false);
 
             if DEBUG && !debugged {
-                t.start("Collect and draw");
+                timeit.start("Collect and draw");
             }
 
             while self.collect_queue.capacity() > 0 {
-                let collector = self.collect_queue.pop();
+                let collector = self.collect_queue.pop().unwrap();
                 if !self.only_draw {
-                    collector.collect();
+                    match collector {
+                        Collectors::CpuCollector(c) => c.collect(),
+                    }
                 }
-                collector.draw();
+                match collector {
+                    Collectors::CpuCollector(c) => c.draw(),
+                }
 
                 if self.use_draw_list {
-                    draw_buffers.push(collector.buffer);
+                    
+                    draw_buffers.push(match collector {
+                        Collectors::CpuCollector(c) => c.buffer,
+                    });
                 }
 
                 if self.collect_interrupt {
@@ -153,20 +174,20 @@ impl Collector {
             }
 
             if DEBUG && !debugged {
-                t.stop("Collect and draw");
+                timeit.stop("Collect and draw");
                 debugged = true;
             }
 
-            if self.draw_now && !m.active && !self.collect_interrupt {
+            if self.draw_now && !menu.active && !self.collect_interrupt {
                 if self.use_draw_list {
-                    d.out(draw_buffers);
+                    draw.out(draw_buffers);
                 } else {
-                    d.out;
+                    draw.out();
                 }
             }
 
-            if CONFIG.draw_clock && CONFIG.update_ms == 1000 {
-                b.draw_clock();
+            if CONFIG.draw_clock != String::default() && CONFIG.update_ms == 1000 {
+                brshtop_box.draw_clock();
             }
 
             self.collect_idle = Event::Flag(true);

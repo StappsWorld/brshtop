@@ -1,5 +1,6 @@
 mod banner;
 mod brshtop;
+mod brshtop_box;
 mod config;
 mod consts;
 mod error;
@@ -17,7 +18,7 @@ mod raw;
 mod nonblocking;
 
 use {
-    config::Config,
+    config::{Config, ViewMode},
     consts::*,
     error::{errlog, throw_error},
 };
@@ -105,7 +106,7 @@ pub fn main() {
         )
         .get_matches();
 
-    let mut ARG_MODE = String::new();
+    let mut ARG_MODE = ViewMode::None;
     let arg_full = matches.value_of("Full Mode");
     let arg_proc = matches.value_of("Minimal Mode (proc)");
     let arg_stat = matches.value_of("Minimal Mode (stat)");

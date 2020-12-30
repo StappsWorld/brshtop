@@ -3,7 +3,7 @@ use std::collections::*;
 use std::path::*;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-struct TimeIt {
+pub struct TimeIt {
     pub timers: HashMap<String, u128>,
     pub paused: HashMap<String, u128>,
 }

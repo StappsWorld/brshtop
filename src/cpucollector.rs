@@ -49,7 +49,7 @@ impl CpuCollector {
 
         CpuCollector_initialize
     }
-    fn collect<P: AsRef<Path>>(
+    pub fn collect<P: AsRef<Path>>(
         &mut self,
         collectors: Vec<Collectors>,
         CONFIG: Config,
@@ -161,7 +161,7 @@ impl CpuCollector {
         }
     }
 
-    fn draw(&mut self) {
+    pub fn draw(&mut self) {
         self.cpu_box.draw_fg();
     }
 

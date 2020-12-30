@@ -86,6 +86,7 @@ pub enum ViewMode {
     Full,
     Proc,
     Stat,
+    None,
 }
 impl Display for ViewMode {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

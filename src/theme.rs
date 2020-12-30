@@ -10,6 +10,10 @@ use {
         iter::FromIterator,
         path::Path,
     },
+    crate::{
+        term::Term,
+    },
+    starlark::values::Value::get_attr,
 };
 
 lazy_static! {
@@ -119,6 +123,14 @@ impl Color {
             b: 0,
             depth: LayerDepth::Fg,
         }
+    }
+
+    pub fn call(&mut self, adder : String, term : Term) -> Color {
+        if adder.len() < 1 {
+            return Color::default();
+        }
+
+        Color::from(format!("{}{}{}", self.escape(), adder, getattr(term, self.depth.as_str()).unwrap().to_str()))
     }
 }
 impl std::default::Default for Color {
