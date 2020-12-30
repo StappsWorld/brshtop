@@ -107,6 +107,7 @@ impl Collector {
         timeit: TimeIt,
         menu: Menu,
         draw: Draw,
+        term : Term,
         config_dir: P,
         THREADS: u64,
         CORES : u64,
