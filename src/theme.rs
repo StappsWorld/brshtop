@@ -13,7 +13,7 @@ use {
     crate::{
         term::Term,
     },
-    starlark::values::Value::get_attr,
+    starlark::values::Value,
 };
 
 lazy_static! {
@@ -130,7 +130,10 @@ impl Color {
             return Color::default();
         }
 
-        Color::from(format!("{}{}{}", self.escape(), adder, getattr(term, self.depth.as_str()).unwrap().to_str()))
+        Color::from(format!("{}{}{}", self.escape(), adder, match self.depth {
+            LayerDepth::Fg => term.fg,
+            LayerDepth::Bg => term.bg,
+        }))
     }
 }
 impl std::default::Default for Color {

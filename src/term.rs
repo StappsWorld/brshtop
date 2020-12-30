@@ -1,16 +1,31 @@
-use crate::error::*;
-use crate::event::Event;
-use crate::theme::Color;
-use crate::mv;
-use crate::fx::Fx;
-use crate::collector::*;
-use crate::*;
-use std::sync::mpsc::*;
-use std::{thread, io};
-use terminal_size::{terminal_size, Height, Width};
-use termios::*;
-use std::os::unix::io::{RawFd, AsRawFd};
-
+use {
+    crate::{
+        brshtop_box::{BrshtopBox, Boxes},
+        cpubox::CpuBox,
+        draw::Draw,
+        error,
+        event::Event,
+        key::Key,
+        theme::Color,
+        mv,
+        fx,
+        collector::*,
+        create_box,
+        init::Init,
+        menu::Menu,
+        timer::Timer,
+    },
+    std::{
+        collections::HashMap,
+        sync::mpsc::*,
+        thread, 
+        io, 
+        os::unix::io::{RawFd, AsRawFd},
+        path::Path,
+    },
+    terminal_size::{terminal_size, Height, Width},
+    termios::*,
+};
 
 
 pub struct Term {
@@ -60,7 +75,7 @@ impl Term {
     }
 
     ///Updates width and height and sets resized flag if terminal has been resized
-    pub fn refresh(&mut self, args: Vec<String>, collector : Collector, init : Init, cpu_box : CpuBox, draw : Draw, force: bool, fx : Fx, key : Key, menu : Menu, box_class : Box, timer : Timer, term : Term) {
+    pub fn refresh(&mut self, args: Vec<String>, boxes : Vec<Boxes>, collector : Collector, init : Init, cpu_box : CpuBox, draw : Draw, force: bool, key : Key, menu : Menu, brshtop_box : BrshtopBox, timer : Timer, term : Term) {
         if self.resized {
             self.winch = Event::Flag(true);
             return;
@@ -72,7 +87,7 @@ impl Term {
                 self._w = w;
                 self._h = h;
             }
-            None => throw_error("Unable to get size of terminal!"),
+            None => error::throw_error("Unable to get size of terminal!"),
         };
 
         if (self._w == self.width && self._h == self.height) && !force {
@@ -97,12 +112,12 @@ impl Term {
                 create_box((self._w / 2) as i32 - 25,
                     (self._h / 2) as i32 - 2,
                     50, 3, 
-                    String::from("resizing"), 
-                    "".to_owned(), 
-                    Color::Green(), 
-                    Color::White(), 
+                    Some(String::from("resizing")), 
+                    None, 
+                    Some(Color::Green()), 
+                    Some(Color::White()), 
                     true, 
-                    Box::None),
+                    None),
                 format!("{}{}{}{}Width : {}   Height: {}{}{}{}",
                     mv::right(120),
                     Color::Default(),
@@ -117,7 +132,16 @@ impl Term {
             while self._w < 80 || self._h < 24 {
                 draw.now(self.clear);
                 draw.now(
-                    create_box((self._w / 2) as i32 - 25, (self._h / 2) as i32 - 2, 50, 5, String::from("warning"), "".to_owned(), Color::Red(), Color::White(), true, Box::None),
+                    create_box((self._w / 2) as i32 - 25, 
+                        (self._h / 2) as i32 - 2, 
+                        50, 
+                        5, 
+                        Some(String::from("warning")), 
+                        None, 
+                        Some(Color::Red()), 
+                        Some(Color::White()),
+                        true, 
+                        None),
                     format!("{}{}{}{}Width: {}{}   ", mv::right(12), Color::default(), Color::BlackBg(), fx::b, if self._w < 80 {Color::Red()} else {Color::Green()}, self._w),
                     format!("{}Height: {}{}{}{}", Color::Default(), if self._h < 24 {Color::Red()} else {Color::Green()}, self._h, self.bg, self.fg),
                     format!("{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}", mv::to((self._h / 2) as u32, (self._w / 2) as u32 - 23), Color::Default(), Color::BlackBg(), fx::ub, self.bg, self.fg)
@@ -132,7 +156,7 @@ impl Term {
                         self._w = w;
                         self._h = h;
                     }
-                    None => throw_error("Unable to get size of terminal!"),
+                    None => error::throw_error("Unable to get size of terminal!"),
                 };
             }
             
@@ -146,12 +170,12 @@ impl Term {
                     self._w = w;
                     self._h = h;
                 }
-                None => throw_error("Unable to get size of terminal!"),
+                None => error::throw_error("Unable to get size of terminal!"),
             };
         }
 
-        key.mouse = HashMap::new();
-        box_class.calc_size();
+        key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
+        brshtop_box.calc_sizes(boxes);
         if init.running {
             self.resized = false;
             return;
@@ -161,7 +185,7 @@ impl Term {
             menu.resize = true;
         }
 
-        box_class.draw_bg(false);
+        brshtop_box.draw_bg(false);
         self.resized = false;
         timer.finish();
 

@@ -119,11 +119,11 @@ pub fn main() {
     let arg_debug = matches.value_of("Debug");
 
     if arg_full.is_some() {
-        ARG_MODE = String::from("full");
+        ARG_MODE = ViewMode::Full;
     } else if arg_proc.is_some() {
-        ARG_MODE = String::from("proc");
+        ARG_MODE = ViewMode::Proc
     } else if arg_stat.is_some() {
-        ARG_MODE = String::from("stat");
+        ARG_MODE = ViewMode::Stat;
     }
 
     let DEBUG = arg_debug.is_some();
@@ -325,6 +325,6 @@ pub fn main() {
 
 
 /// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
-pub fn create_box(x : i32, y : i32, width : i32, height : i32, title : Option<String>, title2 : Option<String>, line_color : Option<Color>, title_color : Option<Color>, fill : bool, box_to_use : Boxes) -> String {
+pub fn create_box(x : i32, y : i32, width : i32, height : i32, title : Option<String>, title2 : Option<String>, line_color : Option<Color>, title_color : Option<Color>, fill : bool, box_to_use : Option<Boxes>) -> String {
 
 }

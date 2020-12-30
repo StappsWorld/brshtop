@@ -1,20 +1,17 @@
 use {
     crate::{
-        brshtop_box::BrshtopBox,
-        Config, 
-        cpucollector::CpuCollector,
-        draw::Draw,
+        brshtop_box::BrshtopBox, 
+        cpucollector::CpuCollector, 
+        draw::Draw, 
         event::Event, 
-        Error::*,
         menu::Menu,
-        timeit::TimeIt,
+        timeit::TimeIt, 
+        Config, 
+        Error::*,
+        term::Term,
+        cpubox::CpuBox,
     },
-    std::{
-        *,
-        path::*,
-        sync::mpsc::*,
-        time::Duration,
-    },
+    std::{path::*, sync::mpsc::*, time::Duration, *},
     thread_control::*,
 };
 
@@ -101,9 +98,19 @@ impl Collector {
         self.collect_run = Event::Flag(true);
     }
 
-    pub fn start(&mut self, CONFIG: Config, DEBUG : bool, collectors : Vec<Collectors>, brshtop_box : BrshtopBox, timeit : TimeIt, menu : Menu, draw : Draw) {
+    pub fn start(
+        &mut self,
+        CONFIG: Config,
+        DEBUG: bool,
+        collectors: Vec<Collectors>,
+        brshtop_box: BrshtopBox,
+        timeit: TimeIt,
+        menu: Menu,
+        draw: Draw,
+    ) {
         self.stopping = false;
-        self.thread = thread::spawn(|| self.runner(&self, CONFIG, DEBUG, brshtop_box, timeit, menu, draw));
+        self.thread =
+            thread::spawn(|| self.runner(&self, CONFIG, DEBUG, brshtop_box, timeit, menu, draw));
         self.started = true;
         self.default_collect_queue = collectors.clone();
     }
@@ -126,7 +133,21 @@ impl Collector {
         }
     }
 
-    pub fn runner(&mut self, CONFIG: Config, DEBUG: bool, brshtop_box: BrshtopBox, timeit: TimeIt, menu: Menu, draw: Draw) {
+    pub fn runner<P: AsRef<Path>>(
+        &mut self,
+        CONFIG: Config,
+        DEBUG: bool,
+        config_dir: P,
+        THREADS: u64,
+        brshtop_box: BrshtopBox,
+        timeit: TimeIt,
+        menu: Menu,
+        draw: Draw,
+        term : Term,
+        CORES : u64,
+        CORE_MAP : Vec<i32>,
+        cpu_box : CpuBox,
+    ) {
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
@@ -147,22 +168,30 @@ impl Collector {
             self.collect_done = Event::Flag(false);
 
             if DEBUG && !debugged {
-                timeit.start("Collect and draw");
+                timeit.start("Collect and draw".to_owned());
             }
 
             while self.collect_queue.capacity() > 0 {
                 let collector = self.collect_queue.pop().unwrap();
                 if !self.only_draw {
                     match collector {
-                        Collectors::CpuCollector(c) => c.collect(),
+                        Collectors::CpuCollector(c) => c.collect(
+                            CONFIG,
+                            THREADS,
+                            config_dir,
+                            term,
+                            CORES,
+                            CORE_MAP,
+                            cpu_box,
+                            brshtop_box,
+                        ),
                     }
                 }
                 match collector {
-                    Collectors::CpuCollector(c) => c.draw(),
+                    Collectors::CpuCollector(c) => c.draw(cpu_box),
                 }
 
                 if self.use_draw_list {
-                    
                     draw_buffers.push(match collector {
                         Collectors::CpuCollector(c) => c.buffer,
                     });
@@ -174,7 +203,7 @@ impl Collector {
             }
 
             if DEBUG && !debugged {
-                timeit.stop("Collect and draw");
+                timeit.stop("Collect and draw".to_owned(), config_dir);
                 debugged = true;
             }
 

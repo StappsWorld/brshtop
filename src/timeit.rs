@@ -43,7 +43,7 @@ impl TimeIt {
         }
     }
 
-    pub fn stop(&mut self, name: String, config_dir: &Path) {
+    pub fn stop<P: AsRef<Path>>(&mut self, name: String, config_dir: P) {
         let name_copy = name.clone();
         if self.timers.contains_key(&name_copy) {
             if let Some(x) = self.timers.get(&name_copy) {

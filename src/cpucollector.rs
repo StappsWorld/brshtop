@@ -58,15 +58,9 @@ impl CpuCollector {
     }
     pub fn collect<P: AsRef<Path>>(
         &mut self,
-        collectors: Vec<Collectors>,
         CONFIG: Config,
         THREADS: u64,
         CONFIG_DIR: P,
-        draw_now: bool,
-        interrupt: bool,
-        proc_interrupt: bool,
-        redraw: bool,
-        only_draw: bool,
         term: Term,
         CORES: u64,
         CORE_MAP: Vec<i32>,
