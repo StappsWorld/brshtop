@@ -115,7 +115,19 @@ impl Collector {
     ) {
         self.stopping = false;
         self.thread =
-            thread::spawn(|| self.runner(&self, CONFIG, DEBUG, brshtop_box, timeit, menu, draw));
+            thread::spawn(|| self.runner(&self, 
+                CONFIG, 
+                DEBUG, 
+                config_dir, 
+                THREADS, 
+                brshtop_box, 
+                timeit, 
+                menu, 
+                draw, 
+                term, 
+                CORES, 
+                CORE_MAP, 
+                cpu_box));
         self.started = true;
         self.default_collect_queue = collectors.clone();
     }
