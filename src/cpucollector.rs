@@ -1,4 +1,11 @@
-use crate::{collector::*, config::Config, error, term::Term, collector::Collectors};
+use crate::{
+    brshtop_box::BrshtopBox,
+    collector::{Collectors}, 
+    config::Config,
+    cpubox::CpuBox, 
+    error, 
+    term::Term, 
+};
 use hhmmss::Hhmmss;
 use psutil::sensors::*;
 use std::time::SystemTime;
@@ -60,10 +67,11 @@ impl CpuCollector {
         proc_interrupt: bool,
         redraw: bool,
         only_draw: bool,
-        t: Term,
+        term: Term,
         CORES: u64,
         CORE_MAP: Vec<i32>,
         cpu_box: CpuBox,
+        brshtop_box : BrshtopBox,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -73,7 +81,7 @@ impl CpuCollector {
             Err(_) => (),
         }
 
-        if self.cpu_usage[0].len() > (t.width * 4) as usize {
+        if self.cpu_usage[0].len() > (term.width * 4) as usize {
             self.cpu_usage[0].remove(0);
         }
 
@@ -100,7 +108,7 @@ impl CpuCollector {
 
         for (n, thread) in cpu_percentages.iter().enumerate() {
             self.cpu_usage[n].push(format!("{:.2}", *thread as u32));
-            if self.cpu_usage[n].len() > (t.width * 2) as usize {
+            if self.cpu_usage[n].len() > (term.width * 2) as usize {
                 self.cpu_usage[n].remove(0);
             }
         }
@@ -157,12 +165,12 @@ impl CpuCollector {
         };
 
         if CONFIG.check_temp && self.got_sensors {
-            self.collect_temps(CONFIG, CONFIG_DIR, THREADS, CORES, CORE_MAP);
+            self.collect_temps(CONFIG, CONFIG_DIR, THREADS, CORES, CORE_MAP, cpu_box, brshtop_box, term);
         }
     }
 
-    pub fn draw(&mut self) {
-        self.cpu_box.draw_fg();
+    pub fn draw(&mut self, cpu_box : CpuBox) {
+        cpu_box.draw_fg();
     }
 
     pub fn get_sensors(&mut self, CONFIG: Config, SYSTEM: String) {
@@ -256,6 +264,9 @@ impl CpuCollector {
         THREADS: u64,
         CORES: u64,
         CORE_MAP: Vec<i32>,
+        cpu_box : CpuBox,
+        brshtop_box : BrshtopBox,
+        term : Term,
     ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
@@ -521,12 +532,12 @@ impl CpuCollector {
                                 ),
                             );
                             self.got_sensors = false;
-                            self.cpu_box.calc_size();
+                            cpu_box.calc_size(THREADS, term, brshtop_box);
                             return;
                         }
                     };
 
-                    temp = if coretemp_p > 0 { coretemp_p } else { 0 };
+                    temp = if coretemp_p > 0 { coretemp_p as i32 } else { 0 };
 
                     let coretemp: Vec<u32> = match Exec::shell("coretemp").capture() {
                         Ok(o) => o
@@ -535,9 +546,7 @@ impl CpuCollector {
                             .trim()
                             .split(" ")
                             .map(|s: &str| s.parse::<u32>().unwrap_or(0))
-                            .collect()
-                            .map(|u: u32| if u > 0 { u } else { 0 })
-                            .collect(),
+                            .collect::<Vec<u32>>(),
                         Err(e) => {
                             error::errlog(
                                 CONFIG_DIR,
@@ -547,7 +556,7 @@ impl CpuCollector {
                                 ),
                             );
                             self.got_sensors = false;
-                            self.cpu_box.calc_size();
+                            cpu_box.calc_size(THREADS, term, brshtop_box);
                             return;
                         }
                     };
@@ -603,7 +612,7 @@ impl CpuCollector {
                                 ),
                             );
                             self.got_sensors = false;
-                            self.cpu_box.calc_size();
+                            cpu_box.calc_size(THREADS, term, brshtop_box);
                             return;
                         }
                     };
@@ -632,7 +641,7 @@ impl CpuCollector {
                                 ),
                             );
                             self.got_sensors = false;
-                            self.cpu_box.calc_size();
+                            cpu_box.calc_size(THREADS, term, brshtop_box);
                             return;
                         }
                     };

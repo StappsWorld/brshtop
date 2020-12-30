@@ -18,37 +18,37 @@ use {
     uname::uname,
 };
 
-pub enum Boxes {
-    BrshtopBox(BrshtopBox),
-    CpuBox(CpuBox),
-    MemBox(MemBox),
+pub enum Boxes<'a> {
+    BrshtopBox(&'a mut BrshtopBox),
+    CpuBox(&'a mut CpuBox),
+    MemBox(&'a mut MemBox),
 }
 
-pub enum SubBoxes {
-    CpuBox(CpuBox),
+pub enum SubBoxes<'a> {
+    CpuBox(&'a mut CpuBox),
 }
 
 pub struct BrshtopBox {
-    name: String,
-    height_p: u32,
-    width_p: u32,
-    x: u32,
-    y: u32,
-    width: u32,
-    height: u32,
-    proc_mode: bool,
-    stat_mode: bool,
-    out: String,
-    bg: String,
-    _b_cpu_h: i32,
-    _b_mem_h: i32,
-    redraw_all: bool,
-    buffers: Vec<String>,
-    clock_on: bool,
-    clock: String,
-    clock_len: u32,
-    resized: bool,
-    clock_custom_format: HashMap<String, String>,
+    pub name: String,
+    pub height_p: u32,
+    pub width_p: u32,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub proc_mode: bool,
+    pub stat_mode: bool,
+    pub out: String,
+    pub bg: String,
+    pub _b_cpu_h: i32,
+    pub _b_mem_h: i32,
+    pub redraw_all: bool,
+    pub buffers: Vec<String>,
+    pub clock_on: bool,
+    pub clock: String,
+    pub clock_len: u32,
+    pub resized: bool,
+    pub clock_custom_format: HashMap<String, String>,
 }
 impl BrshtopBox {
     pub fn new(config: Config, ARG_MODE: ViewMode) -> Self {
@@ -127,7 +127,7 @@ impl BrshtopBox {
         term: Term,
     ) {
         let mut update_string: String = format!("{}ms", config.update_ms);
-        let xpos: u32 = cpu_box.x + cpu_box.width - (update_string.len() as u32) - 15;
+        let xpos: u32 = cpu_box.x + cpu_box.parent.width - (update_string.len() as u32) - 15;
 
         if !key.mouse.contains("+".to_owned()) {
             let mut add_for_mouse_parent = Vec::<Vec<u32>>::new();
@@ -141,7 +141,7 @@ impl BrshtopBox {
             let mut sub_for_mouse_parent = Vec::<Vec<u32>>::new();
             let mut sub_for_mouse = Vec::<u32>::new();
             for i in 0..3 {
-                sub_for_mouse.push(cpu_box.x + cpu_box.width - 4 + i);
+                sub_for_mouse.push(cpu_box.x + cpu_box.parent.width - 4 + i);
                 sub_for_mouse.push(cpu_box.y);
             }
             sub_for_mouse_parent.push(sub_for_mouse);
@@ -235,14 +235,14 @@ impl BrshtopBox {
             }
         }
 
-        let clock_len = clock_string[..cpu_box.width - 56 as usize].len();
+        let clock_len = clock_string[..cpu_box.parent.width as usize - 56].len();
 
         if self.clock_len != clock_len as u32 && !cpu_box.resized {
             out = format!(
                 "{}{}{}{}",
                 mv::to(
                     cpu_box.y,
-                    ((cpu_box.width) / 2) as u32 - (clock_len / 2) as u32
+                    ((cpu_box.parent.width) / 2) as u32 - (clock_len / 2) as u32
                 ),
                 fx::ub,
                 theme.cpu_box,
@@ -257,7 +257,7 @@ impl BrshtopBox {
                 "{}{}{}{}{}{}{}{}{}{}",
                 mv::to(
                     cpu_box.y,
-                    (cpu_box.width / 2) as u32 - (clock_len / 2) as u32
+                    (cpu_box.parent.width / 2) as u32 - (clock_len / 2) as u32
                 ),
                 fx::ub,
                 theme.cpu_box,

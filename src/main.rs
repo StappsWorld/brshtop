@@ -1,25 +1,30 @@
 mod banner;
 mod brshtop;
 mod brshtop_box;
+mod cpubox;
 mod config;
 mod consts;
+mod collector;
+mod cpucollector;
 mod error;
 mod event;
+mod fx;
 mod graph;
 mod mv;
+mod nonblocking;
+mod raw;
+mod subbox;
 mod symbol;
 mod term;
 mod theme;
 mod timeit;
-mod collector;
-mod cpucollector;
-mod fx;
-mod raw;
-mod nonblocking;
 
 use {
     config::{Config, ViewMode},
     consts::*,
+    crate::{
+        brshtop_box::{BrshtopBox, Boxes, SubBoxes}
+    },
     error::{errlog, throw_error},
 };
 
@@ -320,6 +325,6 @@ pub fn main() {
 
 
 /// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
-pub fn create_box(x : i32, y : i32, width : i32, height : i32, title : String, title2 : String, line_color : Color, title_color : Color, fill : bool, box : Box) -> String {
+pub fn create_box(x : i32, y : i32, width : i32, height : i32, title : Option<String>, title2 : Option<String>, line_color : Option<Color>, title_color : Option<Color>, fill : bool, box_to_use : Boxes) -> String {
 
 }
