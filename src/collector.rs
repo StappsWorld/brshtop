@@ -98,7 +98,7 @@ impl Collector {
         self.collect_run = Event::Flag(true);
     }
 
-    pub fn start(
+    pub fn start<P: AsRef<Path>>(
         &mut self,
         CONFIG: Config,
         DEBUG: bool,
@@ -107,6 +107,11 @@ impl Collector {
         timeit: TimeIt,
         menu: Menu,
         draw: Draw,
+        config_dir: P,
+        THREADS: u64,
+        CORES : u64,
+        CORE_MAP : Vec<i32>,
+        cpu_box : CpuBox,
     ) {
         self.stopping = false;
         self.thread =
