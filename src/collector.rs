@@ -1,15 +1,7 @@
 use {
     crate::{
-        brshtop_box::BrshtopBox, 
-        cpucollector::CpuCollector, 
-        draw::Draw, 
-        event::Event, 
-        menu::Menu,
-        timeit::TimeIt, 
-        Config, 
-        Error::*,
-        term::Term,
-        cpubox::CpuBox,
+        brshtop_box::BrshtopBox, cpubox::CpuBox, cpucollector::CpuCollector, draw::Draw,
+        event::Event, menu::Menu, term::Term, timeit::TimeIt, Config, Error::*,
     },
     std::{path::*, sync::mpsc::*, time::Duration, *},
     thread_control::*,
@@ -41,10 +33,10 @@ pub struct Collector {
     pub use_draw_list: bool,
 }
 impl Collector {
-    pub fn new(tx_build: Sender<Event>, rx_build: Receiver<Event>) {
+    pub fn new() -> Self {
         let (tx_build, rx_build) = channel();
         let (flag_build, control_build) = make_pair();
-        let mut collecter_initialize = Collector {
+        Collector {
             stopping: false,
             started: false,
             draw_now: false,
@@ -63,13 +55,13 @@ impl Collector {
             collect_interrupt: false,
             proc_interrupt: false,
             use_draw_list: false,
-        };
+        }
     }
 
     pub fn collect<P: AsRef<Path>>(
         &mut self,
         collectors: Vec<Collectors>,
-        CONFIG: Config,
+        CONFIG: &mut Config,
         CONFIG_DIR: P,
         draw_now: bool,
         interrupt: bool,
@@ -100,35 +92,38 @@ impl Collector {
 
     pub fn start<P: AsRef<Path>>(
         &mut self,
-        CONFIG: Config,
+        CONFIG: &mut Config,
         DEBUG: bool,
         collectors: Vec<Collectors>,
-        brshtop_box: BrshtopBox,
-        timeit: TimeIt,
-        menu: Menu,
-        draw: Draw,
-        term : Term,
+        brshtop_box: &mut BrshtopBox,
+        timeit: &mut TimeIt,
+        menu: &mut Menu,
+        draw: &mut Draw,
+        term: &mut Term,
         config_dir: P,
         THREADS: u64,
-        CORES : u64,
-        CORE_MAP : Vec<i32>,
-        cpu_box : CpuBox,
+        CORES: u64,
+        CORE_MAP: Vec<i32>,
+        cpu_box: &mut CpuBox,
     ) {
         self.stopping = false;
-        self.thread =
-            thread::spawn(|| self.runner(&self, 
-                CONFIG, 
-                DEBUG, 
-                config_dir, 
-                THREADS, 
-                brshtop_box, 
-                timeit, 
-                menu, 
-                draw, 
-                term, 
-                CORES, 
-                CORE_MAP, 
-                cpu_box));
+        self.thread = thread::spawn(|| {
+            self.runner(
+                &self,
+                CONFIG,
+                DEBUG,
+                config_dir,
+                THREADS,
+                brshtop_box,
+                timeit,
+                menu,
+                draw,
+                term,
+                CORES,
+                CORE_MAP,
+                cpu_box,
+            )
+        });
         self.started = true;
         self.default_collect_queue = collectors.clone();
     }
@@ -153,18 +148,18 @@ impl Collector {
 
     pub fn runner<P: AsRef<Path>>(
         &mut self,
-        CONFIG: Config,
+        CONFIG: &mut Config,
         DEBUG: bool,
         config_dir: P,
         THREADS: u64,
-        brshtop_box: BrshtopBox,
-        timeit: TimeIt,
-        menu: Menu,
-        draw: Draw,
-        term : Term,
-        CORES : u64,
-        CORE_MAP : Vec<i32>,
-        cpu_box : CpuBox,
+        brshtop_box: &mut BrshtopBox,
+        timeit: &mut TimeIt,
+        menu: &mut Menu,
+        draw: &mut Draw,
+        term: &mut Term,
+        CORES: u64,
+        CORE_MAP: Vec<i32>,
+        cpu_box: CpuBox,
     ) {
         let mut draw_buffers = Vec::<String>::new();
 

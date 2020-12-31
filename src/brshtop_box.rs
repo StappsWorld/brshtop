@@ -51,7 +51,7 @@ pub struct BrshtopBox {
     pub clock_custom_format: HashMap<String, String>,
 }
 impl BrshtopBox {
-    pub fn new(config: Config, ARG_MODE: ViewMode) -> Self {
+    pub fn new(config: &mut Config, ARG_MODE: ViewMode) -> Self {
         let proc_mode_mut = (config.view_mode == ViewMode::Proc && ARG_MODE == ViewMode::None)
             || ARG_MODE == ViewMode::Proc;
         let stat_mode_mut = (config.view_mode == ViewMode::Stat && ARG_MODE == ViewMode::None)
@@ -102,11 +102,16 @@ impl BrshtopBox {
         }
     }
 
-    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>) {
+    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, THREADS: u64, term: &mut Term) {
         for sub in boxes {
             //TODO : Fill in rest of sub-boxes
             match sub {
-                Boxes::BrshtopBox(b) => {
+                Boxes::BrshtopBox(b) => (),
+                Boxes::CpuBox(b) => {
+                    b.calc_size(THREADS, term, self);
+                    b.resized = true;
+                }
+                Boxes::MemBox(b) => {
                     b.calc_sizes(boxes);
                     b.resized = true;
                 }
@@ -118,13 +123,13 @@ impl BrshtopBox {
     pub fn draw_update_ms(
         &mut self,
         now: bool,
-        config: Config,
-        cpu_box: CpuBox,
-        key: Key,
-        draw: Draw,
-        menu: Menu,
-        theme: Theme,
-        term: Term,
+        config: &mut Config,
+        cpu_box: &mut CpuBox,
+        key: &mut Key,
+        draw: &mut Draw,
+        menu: &mut Menu,
+        theme: &mut Theme,
+        term: &mut Term,
     ) {
         let mut update_string: String = format!("{}ms", config.update_ms);
         let xpos: u32 = cpu_box.x + cpu_box.parent.width - (update_string.len() as u32) - 15;
@@ -201,12 +206,12 @@ impl BrshtopBox {
     pub fn draw_clock(
         &mut self,
         force: bool,
-        term: Term,
-        config: Config,
-        theme: Theme,
-        menu: Menu,
-        cpu_box: CpuBox,
-        draw: Draw,
+        term: &mut Term,
+        config: &mut Config,
+        theme: &mut Theme,
+        menu: &mut Menu,
+        cpu_box: &mut CpuBox,
+        draw: &mut Draw,
     ) {
         let mut out: String = String::default();
 
@@ -300,22 +305,34 @@ impl BrshtopBox {
     }
 
     /// Draw all boxes outlines and titles -> Default now : bool = true
-    pub fn draw_bg(&mut self, now : bool, draw : Draw, subclasses : Vec<Boxes>, menu : Menu, config : Config, cpu_box : CpuBox, key : Key, theme : Theme, term : Term) {
+    pub fn draw_bg(
+        &mut self,
+        now: bool,
+        draw: &mut Draw,
+        subclasses: Vec<Boxes>,
+        menu: &mut Menu,
+        config: &mut Config,
+        cpu_box: &mut CpuBox,
+        key: &mut Key,
+        theme: &mut Theme,
+        term: &mut Term,
+    ) {
         // TODO : Handle the rest of the possible boxes...
-        draw.buffer("bg".to_owned(), 
-            subclasses.into_iter()
-                .map(|b|
-                    match b {
-                        Boxes::CpuBox(cb) => cb.draw_bg(),
-                        _ => String::default(),
-                    })
+        draw.buffer(
+            "bg".to_owned(),
+            subclasses
+                .into_iter()
+                .map(|b| match b {
+                    Boxes::CpuBox(cb) => cb.draw_bg(),
+                    _ => String::default(),
+                })
                 .collect(),
             false,
             now,
             1000,
             menu.active,
             false,
-            true
+            true,
         );
 
         self.draw_update_ms(now, config, cpu_box, key, draw, menu, theme, term);

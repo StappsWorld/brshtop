@@ -4,13 +4,13 @@ use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
 pub struct Graphs {
-    cpu: HashMap<String, Graph>,
-    cores: Vec<Graph>,
-    temps: Vec<Graph>,
-    net: HashMap<String, Graph>,
-    detailed_cpu: Graph,
-    detailed_mem: Graph,
-    pid_cpu: HashMap<u32, Graph>, // TODO: PID type
+    pub cpu: HashMap<String, Graph>,
+    pub cores: Vec<Graph>,
+    pub temps: Vec<Graph>,
+    pub net: HashMap<String, Graph>,
+    pub detailed_cpu: Graph,
+    pub detailed_mem: Graph,
+    pub pid_cpu: HashMap<u32, Graph>, // TODO: PID type
 }
 
 // FIXME
@@ -33,12 +33,18 @@ pub struct Graph {
     _data: Vec<usize>, // TODO: Data type
 }
 impl Graph {
+
+    /// Defaults invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None
     pub fn new<C>(
         width: usize,
         height: usize,
         color: Option<C>,
         data: Vec<usize>, // TODO: Data type
-        term : Term,
+        term : &mut Term,
+        invert : bool,
+        max_value : i32,
+        offset : i32,
+        color_max_value : Option<i32>,
     ) -> Self
     where
         C: Into<Color>,
@@ -83,6 +89,57 @@ impl Graph {
         graph
     }
 
+    /// Defaults invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None
+    pub fn new_with_vec<C>(
+        width: usize,
+        height: usize,
+        color: Vec<String>,
+        data: Vec<usize>, // TODO: Data type
+        term : &mut Term,
+        invert : bool,
+        max_value : i32,
+        offset : i32,
+        color_max_value : Option<i32>,
+    ) -> Self
+    {
+        let graphs = hashmap! {
+            true => Vec::new(),
+            false => Vec::new(),
+        };
+
+        let colors : Vec<Color> = Vec::<Color>::new();
+        if height > 1 {
+            for i in 1..height + 1 {
+                colors.insert(0, Color::new(color.get(if i * (color_scale / height) as i32 < 100 {i * (color_scale / height) as i32} else {100}).unwrap()).unwrap());
+
+            }
+        }
+
+        let mut graph = Self {
+            out: String::new(),
+            width,
+            height,
+            invert: false,
+            offset: 0,
+            color_max_value: 0,
+            colors,
+            symbol: if height == 1 {
+                symbol::graph_up_small()
+            } else {
+                symbol::graph_up()
+            },
+            max_value: 0,
+            _data: data,
+            graphs,
+            current: false,
+            last: 0,
+        };
+
+        graph._refresh_data(term);
+
+        graph
+    }
+
     pub fn invert(mut self, invert: bool) -> Self {
         self.invert = invert;
         self.symbol = match self.height {
@@ -93,7 +150,7 @@ impl Graph {
         };
         self
     }
-    pub fn max_value(mut self, max_value: usize, term : Term) -> Self {
+    pub fn max_value(mut self, max_value: usize, term : &mut Term) -> Self {
         self.max_value = max_value;
         self._refresh_data(term);
         self
@@ -107,7 +164,7 @@ impl Graph {
         self
     }
 
-    fn _refresh_data(&mut self, term : Term) {
+    fn _refresh_data(&mut self, term : &mut Term) {
         let value_width = (self._data.len() as f32 / 2.).ceil() as usize;
 
         self._data = if self._data.is_empty() {
@@ -141,7 +198,7 @@ impl Graph {
         self._create(true, term);
     }
 
-    fn _create(&mut self, new: bool, term : Term) {
+    fn _create(&mut self, new: bool, term : &mut Term) {
         let mut value = hashmap! {
             "left" => 0,
             "right" => 0,
@@ -264,7 +321,7 @@ impl Graph {
         }
     }
 
-    fn _call(&mut self, value: Option<usize>, term : Term) -> String {
+    fn _call(&mut self, value: Option<usize>, term : &mut Term) -> String {
         if let Some(value) = value {
             self.current = !self.current;
 
@@ -314,7 +371,7 @@ impl Graph {
         self.out.clone()
     }
 
-    pub fn add(&mut self, value: Option<usize>, term : Term) -> String {
+    pub fn add(&mut self, value: Option<usize>, term : &mut Term) -> String {
         self._call(value, term)
     }
 }

@@ -1,4 +1,5 @@
 use {
+    crate::term::Term,
     from_map::{FromMap, FromMapDefault},
     gradient::Gradient,
     lazy_static::lazy_static,
@@ -10,10 +11,6 @@ use {
         iter::FromIterator,
         path::Path,
     },
-    crate::{
-        term::Term,
-    },
-    starlark::values::Value,
 };
 
 lazy_static! {
@@ -125,15 +122,20 @@ impl Color {
         }
     }
 
-    pub fn call(&mut self, adder : String, term : Term) -> Color {
+    pub fn call(&mut self, adder: String, term: &mut Term) -> Color {
         if adder.len() < 1 {
             return Color::default();
         }
 
-        Color::from(format!("{}{}{}", self.escape(), adder, match self.depth {
-            LayerDepth::Fg => term.fg,
-            LayerDepth::Bg => term.bg,
-        }))
+        Color::from(format!(
+            "{}{}{}",
+            self.escape(),
+            adder,
+            match self.depth {
+                LayerDepth::Fg => term.fg,
+                LayerDepth::Bg => term.bg,
+            }
+        ))
     }
 }
 impl std::default::Default for Color {
@@ -160,7 +162,7 @@ impl From<String> for Color {
 
 #[derive(FromMapDefault, FromMap, Debug, Gradient)]
 #[value_type = "Color"]
-pub struct Theme {
+pub struct Colors {
     pub main_bg: Color,
     #[default("#cc")]
     pub main_fg: Color,
@@ -245,7 +247,7 @@ pub struct Theme {
     #[default("#d45454")]
     pub process_end: Color,
 }
-impl Theme {
+impl Colors {
     fn from_str<S: ToString>(s: S) -> Result<Self, String> {
         let s = s.to_string();
         let map: HashMap<String, Color> = HashMap::from_iter(
@@ -295,6 +297,84 @@ impl Theme {
         Ok(Self::new(File::open(path)?))
     }
 }
+
+pub struct Theme {
+    pub themes : HashMap<String, String>,
+    pub cached : HashMap<String, HashMap<String, String>>,
+    pub current : String,
+    pub gradient : HashMap<String, Vec<String>>,
+    pub colors : Colors,
+} impl Theme {
+    fn from_str<S: ToString>(s: S, DEFAULT_THEME : HashMap<String, String>) -> Result<Self, String> {
+        let colors_mut : Colors = match Colors::from_str(s) {
+            Ok(c) => c,
+            _ => return Err(String::from("Error in Color parsing")),
+        };
+
+        let mut cached_mut : HashMap<String, HashMap<String, String>> = HashMap::<String, HashMap<String, String>>::new();
+        cached_mut.insert("Default".to_owned(), DEFAULT_THEME);
+
+        let mut gradient_mut : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
+        gradient_mut.insert("temp".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("cpu".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("free".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("cached".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("available".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("used".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("download".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("upload".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("proc".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("proc_color".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("process".to_owned(), Vec::<String>::new());
+
+        Ok(Theme {
+            themes : HashMap::<String, String>::new(),
+            cached : cached_mut,
+            current : String::default(),
+            gradient : gradient_mut,
+            colors : colors_mut,
+        })
+    }
+
+    pub fn new<R>(mut reader: R, DEFAULT_THEME : HashMap<String, String>) -> Result<Self, String>
+    where
+        R: Read,
+    {
+        let colors_mut : Colors = match Colors::new(reader) {
+            Ok(c) => c,
+            _ => return Err(String::from("Error in Color parsing")),
+        };
+
+        let mut cached_mut : HashMap<String, HashMap<String, String>> = HashMap::<String, HashMap<String, String>>::new();
+        cached_mut.insert("Default".to_owned(), DEFAULT_THEME);
+
+        let mut gradient_mut : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
+        gradient_mut.insert("temp".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("cpu".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("free".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("cached".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("available".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("used".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("download".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("upload".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("proc".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("proc_color".to_owned(), Vec::<String>::new());
+        gradient_mut.insert("process".to_owned(), Vec::<String>::new());
+
+        Ok(Theme {
+            themes : HashMap::<String, String>::new(),
+            cached : cached_mut,
+            current : String::default(),
+            gradient : gradient_mut,
+            colors : colors_mut,
+        })
+    }
+
+    pub fn from_file<P: AsRef<Path>>(path: P, DEFAULT_THEME : HashMap<String, String>) -> Result<Result<Self, String>, io::Error> {
+        Ok(Self::new(File::open(path)?, DEFAULT_THEME))
+    }
+}
+
 /*
 
 class Theme:

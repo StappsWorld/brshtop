@@ -27,20 +27,16 @@ use {
     },
     error::{errlog, throw_error},
 };
-
-use nix;
 use clap::{App, Arg};
 use expanduser::expanduser;
-use log::LevelFilter;
-use psutil::*;
 use std::{
     collections::HashMap,
     env, fs,
-    fs::metadata,
+    fs::{metadata, File},
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
+    io::{BufReader, prelude::*},
 };
-use string_template::*;
 use theme::{Theme, Color};
 
 pub fn main() {
@@ -326,5 +322,26 @@ pub fn main() {
 
 /// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
 pub fn create_box(x : i32, y : i32, width : i32, height : i32, title : Option<String>, title2 : Option<String>, line_color : Option<Color>, title_color : Option<Color>, fill : bool, box_to_use : Option<Boxes>) -> String {
+
+}
+
+pub fn readfile(file : File) -> Option<String> {
+    
+    match file.metadata() {
+        Ok(m) => {
+            if m.is_file() {
+                let mut out : String = String::new();
+                let mut buf_reader = BufReader::new(file);
+
+                match buf_reader.read_to_string(&mut out){
+                    Ok(_) => Some(out),
+                    Err(e) => None,
+                }
+            } else {
+                None
+            }
+        },
+        Err(e) => None,
+    }
 
 }

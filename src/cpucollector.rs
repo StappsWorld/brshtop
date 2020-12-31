@@ -1,8 +1,8 @@
 use crate::{
-    brshtop_box::BrshtopBox,
-    collector::{Collectors}, 
+    brshtop_box::&mut BrshtopBox,
+    collector::{Collector, Collectors}, 
     config::Config,
-    cpubox::CpuBox, 
+    &mut CpuBox::&mut CpuBox, 
     error, 
     term::Term, 
 };
@@ -15,6 +15,7 @@ use sys_info::*;
 use which::which;
 
 pub struct CpuCollector {
+    pub parent : Collector,
     pub cpu_usage: Vec<Vec<u32>>,
     pub cpu_temp: Vec<Vec<u32>>,
     pub cpu_temp_high: i32,
@@ -39,6 +40,7 @@ impl CpuCollector {
         }
 
         let mut CpuCollector_initialize = CpuCollector {
+            parent : Collector::new(),
             cpu_usage: cpu_usage_mut,
             cpu_temp: cpu_temp_mut,
             cpu_temp_high: 0,
@@ -64,14 +66,14 @@ impl CpuCollector {
         term: Term,
         CORES: u64,
         CORE_MAP: Vec<i32>,
-        cpu_box: CpuBox,
-        brshtop_box : BrshtopBox,
+        cpu_box: &mut CpuBox,
+        brshtop_box : &mut BrshtopBox,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
             .cpu_percent()
         {
-            Ok(p) => self.cpu_usage[0].push(format!("{:.2}", p)),
+            Ok(p) => self.cpu_usage[0].push(format!("{:.2}", p).parse::<u32>().unwrap()),
             Err(_) => (),
         }
 
@@ -101,7 +103,7 @@ impl CpuCollector {
         };
 
         for (n, thread) in cpu_percentages.iter().enumerate() {
-            self.cpu_usage[n].push(format!("{:.2}", *thread as u32));
+            self.cpu_usage[n].push(format!("{:.2}", *thread as u32).parse::<u32>().unwrap());
             if self.cpu_usage[n].len() > (term.width * 2) as usize {
                 self.cpu_usage[n].remove(0);
             }
@@ -120,8 +122,8 @@ impl CpuCollector {
 
         self.cpu_freq = cpu_frequency;
 
-        let lavg = match sys_info::loadavg() {
-            Ok(l) => [
+        let lavg : Vec<f64> = match sys_info::loadavg() {
+            Ok(l) => vec![
                 format!("{:.2}", l.one).parse::<f64>().unwrap(),
                 format!("{:.2}", l.five).parse::<f64>().unwrap(),
                 format!("{:.2}", l.fifteen).parse::<f64>().unwrap(),
@@ -163,7 +165,7 @@ impl CpuCollector {
         }
     }
 
-    pub fn draw(&mut self, cpu_box : CpuBox) {
+    pub fn draw(&mut self, cpu_box : &mut CpuBox) {
         cpu_box.draw_fg();
     }
 
@@ -258,8 +260,8 @@ impl CpuCollector {
         THREADS: u64,
         CORES: u64,
         CORE_MAP: Vec<i32>,
-        cpu_box : CpuBox,
-        brshtop_box : BrshtopBox,
+        cpu_box : &mut CpuBox,
+        brshtop_box : &mut BrshtopBox,
         term : Term,
     ) {
         let mut temp: i32 = 1000;
@@ -666,7 +668,7 @@ impl CpuCollector {
         }
     }
 } impl Clone for CpuCollector {
-    fn clone(&mut self) -> Self {
+    fn clone(&self) -> Self {
         CpuCollector {
             cpu_usage: self.cpu_usage.clone(),
             cpu_temp: self.cpu_temp.clone(),
