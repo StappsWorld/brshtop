@@ -345,3 +345,17 @@ pub fn readfile(file : File) -> Option<String> {
     }
 
 }
+
+pub fn min_max(value : i32, min_value : i32, max_value : i32) -> i32 {
+    let min = if value > max_value {
+        max_value
+    } else {
+        value
+    };
+
+    if min_value > min {
+        min_value
+    } else {
+        min
+    }
+}

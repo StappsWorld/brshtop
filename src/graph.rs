@@ -421,7 +421,7 @@ impl Graph {
         }
     }
 
-    fn _call(&mut self, value: Option<i32>, term : &mut Term) -> String {
+    pub fn call(&mut self, value: Option<i32>, term : &mut Term) -> String {
         if let Some(value) = value {
             self.current = !self.current;
 
@@ -472,7 +472,7 @@ impl Graph {
     }
 
     pub fn add(&mut self, value: Option<i32>, term : &mut Term) -> String {
-        self._call(value, term)
+        self.call(value, term)
     }
 }
 impl Display for Graph {

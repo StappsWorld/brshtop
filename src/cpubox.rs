@@ -3,10 +3,11 @@ use {
         brshtop_box::{Boxes, BrshtopBox, SubBoxes},
         config::{Config, ViewMode},
         cpucollector::CpuCollector,
-        create_box, error, fx,
+        create_box, error, fx, min_max,
         graph::{Graph, Graphs},
         key::Key,
         menu::Menu,
+        meters::{Meter, Meters},
         mv, readfile,
         subbox::SubBox,
         symbol,
@@ -169,12 +170,18 @@ impl CpuBox {
                 Some(Boxes::CpuBox(self))
             ),
             mv::to(self.y, self.x + 10),
-            theme.colors.cpu_box.call(symbol::title_left.to_owned(), term),
+            theme
+                .colors
+                .cpu_box
+                .call(symbol::title_left.to_owned(), term),
             fx::b,
             theme.colors.hi_fg.call("M".to_owned(), term),
             theme.colors.title.call("enu".to_owned(), term),
             fx::ub,
-            theme.colors.cpu_box.call(symbol::title_right.to_owned(), term),
+            theme
+                .colors
+                .cpu_box
+                .call(symbol::title_right.to_owned(), term),
             create_box(
                 self.sub.box_x as i32,
                 self.sub.box_y as i32,
@@ -310,7 +317,20 @@ impl CpuBox {
         return return_true || self.resized || self.redraw || menu.active;
     }
 
-    pub fn draw_fg(&mut self, cpu: &mut CpuCollector, config: &mut Config, key: &mut Key, theme : &mut Theme, term : &mut Term, ARG_MODE : ViewMode, graphs : Graphs) {
+    pub fn draw_fg<P: AsRef<Path>>(
+        &mut self,
+        cpu: &mut CpuCollector,
+        config: &mut Config,
+        key: &mut Key,
+        theme: &mut Theme,
+        term: &mut Term,
+        ARG_MODE: ViewMode,
+        graphs: Graphs,
+        meters : Meters,
+        THREADS : u64,
+        menu : Menu,
+        config_dir : P,
+    ) {
         if cpu.parent.redraw {
             self.redraw = true;
         }
@@ -350,16 +370,394 @@ impl CpuBox {
                 }
                 key.mouse.set("m".to_owned(), parent);
             }
-            out_misc += format!("{}{}{}{}{}ode:{}{}{}", 
+            out_misc += format!(
+                "{}{}{}{}{}ode:{}{}{}",
                 mv::to(self.y, self.x + 16),
-                theme.colors.cpu_box.call(symbol::title_left.to_owned(), term),
+                theme
+                    .colors
+                    .cpu_box
+                    .call(symbol::title_left.to_owned(), term),
                 fx::b,
+                theme.colors.hi_fg.call("m".to_owned(), term),
                 theme.colors.title,
                 ARG_MODE != ViewMode::None || config.view_mode != ViewMode::None,
                 fx::ub,
-                theme.colors.cpu_box.call(symbol::title_right.to_owned(), term)
+                theme
+                    .colors
+                    .cpu_box
+                    .call(symbol::title_right.to_owned(), term)
             );
-            graphs.cpu.insert("up".to_owned(), Graph::new((w - bw - 3) as usize, hh as usize, Some(theme.gradient.get(&"cpu".to_owned()).unwrap()), cpu.cpu_usage[0], term));
+            graphs.cpu.insert(
+                "up".to_owned(),
+                Graph::new_with_vec(
+                    (w - bw - 3) as u32,
+                    hh as u32,
+                    theme.gradient.get(&"cpu".to_owned()).unwrap().clone(),
+                    cpu.cpu_usage[0].iter().map(|u| *u as i32).collect(),
+                    term,
+                    false,
+                    0,
+                    0,
+                    None,
+                ),
+            );
+            graphs.cpu.insert(
+                "down".to_owned(),
+                Graph::new_with_vec(
+                    (w - bw - 3) as u32,
+                    hh as u32,
+                    theme.gradient.get(&"cpu".to_owned()).unwrap().clone(),
+                    cpu.cpu_usage[0].iter().map(|u| *u as i32).collect(),
+                    term,
+                    true,
+                    0,
+                    0,
+                    None,
+                ),
+            );
+            meters.cpu = Meter::new(
+                cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2],
+                bw - (if cpu.got_sensors {21} else {9}),
+                "cpu".to_owned(),
+            );
+
+            if self.sub.column_size > 0 || ct_width > 0 {
+                for n in 0..THREADS as usize {
+                    graphs.cores[n] = Graph::new(
+                        5, 
+                        1, 
+                        None, 
+                        cpu.cpu_temp[0].iter().map(|u| *u as i32).collect(), 
+                        term, 
+                        false, 
+                        cpu.cpu_temp_crit, 
+                        -23, 
+                        None
+                    );
+                }
+            }
+            if cpu.got_sensors {
+                graphs.temps[0] = Graph::new(
+                    5, 
+                    1, 
+                    None, 
+                    cpu.cpu_temp[0].iter().map(|u| *u as i32).collect(), 
+                    term, 
+                    false, 
+                    cpu.cpu_temp_crit, 
+                    -23, 
+                    None
+                );
+                if self.sub.column_size > 1 {
+                    for n in 1..(THREADS + 1) as usize {
+                        if cpu.cpu_temp[n].len() == 0 {
+                            continue;
+                        }
+                        graphs.temps[n] = Graph::new(
+                            5, 
+                            1, 
+                            None, 
+                            cpu.cpu_temp[0].iter().map(|u| *u as i32).collect(), 
+                            term, 
+                            false, 
+                            cpu.cpu_temp_crit, 
+                            -23, 
+                            None
+                        );
+                    }
+                }
+            }
+
+            // TODO : Fix buffer call, only_save=true
+            draw.buffer("cpu_misc".to_owned(), out_misc, true);
         }
+
+        if config.show_battery && self.battery_activity(config_dir, menu) {
+            let mut bat_out : String = String::default();
+            let mut battery_time : String = String::default();
+            if self.battery_secs > 0.0 {
+                battery_time = format!("{:02}:{:02}", (self.battery_secs / 3600.0) as i32, ((self.battery_secs % 3600.0) / 60.0) as i32);
+            }
+
+            if self.resized {
+                // TODO : Fix meter initialization, invert=true
+                meters.battery = Meter::new(self.battery_percent, 10, "cpu".to_owned(), true);
+            }
+            
+            let mut battery_symbol : String = self.battery_symbols.get(&self.battery_status).unwrap().clone();
+            let battery_len : u32 = (format!("{}", config.update_ms).len() + 
+                if self.parent.width >= 100 {11} else {0} + 
+                battery_time.len() + 
+                format!("{}", self.battery_percent).len()) as u32;
+            let battery_pos : u32 = self.parent.width - battery_len - 17;
+
+            if (battery_pos != self.old_battery_pos || battery_len != self.old_battery_len as u32) && self.old_battery_pos > 0 && !self.resized {
+                bat_out.push_str(format!("{}{}", mv::to(y-1, self.old_battery_pos), theme.colors.cpu_box.call(symbol::h_line.repeat(self.old_battery_len + 4), term)).as_str());
+            }
+
+            self.old_battery_pos = battery_pos;
+            self.old_battery_len = battery_len as usize;
+
+            bat_out.push_str(format!("{}{}{}{}BAT{} {}%{}{}{}{}{}",
+                    mv::to(y-1, battery_pos),
+                    theme.colors.cpu_box.call(symbol::title_left.to_owned(), term),
+                    fx::b,
+                    theme.colors.title,
+                    battery_symbol,
+                    self.battery_percent,
+                    if self.parent.width < 100 {
+                        ""
+                    } else {
+                        format!(" {}{}{}",
+                            fx::ub,
+                            meters.battery.call(symbol::title_right, term),
+                            fx::b,
+                        )
+                    },
+                    theme.colors.title,
+                    battery_time,
+                    fx::ub,
+                    theme.colors.cpu_box.call(symbol::title_right.to_owned(), term),
+                )
+                .as_str()
+            );
+
+            // TODO : Fix buffer call, only_save = menu.active
+            draw.buffer(
+                "battery".to_owned(),
+                format!("{}{}", 
+                    bat_out,
+                    term.fg,
+                ),
+                menu.active
+            );
+        } else if self.battery_clear {
+            out.push_str(format!("{}{}",
+                    mv::to(y-1, self.old_battery_pos),
+                    theme.colors.cpu_box.call(symbol::h_line.repeat(self.old_battery_len + 4), term),
+                )
+            );
+            self.battery_clear = false;
+            self.battery_percent = 1000.0;
+            self.battery_secs = 0.0;
+            self.battery_status = "Unkown".to_owned();
+            self.old_battery_pos = 0;
+            self.old_battery_len = 0;
+            self.battery_path = None;
+            
+            // TODO : Fix clear call, save = true
+            draw.clear("battery".to_owned(), true);
+        }
+
+        let mut cx : u32 = 0;
+        let mut cy : u32 = 0;
+        let mut cc : u32 = 0;
+        let mut ccw : u32 = ((bw + 1) / self.sub.box_columns) as u32;
+
+        if cpu.cpu_freq != 0.0 {
+            let mut freq : String = if cpu.cpu_freq < 1000.0 {
+                format!("{:.0} Mhz", cpu.cpu_freq)
+            } else {
+                format!("{:.1}", cpu.cpu_freq / 1000.0)
+            };
+
+            out.push_str(format!("{}{}{}{}{}{}",
+                    mv::to(by -1, bx + bw - 9),
+                    theme.colors.div_line.call(symbol::title_left.to_owned(), term),
+                    fx::b,
+                    theme.colors.title.call(freq, term),
+                    fx::ub,
+                    theme.colors.div_line.call(symbol::title_right.to_owned(), term),
+                )
+                .as_str()
+            );
+        }
+
+        out.push_str(format!("{}{}{}{}{}{}{}{}{}{}{}{:>4}{}%",
+                mv::to(y, x),
+                graphs.cpu[&"up".to_owned()].call(
+                    if self.resized {
+                        None
+                    } else {
+                        Some(cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2] as i32)
+                    }, 
+                    term
+                ),
+                mv::to(y + hh, x),
+                graphs.cpu[&"up".to_owned()].call(
+                    if self.resized {
+                        None
+                    } else {
+                        Some(cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2] as i32)
+                    }, 
+                    term
+                ),
+                theme.colors.main_fg,
+                mv::to(by + cy, bx + cx),
+                fx::b,
+                "CPU ",
+                fx::ub,
+                meters.cpu.call(cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2]),
+                theme.gradient[&"cpu".to_owned()][cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2] as usize],
+                cpu.cpu_usage[0][cpu.cpu_usage.len() - 2],
+                theme.colors.main_fg
+            )
+            .as_str()
+        );
+
+        if cpu.got_sensors {
+            out.push_str(format!("{} . . . . . {}{}{}{:>4}{}°C",
+                    theme.colors.inactive_fg,
+                    mv::left(5),
+                    theme.gradient[&"temp".to_owned()][(min_max(cpu.cpu_temp[0][cpu.cpu_temp[0].len() - 2] as i32, 0, cpu.cpu_temp_crit) * (100 / cpu.cpu_temp_crit) as i32) as usize],
+                    graphs.temps[0].call(if self.resized {
+                            None
+                        } else {
+                            Some(cpu.cpu_temp[0][cpu.cpu_temp[0].len() - 2] as i32)
+                        },
+                        term
+                    ),
+                    cpu.cpu_temp[0][cpu.cpu_temp[0].len() - 2],
+                    theme.colors.main_fg,
+                )
+                .as_str()
+            );
+        }
+
+        cy += 1;
+        for n in 1..(THREADS + 1) as usize {
+            out.push_str(format!("{}{}{}{:<width$}",
+                theme.colors.main_fg,
+                mv::to(by + cy, bx + cx),
+                fx::b.to_owned() + "C" + if THREADS < 100 {
+                    fx::ub
+                } else {
+                    ""
+                },
+                if self.sub.column_size == 0 {
+                    2
+                } else {
+                    3
+                },
+                width = n,
+            )
+            .as_str()
+            );
+
+            if self.sub.column_size > 0 || ct_width > 0 {
+                out.push_str(format!("{}{}{}{}{}",
+                    theme.colors.inactive_fg,
+                    ".".repeat((5 * self.sub.column_size + ct_width) as usize),
+                    mv::left((5 * self.sub.column_size + ct_width) as u32),
+                    theme.gradient[&"cpu".to_owned()][(cpu.cpu_usage[n][cpu.cpu_usage[n].len() - 2]) as usize],
+                    graphs.cores[n - 1].call(if self.resized {
+                            None
+                        } else {
+                            Some(cpu.cpu_temp[n][cpu.cpu_temp[n].len() - 2] as i32)
+                        }, 
+                        term
+                    ),
+                )
+                .as_str()
+                );
+            } else {
+                out.push_str(format!("{}", theme.gradient[&"cpu".to_owned()][(cpu.cpu_usage[n][cpu.cpu_usage[n].len() - 2]) as usize]).as_str());
+            }
+
+            out.push_str(format!("{:width$}{}°C",
+                    cpu.cpu_usage[n][cpu.cpu_usage[n].len() - 2],
+                    theme.colors.main_fg,
+                    width = if self.sub.column_size < 2 {3} else {4},
+                )
+                .as_str()
+            );
+
+            if cpu.got_sensors && cpu.cpu_temp[n].len() != 0 && !hide_cores {
+                if self.sub.column_size > 1 {
+                    out.push_str(format!("{} . . . . . {}{}{}",
+                            theme.colors.inactive_fg,
+                            mv::left(5),
+                            theme.gradient[&"temp".to_owned()][(if cpu.cpu_temp[n][cpu.cpu_temp[n].len() - 2] >= cpu.cpu_temp_crit as u32 {100} else {cpu.cpu_temp[n][cpu.cpu_temp[n].len() - 2] * (100 / cpu.cpu_temp_crit) as u32}) as usize],
+                            graphs.temps[n].call(if self.resized {None} else {Some(cpu.cpu_temp[n][cpu.cpu_temp[n].len() - 2] as i32)}, term)
+                        )
+                        .as_str()
+                    );
+                } else {
+                    out.push_str(format!("{}",
+                            theme.gradient[&"temp".to_owned()][if cpu.cpu_temp[n][cpu.cpu_temp[n].len() - 2] >= cpu.cpu_temp_crit as u32 {
+                                100
+                            } else {
+                                (cpu.cpu_temp[n][cpu.cpu_temp[n].len() - 2] * (100 / cpu.cpu_temp_crit) as u32) as usize
+                            }]
+                        )
+                        .as_str()
+                    );
+                }
+
+            } else if cpu.got_sensors && !hide_cores {
+                out.push_str(format!("{}", mv::right(if self.sub.column_size * 6 > 6 {self.sub.column_size * 6} else {6})));
+            }
+
+            out.push_str(theme.colors.div_line.call(symbol::v_line.to_owned(), term).to_string().as_str());
+            cy += 1;
+
+            if cy > ceil((THREADS / self.sub.box_columns) as f64, 0) as u32 && n != THREADS as usize {
+                cc += 1;
+                cy = 1;
+                cx = ccw * cc;
+                if cc == self.sub.box_columns {
+                    break;
+                }
+            }
+        }
+
+        if cy < bh - 1 {
+            cy = bh - 1;
+        }
+
+        if cy < bh && cc < self.sub.box_columns {
+            if self.sub.column_size == 2 && cpu.got_sensors {
+                let mut adder : String = "   ".to_owned();
+                cpu.load_avg.iter().map(|l| adder.push_str(l.to_string().as_str()));
+                lavg = format!(" Load AVG:  {:^19.19}", adder);
+            } else if self.sub.column_size == 2 || (self.sub.column_size == 1 && cpu.got_sensors) {
+                let mut adder : String = " ".to_owned();
+                cpu.load_avg.iter().map(|l| adder.push_str(l.to_string().as_str()));
+                lavg = format!("LAV: {:^14.14}", adder);
+            } else if self.sub.column_size == 1 || (self.sub.column_size == 0 && cpu.got_sensors) {
+                let mut adder : String = "   ".to_owned();
+                cpu.load_avg.iter().map(|l| adder.push_str(ceil(*l, 1).to_string().as_str()));
+                lavg = format!("L {:^11.11}", adder);
+            } else {
+                let mut adder : String = "   ".to_owned();
+                cpu.load_avg.iter().map(|l| adder.push_str(ceil(*l, 1).to_string().as_str()));
+                lavg = format!("{:^7.7}", adder);
+            }
+            out.push_str(format!("{}{}{}{}", 
+                    mv::to(by + cy, bx + cx),
+                    theme.colors.main_fg,
+                    lavg,
+                    theme.colors.div_line.call(symbol::v_line.to_owned(), term)
+                )
+                .as_str()
+            );
+        }
+
+        out.push_str(format!("{}{}up {}",
+                mv::to(y + h - 1, x + 1),
+                theme.colors.graph_text,
+                cpu.uptime
+            )
+            .as_str()
+        );
+
+        // TODO : Fix buffer call, only_save = menu.active
+        draw.buffer(self.buffer, format!("{}{}{}", out_misc, out, term.fg), menu.active);
+        
+        self.resized = false;
+        self.redraw = false;
+        self.clock_block = false;
     }
+
+    
 }
