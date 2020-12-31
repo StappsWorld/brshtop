@@ -1,6 +1,7 @@
 use std::time::{Duration, SystemTime};
 use std::*;
 
+#[derive(Clone, Copy)]
 pub enum Event {
     Flag(bool),
     Wait,

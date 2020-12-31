@@ -1,8 +1,8 @@
 use crate::{
-    brshtop_box::&mut BrshtopBox,
+    brshtop_box::BrshtopBox,
     collector::{Collector, Collectors}, 
     config::Config,
-    &mut CpuBox::&mut CpuBox, 
+    cpubox::CpuBox, 
     error, 
     term::Term, 
 };
@@ -60,10 +60,10 @@ impl CpuCollector {
     }
     pub fn collect<P: AsRef<Path>>(
         &mut self,
-        CONFIG: Config,
+        CONFIG: &mut Config,
         THREADS: u64,
         CONFIG_DIR: P,
-        term: Term,
+        term: &mut Term,
         CORES: u64,
         CORE_MAP: Vec<i32>,
         cpu_box: &mut CpuBox,
@@ -262,7 +262,7 @@ impl CpuCollector {
         CORE_MAP: Vec<i32>,
         cpu_box : &mut CpuBox,
         brshtop_box : &mut BrshtopBox,
-        term : Term,
+        term : &mut Term,
     ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
@@ -670,6 +670,7 @@ impl CpuCollector {
 } impl Clone for CpuCollector {
     fn clone(&self) -> Self {
         CpuCollector {
+            parent : self.parent.clone(),
             cpu_usage: self.cpu_usage.clone(),
             cpu_temp: self.cpu_temp.clone(),
             cpu_temp_high: self.cpu_temp_high.clone(),

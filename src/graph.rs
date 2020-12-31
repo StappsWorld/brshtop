@@ -19,27 +19,27 @@ pub struct Graphs {
 #[derive(Debug)]
 pub struct Graph {
     out: String,
-    width: usize,
-    height: usize,
+    width: i32,
+    height: i32,
     graphs: HashMap<bool, Vec<String>>,
     colors: Vec<Color>,
     invert: bool,
-    max_value: usize,
-    color_max_value: usize,
-    offset: usize,
+    max_value: i32,
+    color_max_value: i32,
+    offset: i32,
     current: bool,
-    last: usize,
+    last: i32,
     symbol: HashMap<u32, &'static str>,
-    _data: Vec<usize>, // TODO: Data type
+    _data: Vec<i32>, // TODO: Data type
 }
 impl Graph {
 
     /// Defaults invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None
     pub fn new<C>(
-        width: usize,
-        height: usize,
+        width: i32,
+        height: i32,
         color: Option<C>,
-        data: Vec<usize>, // TODO: Data type
+        data: Vec<i32>,
         term : &mut Term,
         invert : bool,
         max_value : i32,
@@ -53,6 +53,25 @@ impl Graph {
             true => Vec::new(),
             false => Vec::new(),
         };
+
+        let mut real_data = data.clone();
+        if data.len() == 0 {
+            real_data = vec![0];
+        }
+
+        if max_value != 0 {
+            let mut to_set : Vec<i32> = Vec::<i32>::new();
+
+            for v in real_data {
+                to_set.push(if (v + offset) * (100 / (max_value + offset)) as i32 > 100 {100} else {(v + offset) * (100 / (max_value + offset)) as i32});
+            }
+
+            real_data = to_set;
+        }
+
+        if color_max_value != None {
+            
+        }
 
         let colors = if let Some(color) = color.map(<_ as Into<Color>>::into) {
             if height > 1 {
@@ -70,14 +89,14 @@ impl Graph {
             height,
             invert: false,
             offset: 0,
-            color_max_value: 0,
             colors,
             symbol: if height == 1 {
                 symbol::graph_up_small()
             } else {
                 symbol::graph_up()
             },
-            max_value: 0,
+            max_value: max_value,
+            color_max_value: 0,
             _data: data,
             graphs,
             current: false,

@@ -159,7 +159,7 @@ impl Collector {
         term: &mut Term,
         CORES: u64,
         CORE_MAP: Vec<i32>,
-        cpu_box: CpuBox,
+        cpu_box: &mut CpuBox,
     ) {
         let mut draw_buffers = Vec::<String>::new();
 
@@ -234,6 +234,31 @@ impl Collector {
 
             self.collect_idle = Event::Flag(true);
             self.collect_done = Event::Flag(true);
+        }
+    }
+} impl Clone for Collector {
+    fn clone(&self) -> Self {
+        let (tx_build, rx_build) = channel();
+        let (flag_build, control_build) = make_pair();
+        Collector {
+            stopping: self.stopping.clone(),
+            started: self.started.clone(),
+            draw_now: self.draw_now.clone(),
+            redraw: self.redraw.clone(),
+            only_draw: self.only_draw.clone(),
+            tx: tx_build,
+            rx: rx_build,
+            thread: None,
+            flag: flag_build,
+            control: control_build,
+            collect_run: self.collect_run.clone(),
+            collect_idle: self.collect_idle.clone(),
+            collect_done: self.collect_done.clone(),
+            collect_queue: self.collect_queue.clone(),
+            default_collect_queue: self.default_collect_queue.clone(),
+            collect_interrupt: self.collect_interrupt.clone(),
+            proc_interrupt: self.proc_interrupt.clone(),
+            use_draw_list: self.use_draw_list.clone(),
         }
     }
 }
