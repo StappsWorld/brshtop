@@ -2,6 +2,7 @@ use crate::{mv, symbol, theme::Color, term::Term};
 use maplit::hashmap;
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
+use math::round::ceil;
 
 pub struct Graphs {
     pub cpu: HashMap<String, Graph>,
@@ -19,8 +20,8 @@ pub struct Graphs {
 #[derive(Debug)]
 pub struct Graph {
     out: String,
-    width: i32,
-    height: i32,
+    width: u32,
+    height: u32,
     graphs: HashMap<bool, Vec<String>>,
     colors: Vec<Color>,
     invert: bool,
@@ -59,6 +60,7 @@ impl Graph {
             real_data = vec![0];
         }
 
+        let mut color_scale : i32 = 100;
         if max_value != 0 {
             let mut to_set : Vec<i32> = Vec::<i32>::new();
 
@@ -67,11 +69,16 @@ impl Graph {
             }
 
             real_data = to_set;
+
+            if color_max_value != None {
+                color_scale = 100 * (max_value / match color_max_value {
+                    Some(val) => val,
+                    None => max_value,
+                } as i32);
+            }
         }
 
-        if color_max_value != None {
-            
-        }
+        
 
         let colors = if let Some(color) = color.map(<_ as Into<Color>>::into) {
             if height > 1 {
@@ -83,21 +90,34 @@ impl Graph {
             vec![]
         };
 
+        
+
         let mut graph = Self {
             out: String::new(),
-            width,
-            height,
+            width : width as u32,
+            height : height as u32,
             invert: false,
-            offset: 0,
+            offset: offset,
             colors,
             symbol: if height == 1 {
-                symbol::graph_up_small()
+                if invert {
+                    symbol::graph_down_small()
+                } else {
+                    symbol::graph_up_small()
+                }
             } else {
-                symbol::graph_up()
+                if invert {
+                    symbol::graph_down()
+                } else {
+                    symbol::graph_up()
+                }
             },
             max_value: max_value,
-            color_max_value: 0,
-            _data: data,
+            color_max_value: match color_max_value {
+                Some(c) => c,
+                None => max_value,
+            },
+            _data: real_data,
             graphs,
             current: false,
             last: 0,
@@ -105,15 +125,36 @@ impl Graph {
 
         graph._refresh_data(term);
 
+        let mut value_width : i32 = ceil(data.len() as f64 / 2.0, 0) as i32;
+        let mut filler : String = String::default();
+
+        if value_width > width {
+            real_data = data[(width as usize * 2)..].to_vec();
+        } else if value_width < width {
+            filler = graph.symbol[&(0 as u32)].repeat((width - value_width) as usize);
+        }
+
+        if real_data.len() % 2 != 0 {
+            real_data.insert(0,0);
+        }
+
+        for _ in 0..height {
+            for b in vec![true, false] {
+                graph.graphs[&b].push(filler);
+            }
+        }
+
+        graph._create(true, term);
+
         graph
     }
 
     /// Defaults invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None
     pub fn new_with_vec<C>(
-        width: usize,
-        height: usize,
+        width: u32,
+        height: u32,
         color: Vec<String>,
-        data: Vec<usize>, // TODO: Data type
+        data: Vec<i32>, // TODO: Data type
         term : &mut Term,
         invert : bool,
         max_value : i32,
@@ -121,40 +162,80 @@ impl Graph {
         color_max_value : Option<i32>,
     ) -> Self
     {
+
         let graphs = hashmap! {
             true => Vec::new(),
             false => Vec::new(),
         };
 
+        let mut real_data = data.clone();
+        if data.len() == 0 {
+            real_data = vec![0];
+        }
+
+        let mut color_scale : u32 = 100;
+        if max_value != 0 {
+            let mut to_set : Vec<i32> = Vec::<i32>::new();
+
+            for v in real_data {
+                to_set.push(if (v + offset) * (100 / (max_value + offset)) as i32 > 100 {100} else {(v + offset) * (100 / (max_value + offset)) as i32});
+            }
+
+            real_data = to_set;
+
+            if color_max_value != None {
+                color_scale = 100 * (max_value / match color_max_value {
+                    Some(val) => val,
+                    None => max_value,
+                }) as u32;
+            }
+        }
+
+        
+
         let colors : Vec<Color> = Vec::<Color>::new();
         if height > 1 {
             for i in 1..height + 1 {
-                colors.insert(0, Color::new(color.get(if i * (color_scale / height) as i32 < 100 {i * (color_scale / height) as i32} else {100}).unwrap()).unwrap());
+                colors.insert(0, Color::new(color.get(if i * (color_scale / height) < 100 {(i * (color_scale / height)) as usize} else {100 as usize}).unwrap()).unwrap());
 
             }
         }
+
+        
 
         let mut graph = Self {
             out: String::new(),
             width,
             height,
             invert: false,
-            offset: 0,
-            color_max_value: 0,
+            offset: offset,
             colors,
             symbol: if height == 1 {
-                symbol::graph_up_small()
+                if invert {
+                    symbol::graph_down_small()
+                } else {
+                    symbol::graph_up_small()
+                }
             } else {
-                symbol::graph_up()
+                if invert {
+                    symbol::graph_down()
+                } else {
+                    symbol::graph_up()
+                }
             },
-            max_value: 0,
-            _data: data,
+            max_value: max_value,
+            color_max_value: match color_max_value {
+                Some(c) => c,
+                None => max_value,
+            },
+            _data: real_data,
             graphs,
             current: false,
             last: 0,
         };
 
         graph._refresh_data(term);
+
 
         graph
     }
@@ -169,22 +250,22 @@ impl Graph {
         };
         self
     }
-    pub fn max_value(mut self, max_value: usize, term : &mut Term) -> Self {
+    pub fn max_value(mut self, max_value: i32, term : &mut Term) -> Self {
         self.max_value = max_value;
         self._refresh_data(term);
         self
     }
-    pub fn offset(mut self, offset: usize) -> Self {
+    pub fn offset(mut self, offset: i32) -> Self {
         self.offset = offset;
         self
     }
-    pub fn color_max_value(mut self, color_max_value: usize) -> Self {
+    pub fn color_max_value(mut self, color_max_value: i32) -> Self {
         self.color_max_value = color_max_value;
         self
     }
 
     fn _refresh_data(&mut self, term : &mut Term) {
-        let value_width = (self._data.len() as f32 / 2.).ceil() as usize;
+        let value_width = (self._data.len() as f32 / 2.).ceil() as i32;
 
         self._data = if self._data.is_empty() {
             vec![]
@@ -192,7 +273,7 @@ impl Graph {
             self._data
                 .iter()
                 .map(|v| (v + self.offset) * (100 / (self.max_value + self.offset)))
-                .skip(if value_width < self.width {
+                .skip(if value_width < self.width as i32 {
                     self._data.len() - self.width as usize * 2
                 } else {
                     0
@@ -200,8 +281,8 @@ impl Graph {
                 .collect()
         };
 
-        let filler: String = if value_width < self.width {
-            (0..self.width - value_width)
+        let filler: String = if value_width < self.width as i32 {
+            (0..self.width - value_width as u32)
                 .map(|_| self.symbol[&0].to_string())
                 .collect()
         } else {
@@ -224,13 +305,13 @@ impl Graph {
         };
         for h in 0..self.height {
             let h_high = if self.height > 1 {
-                (100. * (self.height - h) as f32 / self.height as f32).round() as usize
+                (100. * (self.height - h) as f32 / self.height as f32).round() as i32
             } else {
                 100
             };
 
             let h_low = if self.height > 1 {
-                (100. * (self.height - (h + 1)) as f32 / self.height as f32).round() as usize
+                (100. * (self.height - (h + 1)) as f32 / self.height as f32).round() as i32
             } else {
                 0
             };
@@ -267,9 +348,9 @@ impl Graph {
 
                 // Unwrap is safe, self.current will only ever be true or false, self.graphs is preloaded with true/false values
                 let graph = self.graphs.get_mut(&self.current).unwrap();
-                if h < graph.len() {
+                if h < graph.len() as u32 {
                     // TODO: Determine if this unwrap is safe (value[left/right] can only be 0-4)
-                    graph[h].push_str(
+                    graph[h as usize].push_str(
                         self.symbol
                             .get(&((value["left"] * 10 + value["right"]) as u32))
                             .unwrap(),
@@ -294,7 +375,7 @@ impl Graph {
                     "".into()
                 } else {
                     self.colors
-                        .get(self.last)
+                        .get(self.last as usize)
                         .map(Color::to_string)
                         .unwrap_or_default()
                 },
@@ -320,12 +401,12 @@ impl Graph {
                         if self.colors.is_empty() {
                             "".into()
                         } else {
-                            self.colors.get(h).map(Color::to_string).unwrap_or_default()
+                            self.colors.get(h as usize).map(Color::to_string).unwrap_or_default()
                         },
                         self.graphs
                             .get(&self.current)
                             .map(|graph| {
-                                graph.get(if self.invert { self.height - 1 - h } else { h })
+                                graph.get(if self.invert { self.height - 1 - h } else { h } as usize)
                             })
                             .flatten()
                             .cloned()
@@ -340,7 +421,7 @@ impl Graph {
         }
     }
 
-    fn _call(&mut self, value: Option<usize>, term : &mut Term) -> String {
+    fn _call(&mut self, value: Option<i32>, term : &mut Term) -> String {
         if let Some(value) = value {
             self.current = !self.current;
 
@@ -371,7 +452,7 @@ impl Graph {
                         .graphs
                         .get_mut(&self.current)
                         .expect("Graph not available");
-                    graph[n] = graph[n].chars().skip(1).collect();
+                    graph[n as usize] = graph[n as usize].chars().skip(1).collect();
                 }
             }
 
@@ -380,7 +461,7 @@ impl Graph {
                     ((value + self.offset) * 100) / (self.max_value + self.offset)
                 } else {
                     100
-                }];
+                } as i32];
                 self._refresh_data(term);
             }
 
@@ -390,7 +471,7 @@ impl Graph {
         self.out.clone()
     }
 
-    pub fn add(&mut self, value: Option<usize>, term : &mut Term) -> String {
+    pub fn add(&mut self, value: Option<i32>, term : &mut Term) -> String {
         self._call(value, term)
     }
 }
