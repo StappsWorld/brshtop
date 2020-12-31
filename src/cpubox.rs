@@ -347,7 +347,7 @@ impl CpuBox {
         let mut by = self.sub.box_y + 1;
         let mut bw = self.sub.box_width - 2;
         let mut bh = self.sub.box_height - 2;
-        let mut hh = ceil((h / 2) as f64, 0);
+        let mut hh = ceil((h / 2) as f64, 0) as i32;
         let mut hide_cores: bool = (cpu.cpu_temp_only || !config.show_coretemp) && cpu.got_sensors;
         let mut ct_width: u32 = if hide_cores {
             if 6 * self.sub.column_size > 6 {
@@ -583,7 +583,7 @@ impl CpuBox {
                     }, 
                     term
                 ),
-                mv::to(y + hh, x),
+                mv::to(y + hh as u32, x),
                 graphs.cpu[&"up".to_owned()].call(
                     if self.resized {
                         None
@@ -701,7 +701,7 @@ impl CpuBox {
             out.push_str(theme.colors.div_line.call(symbol::v_line.to_owned(), term).to_string().as_str());
             cy += 1;
 
-            if cy > ceil((THREADS / self.sub.box_columns) as f64, 0) as u32 && n != THREADS as usize {
+            if cy > ceil((THREADS / self.sub.box_columns as u64) as f64, 0) as u32 && n != THREADS as usize {
                 cc += 1;
                 cy = 1;
                 cx = ccw * cc;
@@ -753,7 +753,7 @@ impl CpuBox {
 
         // TODO : Fix buffer call, only_save = menu.active
         draw.buffer(self.buffer, format!("{}{}{}", out_misc, out, term.fg), menu.active);
-        
+
         self.resized = false;
         self.redraw = false;
         self.clock_block = false;

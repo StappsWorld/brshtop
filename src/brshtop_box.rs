@@ -163,19 +163,19 @@ impl BrshtopBox {
                 format!(
                     "{}{}{}{} ",
                     mv::to(cpu_box.y, xpos),
-                    theme.cpu_box.call(
+                    theme.colors.cpu_box.call(
                         format!("{}{}", symbol::h_line.repeat(7), symbol::title_left),
                         term
                     ),
                     fx::b,
-                    theme.hi_fg.call("+".to_owned(), term)
+                    theme.colors.hi_fg.call("+".to_owned(), term)
                 ),
                 format!(
                     "{} {}{}{}",
-                    theme.title.call(update_string, term),
-                    theme.hi_fg.call("-".to_owned(), term),
+                    theme.colors.title.call(update_string, term),
+                    theme.colors.hi_fg.call("-".to_owned(), term),
                     fx::ub,
-                    theme.cpu_box.call(symbol::title_right.to_owned(), term)
+                    theme.colors.cpu_box.call(symbol::title_right.to_owned(), term)
                 ),
             ],
             false,
@@ -250,7 +250,7 @@ impl BrshtopBox {
                     ((cpu_box.parent.width) / 2) as u32 - (clock_len / 2) as u32
                 ),
                 fx::ub,
-                theme.cpu_box,
+                theme.colors.cpu_box,
                 symbol::h_line.repeat(self.clock_len as usize)
             );
         }
@@ -265,14 +265,14 @@ impl BrshtopBox {
                     (cpu_box.parent.width / 2) as u32 - (clock_len / 2) as u32
                 ),
                 fx::ub,
-                theme.cpu_box,
+                theme.colors.cpu_box,
                 symbol::title_left,
                 fx::b,
                 theme
-                    .title
+                    .colors.title
                     .call(clock_string[..clock_len as usize].to_string(), term),
                 fx::ub,
-                theme.cpu_box,
+                theme.colors.cpu_box,
                 symbol::title_right,
                 term.fg
             )

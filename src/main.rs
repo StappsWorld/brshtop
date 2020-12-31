@@ -6,6 +6,7 @@ mod config;
 mod consts;
 mod collector;
 mod cpucollector;
+mod draw;
 mod error;
 mod event;
 mod fx;
