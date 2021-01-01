@@ -255,7 +255,7 @@ impl CpuCollector {
 
     pub fn collect_temps<P: AsRef<Path>>(
         &mut self,
-        CONFIG: Config,
+        CONFIG: &mut Config,
         CONFIG_DIR: P,
         THREADS: u64,
         CORES: u64,

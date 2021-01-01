@@ -11,6 +11,7 @@ mod error;
 mod event;
 mod fx;
 mod graph;
+mod key;
 mod mv;
 mod nonblocking;
 mod raw;
@@ -41,8 +42,7 @@ use std::{
 use theme::{Theme, Color};
 
 pub fn main() {
-    let mut b = brshtop::Brshtop::new();
-    b._init();
+    
 
     let errors = Vec::<String>::new();
 
@@ -190,7 +190,7 @@ pub fn main() {
 
     let THREAD_ERROR = 0;
 
-    let mut DEFAULT_THEME: HashMap<&str, &str> = [
+    let mut DEFAULT_THEME: HashMap<String, String> = [
         ("main_bg", ""),
         ("main_fg", "#cc"),
         ("title", "#ee"),
@@ -236,6 +236,7 @@ pub fn main() {
     ]
     .iter()
     .cloned()
+    .map(|(a,b)| (a.to_owned(), b.to_owned()))
     .collect();
 
     let mut MENUS = HashMap::new();
@@ -318,12 +319,15 @@ pub fn main() {
         arg_output.push_str((arg + " ").as_str());
     }
     // errlog(CONFIG_DIR, format!("CMD: {}", arg_output));
+
+    let mut b = brshtop::Brshtop::new();
+    b._init(DEFAULT_THEME);
 }
 
 
 /// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
 pub fn create_box(x : i32, y : i32, width : i32, height : i32, title : Option<String>, title2 : Option<String>, line_color : Option<Color>, title_color : Option<Color>, fill : bool, box_to_use : Option<Boxes>) -> String {
-
+    String::default()
 }
 
 pub fn readfile(file : File) -> Option<String> {

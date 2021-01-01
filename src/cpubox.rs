@@ -4,6 +4,7 @@ use {
         config::{Config, ViewMode},
         cpucollector::CpuCollector,
         create_box, error, fx, min_max,
+        draw::Draw,
         graph::{Graph, Graphs},
         key::Key,
         menu::Menu,
@@ -324,6 +325,7 @@ impl CpuBox {
         key: &mut Key,
         theme: &mut Theme,
         term: &mut Term,
+        draw : &mut Draw,
         ARG_MODE: ViewMode,
         graphs: Graphs,
         meters : Meters,
@@ -386,7 +388,7 @@ impl CpuBox {
                     .colors
                     .cpu_box
                     .call(symbol::title_right.to_owned(), term)
-            );
+            ).as_str();
             graphs.cpu.insert(
                 "up".to_owned(),
                 Graph::new_with_vec(
@@ -468,8 +470,7 @@ impl CpuBox {
                 }
             }
 
-            // TODO : Fix buffer call, only_save=true
-            draw.buffer("cpu_misc".to_owned(), out_misc, true);
+            draw.buffer("cpu_misc".to_owned(), vec![out_misc.clone()], false, false, 100, true, false, false, key);
         }
 
         if config.show_battery && self.battery_activity(config_dir, menu) {
@@ -522,20 +523,26 @@ impl CpuBox {
                 .as_str()
             );
 
-            // TODO : Fix buffer call, only_save = menu.active
             draw.buffer(
                 "battery".to_owned(),
-                format!("{}{}", 
+                vec![format!("{}{}", 
                     bat_out,
                     term.fg,
-                ),
-                menu.active
+                )],
+                false,
+                false,
+                100,
+                menu.active,
+                false,
+                false,
+                key,
             );
         } else if self.battery_clear {
             out.push_str(format!("{}{}",
                     mv::to(y-1, self.old_battery_pos),
                     theme.colors.cpu_box.call(symbol::h_line.repeat(self.old_battery_len + 4), term),
                 )
+                .as_str()
             );
             self.battery_clear = false;
             self.battery_percent = 1000.0;
@@ -545,8 +552,7 @@ impl CpuBox {
             self.old_battery_len = 0;
             self.battery_path = None;
             
-            // TODO : Fix clear call, save = true
-            draw.clear("battery".to_owned(), true);
+            draw.clear(vec!["battery".to_owned()], true);
         }
 
         let mut cx : u32 = 0;
@@ -695,7 +701,7 @@ impl CpuBox {
                 }
 
             } else if cpu.got_sensors && !hide_cores {
-                out.push_str(format!("{}", mv::right(if self.sub.column_size * 6 > 6 {self.sub.column_size * 6} else {6})));
+                out.push_str(format!("{}", mv::right(if self.sub.column_size * 6 > 6 {self.sub.column_size * 6} else {6})).as_str());
             }
 
             out.push_str(theme.colors.div_line.call(symbol::v_line.to_owned(), term).to_string().as_str());

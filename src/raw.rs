@@ -6,13 +6,13 @@ use std::os::unix::io::{RawFd, AsRawFd};
 use pancurses;
 
 
-pub struct Raw {
-    pub stream : Stdin,
+pub struct Raw<'a> {
+    pub stream : &'a mut Stdin,
     pub fd : RawFd,
     pub original_stty : Termios,
 }
-impl Raw {
-    pub fn new(s : Stdin) -> Self {
+impl<'a> Raw<'a> {
+    pub fn new(s : &'a mut Stdin) -> Self {
         let usable_fd = s.as_raw_fd().clone();
         let tty = match Termios::from_fd(usable_fd) {
             Ok(t) => t,

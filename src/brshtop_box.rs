@@ -186,7 +186,7 @@ impl BrshtopBox {
         );
 
         if now && !menu.active {
-            draw.clear("update_ms".to_owned());
+            draw.clear(vec!["update_ms".to_owned()], false);
             if config.show_battery {
                 match Manager::new() {
                     Ok(m) => match m.batteries() {
