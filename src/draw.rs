@@ -34,7 +34,7 @@ impl Draw {
     /// Wait for input reader and self to be idle then print to screen
     pub fn now(&mut self, args : Vec<String>, key : &mut Key) {
         key.idle = Event::Wait;
-        key.idle.wait();
+        key.idle.wait(-1.0);
         key.idle = Event::Flag(false);
 
         io::stdout().flush().unwrap();

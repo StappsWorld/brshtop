@@ -145,15 +145,15 @@ impl CpuBox {
         config: &mut Config,
         CPU_NAME: String,
     ) -> String {
-        if !key.mouse.contains("M".to_owned()) {
-            let mut top: Vec<Vec<u32>> = Vec::<Vec<u32>>::new();
+        if !key.mouse.contains_key(&"M".to_owned()) {
+            let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
             for i in 0..6 {
-                let mut pusher: Vec<u32> = Vec::<u32>::new();
-                pusher.push(self.x + 10 + i);
-                pusher.push(self.y);
+                let mut pusher: Vec<i32> = Vec::<i32>::new();
+                pusher.push((self.x + 10 + i) as i32);
+                pusher.push(self.y as i32);
                 top.push(pusher);
             }
-            key.insert("M".to_owned(), top);
+            key.mouse.insert("M".to_owned(), top);
         }
 
         return format!(
@@ -362,15 +362,15 @@ impl CpuBox {
         };
 
         if self.resized || self.redraw {
-            if !key.mouse.contains("m".to_owned()) {
-                let mut parent = Vec::<Vec<u32>>::new();
+            if !key.mouse.contains_key(&"m".to_owned()) {
+                let mut parent = Vec::<Vec<i32>>::new();
                 for i in 0..12 {
-                    let mut adder = Vec::<u32>::new();
-                    adder.push(self.x + 16 + i);
-                    adder.push(self.y);
+                    let mut adder = Vec::<i32>::new();
+                    adder.push((self.x + 16 + i) as i32);
+                    adder.push(self.y as i32);
                     parent.push(adder);
                 }
-                key.mouse.set("m".to_owned(), parent);
+                key.mouse.insert("m".to_owned(), parent);
             }
             out_misc += format!(
                 "{}{}{}{}{}ode:{}{}{}",
@@ -758,7 +758,21 @@ impl CpuBox {
         );
 
         // TODO : Fix buffer call, only_save = menu.active
-        draw.buffer(self.buffer, format!("{}{}{}", out_misc, out, term.fg), menu.active);
+        draw.buffer(
+            self.buffer, 
+            vec![format!("{}{}{}", 
+                out_misc, 
+                out, 
+                term.fg
+            )],
+            false,
+            false,
+            100,
+            menu.active,
+            false,
+            false,
+            key
+        );
 
         self.resized = false;
         self.redraw = false;

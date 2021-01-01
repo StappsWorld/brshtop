@@ -134,23 +134,23 @@ impl BrshtopBox {
         let mut update_string: String = format!("{}ms", config.update_ms);
         let xpos: u32 = cpu_box.x + cpu_box.parent.width - (update_string.len() as u32) - 15;
 
-        if !key.mouse.contains("+".to_owned()) {
-            let mut add_for_mouse_parent = Vec::<Vec<u32>>::new();
-            let mut add_for_mouse = Vec::<u32>::new();
+        if !key.mouse.contains_key(&"+".to_owned()) {
+            let mut add_for_mouse_parent = Vec::<Vec<i32>>::new();
+            let mut add_for_mouse = Vec::<i32>::new();
             for i in 0..3 {
-                add_for_mouse.push(xpos + 7 + i);
-                add_for_mouse.push(cpu_box.y);
+                add_for_mouse.push((xpos + 7 + i) as i32);
+                add_for_mouse.push((cpu_box.y) as i32);
             }
             add_for_mouse_parent.push(add_for_mouse);
-            key.mouse.set("+".to_owned(), add_for_mouse_parent);
-            let mut sub_for_mouse_parent = Vec::<Vec<u32>>::new();
-            let mut sub_for_mouse = Vec::<u32>::new();
+            key.mouse.insert("+".to_owned(), add_for_mouse_parent);
+            let mut sub_for_mouse_parent = Vec::<Vec<i32>>::new();
+            let mut sub_for_mouse = Vec::<i32>::new();
             for i in 0..3 {
-                sub_for_mouse.push(cpu_box.x + cpu_box.parent.width - 4 + i);
-                sub_for_mouse.push(cpu_box.y);
+                sub_for_mouse.push((cpu_box.x + cpu_box.parent.width - 4 + i) as i32);
+                sub_for_mouse.push(cpu_box.y as i32);
             }
             sub_for_mouse_parent.push(sub_for_mouse);
-            key.mouse.set("-".to_owned(), sub_for_mouse_parent);
+            key.mouse.insert("-".to_owned(), sub_for_mouse_parent);
         }
 
         draw.buffer(
@@ -179,10 +179,12 @@ impl BrshtopBox {
                 ),
             ],
             false,
+            false,
             100,
             menu.active,
             false,
             true,
+            key,
         );
 
         if now && !menu.active {
@@ -191,7 +193,7 @@ impl BrshtopBox {
                 match Manager::new() {
                     Ok(m) => match m.batteries() {
                         Ok(b) => match b.into_iter().size_hint() {
-                            (0, Some(_)) => draw.out("battery".to_owned()),
+                            (0, Some(_)) => draw.out(vec!["battery".to_owned()], false, key),
                             _ => (),
                         },
                         _ => (),
@@ -212,6 +214,7 @@ impl BrshtopBox {
         menu: &mut Menu,
         cpu_box: &mut CpuBox,
         draw: &mut Draw,
+        key : &mut Key,
     ) {
         let mut out: String = String::default();
 
@@ -288,13 +291,14 @@ impl BrshtopBox {
             menu.active,
             false,
             !force,
+            key,
         );
 
         if now && !menu.active && config.show_battery {
             match Manager::new() {
                 Ok(m) => match m.batteries() {
                     Ok(b) => match b.into_iter().size_hint() {
-                        (0, Some(_)) => draw.out("battery".to_owned()),
+                        (0, Some(_)) => draw.out(vec!["battery".to_owned()], false, key),
                         _ => (),
                     },
                     _ => (),
@@ -316,6 +320,7 @@ impl BrshtopBox {
         key: &mut Key,
         theme: &mut Theme,
         term: &mut Term,
+        CPU_NAME : String,
     ) {
         // TODO : Handle the rest of the possible boxes...
         draw.buffer(
@@ -323,7 +328,7 @@ impl BrshtopBox {
             subclasses
                 .into_iter()
                 .map(|b| match b {
-                    Boxes::CpuBox(cb) => cb.draw_bg(),
+                    Boxes::CpuBox(cb) => cb.draw_bg(key, theme, term, config, CPU_NAME),
                     _ => String::default(),
                 })
                 .collect(),
@@ -333,6 +338,7 @@ impl BrshtopBox {
             menu.active,
             false,
             true,
+            key,
         );
 
         self.draw_update_ms(now, config, cpu_box, key, draw, menu, theme, term);

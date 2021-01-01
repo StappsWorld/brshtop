@@ -120,9 +120,9 @@ impl Term {
             collector.collect_interrupt = true;
             self.width = self._w;
             self.height = self._h;
-            draw.now(self.clear);
+            draw.now(vec![self.clear], key);
             draw.now(
-                create_box(
+                vec![create_box(
                     (self._w / 2) as i32 - 25,
                     (self._h / 2) as i32 - 2,
                     50,
@@ -145,11 +145,12 @@ impl Term {
                     fx::ub,
                     self.bg,
                     self.fg
-                ),
+                )],
+                key,
             );
 
             while self._w < 80 || self._h < 24 {
-                draw.now(self.clear);
+                draw.now(vec![self.clear], key);
                 draw.now(
                     create_box(
                         (self._w / 2) as i32 - 25,

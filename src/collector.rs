@@ -1,7 +1,7 @@
 use {
     crate::{
         brshtop_box::BrshtopBox, cpubox::CpuBox, cpucollector::CpuCollector, draw::Draw,
-        event::Event, menu::Menu, term::Term, timeit::TimeIt, Config, Error::*,
+        event::Event, key::Key, menu::Menu, term::Term, timeit::TimeIt, Config,
     },
     std::{path::*, sync::mpsc::*, time::Duration, *},
     thread_control::*,
@@ -160,6 +160,7 @@ impl Collector {
         CORES: u64,
         CORE_MAP: Vec<i32>,
         cpu_box: &mut CpuBox,
+        key : &mut Key,
     ) {
         let mut draw_buffers = Vec::<String>::new();
 
@@ -222,9 +223,9 @@ impl Collector {
 
             if self.draw_now && !menu.active && !self.collect_interrupt {
                 if self.use_draw_list {
-                    draw.out(draw_buffers);
+                    draw.out(draw_buffers, false, key);
                 } else {
-                    draw.out();
+                    draw.out(Vec::<String>::new(), false, key);
                 }
             }
 
