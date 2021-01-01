@@ -143,6 +143,16 @@ impl Display for SortingOption {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum ConfigAttr {
+    String(String),
+    Bool(bool),
+    ViewMode(ViewMode),
+    Int64(i64),
+    SortingOption(SortingOption),
+    LogLevel(LogLevel),
+}
+
 pub struct Config {
     pub keys: Vec<String>,
     pub conf_dict: HashMap<String, ConfigItem>,
@@ -550,6 +560,43 @@ impl Config {
 
         if test_values_converted.contains(&name) {
             self.conf_dict.insert(name.clone(), value.clone());
+        }
+    }
+
+    pub fn getattr(&mut self, attr : String) -> ConfigAttr {
+        match attr {
+            "color_theme".to_owned() => ConfigAttr::String(self.color_theme.clone()),
+            "theme_background".to_owned() => ConfigAttr::Bool(self.theme_background),
+            "view_mode".to_owned() => ConfigAttr::ViewMode(self.view_mode),
+            "update_ms".to_owned() => ConfigAttr::Int64(self.update_ms),
+            "proc_sorting".to_owned() => ConfigAttr::SortingOption(self.proc_sorting),
+            "proc_reversed".to_owned() => ConfigAttr::Bool(self.proc_reversed),
+            "proc_tree".to_owned() => ConfigAttr::Bool(self.proc_tree),
+            "tree_depth".to_owned() => ConfigAttr::Int64(self.tree_depth as i64),
+            "proc_colors".to_owned() => ConfigAttr::Bool(self.proc_colors),
+            "proc_gradient".to_owned() => ConfigAttr::Bool(self.proc_gradient),
+            "proc_per_core".to_owned() => ConfigAttr::Bool(self.proc_per_core),
+            "proc_mem_bytes".to_owned() => ConfigAttr::Bool(self.proc_mem_bytes),
+            "check_temp".to_owned() => ConfigAttr::Bool(self.check_temp),
+            "cpu_sensor".to_owned() => ConfigAttr::String(self.cpu_sensor.clone()),
+            "show_coretemp".to_owned() => ConfigAttr::Bool(self.show_coretemp),
+            "draw_clock".to_owned() => ConfigAttr::String(self.draw_clock.clone()),
+            "background_update".to_owned() => ConfigAttr::Bool(self.background_update),
+            "custom_cpu_name".to_owned() => ConfigAttr::String(self.custom_cpu_name.clone()),
+            "disks_filter".to_owned() => ConfigAttr::String(self.disks_filter.clone()),
+            "mem_graphs".to_owned() => ConfigAttr::Bool(self.mem_graphs),
+            "show_swap".to_owned() => ConfigAttr::Bool(self.show_swap),
+            "swap_disk".to_owned() => ConfigAttr::Bool(self.swap_disk),
+            "show_disks".to_owned() => ConfigAttr::Bool(self.show_disks),
+            "net_download".to_owned() => ConfigAttr::String(self.net_download.clone()),
+            "net_upload".to_owned() => ConfigAttr::String(self.net_upload.clone()),
+            "net_auto".to_owned() => ConfigAttr::Bool(self.net_auto),
+            "net_sync".to_owned() => ConfigAttr::Bool(self.net_sync),
+            "net_color_fixed".to_owned() => ConfigAttr::Bool(self.net_color_fixed),
+            "show_battery".to_owned() => ConfigAttr::Bool(self.show_battery),
+            "show_init".to_owned() => ConfigAttr::Bool(self.show_init),
+            "update_check".to_owned() => ConfigAttr::Bool(self.update_check),
+            "log_level".to_owned() => ConfigAttr::LogLevel(self.log_level),
         }
     }
 

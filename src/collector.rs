@@ -58,6 +58,7 @@ impl Collector {
         }
     }
 
+    /// Defaults draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False
     pub fn collect<P: AsRef<Path>>(
         &mut self,
         collectors: Vec<Collectors>,

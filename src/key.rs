@@ -160,7 +160,7 @@ impl Key {
         self.list = Vec::<String>::new();
     }
 
-    /// Returns true if key is detected else waits out timer and returns false
+    /// Returns true if key is detected else waits out timer and returns false, defaults sec: float = 0.0, mouse: bool = False
     pub fn input_wait(&mut self, sec : f64, mouse : bool, draw : &mut Draw, term : &mut Term) -> bool {
         if self.list.len() > 0 {
             return true;

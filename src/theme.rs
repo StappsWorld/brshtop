@@ -1,5 +1,8 @@
 use {
-    crate::term::Term,
+    crate::{
+        term::Term,
+        error::errlog,
+    },
     from_map::{FromMap, FromMapDefault},
     gradient::Gradient,
     lazy_static::lazy_static,
@@ -7,9 +10,10 @@ use {
     std::{
         collections::HashMap,
         fs::File,
-        io::{self, Read},
+        io::{self, BufRead, Read},
         iter::FromIterator,
-        path::Path,
+        path::{Path, PathBuf},
+        ffi::OsString,
     },
 };
 
@@ -373,6 +377,71 @@ pub struct Theme {
     pub fn from_file<P: AsRef<Path>>(path: P, DEFAULT_THEME : HashMap<String, String>) -> Result<Result<Self, String>, io::Error> {
         Ok(Self::new(File::open(path)?, DEFAULT_THEME))
     }
+
+    pub fn refresh<P: AsRef<Path>>(&mut self, THEME_DIR : &Path, USER_THEME_DIR : &Path, CONFIG_DIR : P) {
+        self.themes = vec![("Default", "Default")].iter().map(|(s1, s2)| (s1.clone().to_owned(), s2.clone().to_owned())).collect();
+    
+        for d in vec![THEME_DIR, USER_THEME_DIR] {
+            if !d.exists() {
+                continue;
+            }
+            for f in match d.read_dir() {
+                Ok(dir) => dir,
+                Err(e) => {
+                    errlog(CONFIG_DIR, format!("Unable to read theme directory ({})", e));
+                    return;  
+                },
+            } {
+                let f_unwrap = match f {
+                    Ok(f) => f,
+                    Err(e) => {
+                        errlog(CONFIG_DIR, format!("Unable to read theme files ({})", e));
+                        return;  
+                    },
+                };
+
+                match f_unwrap.path().file_name(){
+                    Some(path) => match path.to_str() {
+                        Some(path_str) => if path_str.ends_with(".theme") {
+                            self.themes[format!("{}{}", if d == THEME_DIR {""} else {"+"}, path_str[..path_str.len() - 7])] = format!("{}/{:?}", d.to_str().unwrap(), f_unwrap.file_name());
+                        },
+                        None => {
+                            errlog(CONFIG_DIR, format!("Unable to convert path to str"));
+                            return;  
+                        },
+                    },
+                    None => {
+                        errlog(CONFIG_DIR, format!("Unable to read file name"));
+                        return;  
+                    },
+                } 
+            }
+        }
+        
+        pub fn _load_file<P: AsRef<Path>>(path : P, CONFIG_DIR : P) -> Result<HashMap<String, String>, String> {
+            let mut new_theme : HashMap<String, String> = HashMap::<String, String>::new();
+            let file = match File::open(path) {
+                Ok(f) => f,
+                Err(e) => {
+                    let error_string = format!("Unable to open path provided ({})", e);
+                    errlog(CONFIG_DIR, error_string.clone());
+                    return Err(error_string.clone());  
+                },
+            };
+            let reader = io::BufReader::new(file).lines();
+
+            for Ok(line) in reader {
+                if !line.starts_with("theme[") {
+                    continue;
+                }
+                let key : String = line[6..line.chars().position(|c| c == ']').unwrap()].to_owned();
+                let s : usize = line.chars().position(|c| c == '"').unwrap();
+                let value : String = line[s + 1..line[s + 1..].chars().position(|c| c == '"').unwrap()].to_owned();
+                new_theme.insert(key, value);
+            }
+
+            Ok(new_theme)
+        }
 }
 
 /*
