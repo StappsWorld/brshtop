@@ -164,7 +164,7 @@ impl From<String> for Color {
     }
 }
 
-#[derive(FromMapDefault, FromMap, Debug, Gradient)]
+#[derive(FromMapDefault, FromMap, Debug, Gradient, Clone)]
 #[value_type = "Color"]
 pub struct Colors {
     pub main_bg: Color,
@@ -302,6 +302,7 @@ impl Colors {
     }
 }
 
+#[derive(Clone)]
 pub struct Theme {
     pub themes : HashMap<String, String>,
     pub cached : HashMap<String, HashMap<String, String>>,
@@ -309,7 +310,7 @@ pub struct Theme {
     pub gradient : HashMap<String, Vec<String>>,
     pub colors : Colors,
 } impl Theme {
-    fn from_str<S: ToString>(s: S, DEFAULT_THEME : HashMap<String, String>) -> Result<Self, String> {
+    pub fn from_str<S: ToString>(s: S, DEFAULT_THEME : HashMap<String, String>) -> Result<Self, String> {
         let colors_mut : Colors = match Colors::from_str(s) {
             Ok(c) => c,
             _ => return Err(String::from("Error in Color parsing")),

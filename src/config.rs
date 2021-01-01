@@ -152,6 +152,18 @@ pub enum ConfigAttr {
     SortingOption(SortingOption),
     LogLevel(LogLevel),
 }
+impl Display for ConfigAttr {
+    fn fmt(&self, f : &mut Formatter) -> fmt::Result {
+        match self {
+            ConfigAttr::Bool(b) => write!(f, "{}", b),
+            ConfigAttr::Int64(i) => write!(f, "{}", i),
+            ConfigAttr::LogLevel(l) => write!(f, "{}", l.to_string()),
+            ConfigAttr::SortingOption(s) => write!(f, "{}", s.to_string()),
+            ConfigAttr::String(s) => write!(f, "{}", s),
+            ConfigAttr::ViewMode(v) => write!(f, "{}", v.to_string()),
+        }
+    }
+}
 
 pub struct Config {
     pub keys: Vec<String>,
@@ -597,6 +609,139 @@ impl Config {
             "show_init".to_owned() => ConfigAttr::Bool(self.show_init),
             "update_check".to_owned() => ConfigAttr::Bool(self.update_check),
             "log_level".to_owned() => ConfigAttr::LogLevel(self.log_level),
+        }
+    }
+
+    pub fn setattr_configattr(&mut self, attr : String , to_set : ConfigAttr) {
+        match attr {
+            "color_theme".to_owned() => self.color_theme = match to_set {
+                ConfigAttr::String(s) => s.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "theme_background".to_owned() => self.theme_background = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "view_mode".to_owned() => self.view_mode = match to_set {
+                ConfigAttr::ViewMode(v) => v.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "update_ms".to_owned() => self.update_ms = match to_set {
+                ConfigAttr::Int64(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "proc_sorting".to_owned() => self.proc_sorting = match to_set {
+                ConfigAttr::SortingOption(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "proc_reversed".to_owned() => self.proc_reversed = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "proc_tree".to_owned() => self.proc_tree = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "tree_depth".to_owned() => self.tree_depth  = match to_set {
+                ConfigAttr::Int64(b) => b.clone() as i32,
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "proc_colors".to_owned() => self.proc_colors = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "proc_gradient".to_owned() => self.proc_gradient = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "proc_per_core".to_owned() => self.proc_per_core = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "proc_mem_bytes".to_owned() => self.proc_mem_bytes = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "check_temp".to_owned() => self.check_temp = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "cpu_sensor".to_owned() => self.cpu_sensor = match to_set {
+                ConfigAttr::String(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "show_coretemp".to_owned() => self.show_coretemp = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "draw_clock".to_owned() => self.draw_clock = match to_set {
+                ConfigAttr::String(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "background_update".to_owned() => self.background_update = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "custom_cpu_name".to_owned() => self.custom_cpu_name = match to_set {
+                ConfigAttr::String(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "disks_filter".to_owned() => self.disks_filter = match to_set {
+                ConfigAttr::String(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "mem_graphs".to_owned() => self.mem_graphs = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "show_swap".to_owned() => self.show_swap = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "swap_disk".to_owned() => self.swap_disk = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "show_disks".to_owned() => self.show_disks = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "net_download".to_owned() => self.net_download = match to_set {
+                ConfigAttr::String(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "net_upload".to_owned() => self.net_upload = match to_set {
+                ConfigAttr::String(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "net_auto".to_owned() => self.net_auto = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "net_sync".to_owned() => self.net_sync = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "net_color_fixed".to_owned() => self.net_color_fixed = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "show_battery".to_owned() => self.show_battery = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "show_init".to_owned() => self.show_init = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "update_check".to_owned() => self.update_check = match to_set {
+                ConfigAttr::Bool(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
+            "log_level".to_owned() => self.log_level = match to_set {
+                ConfigAttr::LogLevel(b) => b.clone(),
+                _ => throw_error("Illegal attribute set in CONFIG"),
+            },
         }
     }
 

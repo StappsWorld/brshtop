@@ -1,21 +1,31 @@
 use {
     crate::{
-        banner, clean_quit,
+        banner,
+        brshtop_box::{Boxes, BrshtopBox},
+        clean_quit,
         collector::{Collector, Collectors},
-        config::{Config, ConfigAttr, ViewMode},
+        config::{Config, ConfigAttr, LogLevel, ViewMode},
+        cpubox::CpuBox,
+        cpucollector::CpuCollector,
         create_box,
         draw::Draw,
+        error,
         event::Event,
         first_letter_to_upper_case, fx,
+        init::Init,
         key::Key,
-        mv, symbol,
+        mv,
+        netbox::NetBox,
+        netcollector::NetCollector,
+        proc_collector::ProcCollector,
+        symbol,
         term::Term,
         theme::{Color, Colors, Theme},
         timer::Timer,
         updatechecker::UpdateChecker,
     },
     math::round::ceil,
-    std::{collections::HashMap, iter::FromIterator, path::Path},
+    std::{collections::HashMap, iter::FromIterator, mem, path::Path},
 };
 
 pub struct Menu {
@@ -265,7 +275,7 @@ impl Menu {
                         self.options();
                         self.resized = true;
                     } else if menu_current == "help".to_owned() {
-                        self.help();
+                        self.help(THEME, draw, term, VERSION, key_class, collector, collectors, CONFIG, CONFIG_DIR);
                         self.resized = true;
                     }
                 }
@@ -610,7 +620,7 @@ impl Menu {
 
     pub fn options<P: AsRef<Path>>(
         &mut self,
-        ARG_MODE: ViewMode,
+        ARG_MODE: &mut ViewMode,
         THEME: &mut Theme,
         theme: &mut Theme,
         THEME_DIR: &Path,
@@ -620,8 +630,22 @@ impl Menu {
         term: &mut Term,
         CONFIG: &mut Config,
         VERSION: String,
-        key_class : &mut Key,
-        timer : &mut Timer,
+        key_class: &mut Key,
+        timer: &mut Timer,
+        netcollector: &mut NetCollector,
+        brshtop_box: &mut BrshtopBox,
+        boxes: Vec<Boxes>,
+        THREADS: u64,
+        collector: &mut Collector,
+        init: &mut Init,
+        cpubox: &mut CpuBox,
+        CPU_NAME: String,
+        cpucollector: &mut CpuCollector,
+        SYSTEM: String,
+        netbox: &mut NetBox,
+        DEFAULT_THEME: HashMap<String, String>,
+        proc_collector: ProcCollector,
+        collectors: Vec<Collectors>,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -1069,14 +1093,15 @@ impl Menu {
                 self.resized = false;
             }
 
+            let selected: String = option_items
+                .iter()
+                .map(|(key, val)| key.clone())
+                .collect::<Vec<String>>()[selected_int];
+
             if redraw {
                 out = String::default();
                 let cy: u32 = 0;
 
-                let selected: String = option_items
-                    .iter()
-                    .map(|(key, val)| key.clone())
-                    .collect::<Vec<String>>()[selected_int];
                 if pages > 0 {
                     out.push_str(format!(
                         "{}{}{}{}{}{} {}{}{}/{}pg{}{}{}",
@@ -1302,8 +1327,488 @@ impl Menu {
             redraw = false;
 
             if key_class.input_wait(timer.left(), false, draw, term) {
-                
+                key = match key_class.get() {
+                    Some(k) => k,
+                    None => "".to_owned(),
+                };
+                redraw = true;
+                let mut has_sel = false;
+                if key == "mouse_click".to_owned() && !inputting {
+                    let (mx, my) = key_class.get_mouse();
+                    if x < mx as u32
+                        && mx < (x + w) as i32
+                        && y < my as u32
+                        && my < (y + h + w) as i32
+                    {
+                        let mouse_sel: u32 = ceil(((my - y as i32) / 2) as f64, 0) as u32
+                            + ceil(((page - 1) * (h / 2)) as f64, 0) as u32;
+                        if pages != 0
+                            && my == (y + h + 1) as i32
+                            && (x as i32 + 11) < mx
+                            && mx < (x as i32 + 16)
+                        {
+                            key = "page_up".to_owned();
+                        } else if pages != 0
+                            && my == (y + h + 1) as i32
+                            && (x as i32 + 19) < mx
+                            && mx < (x as i32 + 24)
+                        {
+                            key = "page_down".to_owned();
+                        } else if my == (y + h + 1) as i32 {
+                            //pass
+                        } else if mouse_sel == selected_int as u32 {
+                            if mx < (x + 6) as i32 {
+                                key = "left".to_owned();
+                            } else if mx > (x + 19) as i32 {
+                                key = "right".to_owned();
+                            } else {
+                                key = "enter".to_owned();
+                            }
+                        } else if mouse_sel < option_items.len() as u32 {
+                            selected_int = mouse_sel as usize;
+                            has_sel = true;
+                        }
+                    } else {
+                        key = "escape".to_owned();
+                    }
+                }
+
+                if inputting {
+                    if vec!["escape", "mouse_click"]
+                        .iter()
+                        .map(|s| s.to_owned().clone())
+                        .collect()
+                        .contains(key)
+                    {
+                        inputting = false;
+                    } else if key == "enter".to_owned() {
+                        inputting = false;
+                        match CONFIG.getattr(selected) {
+                            ConfigAttr::String(s) => {
+                                if s != input_val {
+                                    let parsed: i64 = input_val.parse::<i64>().unwrap();
+                                    if selected == "update_ms".to_owned() {
+                                        if input_val == String::default() || parsed < 100 {
+                                            CONFIG.update_ms = 100;
+                                        } else if parsed > 86399900 {
+                                            CONFIG.update_ms = 86399900;
+                                        } else {
+                                            CONFIG.update_ms = parsed;
+                                        }
+                                    } else if selected == "tree_depth".to_owned() {
+                                        if input_val == String::default() || parsed < 0 {
+                                            CONFIG.tree_depth = 0;
+                                        } else {
+                                            CONFIG.tree_depth = parsed as i32;
+                                        }
+                                    } else {
+                                        match CONFIG.getattr(selected) {
+                                            ConfigAttr::String(s) => {
+                                                CONFIG.setattr_configattr(
+                                                    selected,
+                                                    ConfigAttr::String(input_val),
+                                                );
+                                                if selected.starts_with("net_") {
+                                                    netcollector.net_min = [
+                                                        ("download".to_owned(), -1),
+                                                        ("upload".to_owned(), -1),
+                                                    ]
+                                                    .iter()
+                                                    .map(|(s, i)| (s.clone(), *i as i32))
+                                                    .collect::<HashMap<String, i32>>();
+                                                } else if selected == "draw_clock".to_owned() {
+                                                    brshtop_box.clock_on =
+                                                        CONFIG.draw_clock.len() > 0;
+                                                    if !brshtop_box.clock_on {
+                                                        draw.clear(vec!["clock".to_owned()], true);
+                                                    }
+                                                }
+                                            }
+                                            _ => (),
+                                        }
+                                        term.refresh(
+                                            [],
+                                            boxes,
+                                            THREADS,
+                                            collector,
+                                            init,
+                                            cpubox,
+                                            draw,
+                                            true,
+                                            key,
+                                            self,
+                                            brshtop_box,
+                                            timer,
+                                            THEME,
+                                            CPU_NAME,
+                                        );
+                                        self.resized = false;
+                                    }
+                                }
+                            }
+                            _ => (),
+                        };
+                    } else if key == "backspace".to_owned() && input_val.len() > 0 {
+                        input_val = input_val[..input_val.len() - 2].to_owned();
+                    } else if key == "delete".to_owned() {
+                        input_val = String::default();
+                    } else if match CONFIG.getattr(selected) {
+                        ConfigAttr::String(_) => true,
+                        _ => false,
+                    } && key.len() == 1
+                    {
+                        input_val.push_str(key.as_str());
+                    } else if match CONFIG.getattr(selected) {
+                        ConfigAttr::Int64(_) => true,
+                        _ => false,
+                    } && match key.trim().parse::<f64>() {
+                        Ok(_) => true,
+                        _ => false,
+                    } {
+                        input_val.push_str(key.as_str());
+                    }
+                } else if key == "q".to_owned() {
+                    clean_quit();
+                } else if ["escape", "o", "M", "f2"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                {
+                    self.close = true;
+                    break;
+                } else if key == "enter".to_owned()
+                    && [
+                        "update_ms",
+                        "disks_filter",
+                        "custom_cpu_name",
+                        "net_download",
+                        "net_upload",
+                        "draw_clock",
+                        "tree_depth",
+                    ]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(selected)
+                {
+                    inputting = true;
+                    input_val = CONFIG.getattr(selected).to_string();
+                } else if key == "left".to_owned()
+                    && selected == "update_ms".to_owned()
+                    && CONFIG.update_ms - 100 >= 100
+                {
+                    CONFIG.update_ms -= 100;
+                    brshtop_box
+                        .draw_update_ms(true, CONFIG, cpubox, key_class, draw, self, THEME, term);
+                } else if key == "right".to_owned()
+                    && selected == "update_ms".to_owned()
+                    && CONFIG.update_ms + 100 <= 86399900
+                {
+                    CONFIG.update_ms += 100;
+                    brshtop_box
+                        .draw_update_ms(true, CONFIG, cpubox, key_class, draw, self, THEME, term);
+                } else if key == "left".to_owned()
+                    && selected == "tree_depth".to_owned()
+                    && CONFIG.tree_depth > 0
+                {
+                    CONFIG.tree_depth -= 1;
+                    // TODO : HashMap types
+                    proc_collector.collapsed = HashMap::new();
+                } else if ["left", "right"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                    && match CONFIG.getattr(selected) {
+                        ConfigAttr::Bool(b) => true,
+                        _ => false,
+                    }
+                {
+                    CONFIG.setattr_configattr(
+                        selected,
+                        ConfigAttr::Bool(match CONFIG.getattr(selected) {
+                            ConfigAttr::Bool(b) => !b,
+                            _ => false,
+                        }),
+                    );
+                    if selected == "check_temp".to_owned() {
+                        if CONFIG.check_temp {
+                            cpucollector.get_sensors(CONFIG, SYSTEM);
+                        } else {
+                            cpucollector.sensor_method = String::default();
+                            cpucollector.got_sensors = false;
+                        }
+                    }
+                    if ["net_auto", "net_color_fixed", "net_sync"]
+                        .iter()
+                        .map(|s| s.to_owned())
+                        .collect()
+                        .contains(selected)
+                    {
+                        if selected == "net_auto".to_owned() {
+                            netcollector.auto_min = CONFIG.net_auto;
+                        }
+                        netbox.redraw = true;
+                    } else if selected == "theme_background".to_owned() {
+                        term.bg = if CONFIG.theme_background {
+                            theme.colors.main_bg
+                        } else {
+                            Color::from("\033[49m".to_owned())
+                        };
+                        draw.now(vec![term.bg.to_string()], key_class);
+                    } else if selected == "show_battery".to_owned() {
+                        draw.clear(vec!["battery".to_owned()], true);
+                    }
+                    term.refresh(
+                        [],
+                        boxes,
+                        THREADS,
+                        collector,
+                        init,
+                        cpubox,
+                        draw,
+                        true,
+                        key_class,
+                        self,
+                        brshtop_box,
+                        timer,
+                        CONFIG,
+                        THEME,
+                        CPU_NAME,
+                    );
+                    self.resized = true;
+                } else if ["left", "right"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                    && selected == "color_theme".to_owned()
+                    && theme.themes.len() > 1
+                {
+                    if key == "left".to_owned() {
+                        color_i -= 1;
+                        if color_i < 0 {
+                            color_i = theme.themes.len() - 1;
+                        }
+                    } else if key == "right".to_owned() {
+                        color_i += 1;
+                        if color_i > theme.themes.len() - 1 {
+                            color_i = 0;
+                        }
+                    }
+                    collector.collect_idle = Event::Wait;
+                    collector.collect_idle.wait(-1.0);
+                    CONFIG.color_theme = theme.themes.keys().cloned().collect()[color_i];
+                    mem::replace(
+                        THEME,
+                        Theme::from_str(CONFIG.color_theme, DEFAULT_THEME).unwrap(),
+                    );
+                    term.refresh(
+                        [],
+                        boxes,
+                        THREADS,
+                        collector,
+                        init,
+                        cpubox,
+                        draw,
+                        true,
+                        key_class,
+                        self,
+                        brshtop_box,
+                        timer,
+                        CONFIG,
+                        THEME,
+                        CPU_NAME,
+                    );
+                    timer.finished();
+                } else if ["left", "right"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                    && selected == "proc_sorting".to_owned()
+                {
+                    proc_collector.sorting(key);
+                } else if ["left", "right"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                    && selected == "log_level".to_owned()
+                {
+                    if key == "left".to_owned() {
+                        loglevel_i -= 1;
+                        if loglevel_i < 0 {
+                            loglevel_i = CONFIG.log_levels.len() - 1;
+                        }
+                    } else if key == "right".to_owned() {
+                        loglevel_i == 1;
+                        if loglevel_i > CONFIG.log_levels.len() - 1 {
+                            loglevel_i = 0;
+                        }
+                    }
+                    CONFIG.log_level = CONFIG.log_levels[loglevel_i];
+                    // TODO : Implement error logging level
+                    error::errlog(
+                        CONFIG_DIR,
+                        ("LogLevel set to ".to_owned() + CONFIG.log_level.to_string().as_str())
+                            .to_owned(),
+                    );
+                } else if ["left", "right"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                    && selected == "cpu_sensor".to_owned()
+                    && CONFIG.cpu_sensors.len() > 1
+                {
+                    if key == "left".to_owned() {
+                        cpu_sensor_i -= 1;
+                        if cpu_sensor_i < 0 {
+                            cpu_sensor_i = CONFIG.cpu_sensors.len() - 1;
+                        }
+                    } else if key == "right".to_owned() {
+                        cpu_sensor_i += 1;
+                        if cpu_sensor_i < CONFIG.cpu_sensors.len() - 1 {
+                            cpu_sensor_i = 0;
+                        }
+                    }
+                    collector.collect_idle = Event::Wait;
+                    collector.collect_idle.wait(-1.0);
+                    cpucollector.sensor_swap = true;
+                    CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i];
+                    if CONFIG.check_temp
+                        && (cpucollector.sensor_method != "psutil".to_owned()
+                            || CONFIG.cpu_sensor == "Auto".to_owned())
+                    {
+                        cpucollector.get_sensors(CONFIG, SYSTEM);
+                        term.refresh(
+                            [],
+                            boxes,
+                            THREADS,
+                            collector,
+                            init,
+                            cpubox,
+                            draw,
+                            true,
+                            key_class,
+                            self,
+                            brshtop_box,
+                            timer,
+                            CONFIG,
+                            THEME,
+                            CPU_NAME,
+                        );
+                        self.resized = false;
+                    }
+                } else if ["left", "right"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                    && selected == "view_mode".to_owned()
+                {
+                    if key == "left".to_owned() {
+                        view_mode_i -= 1;
+                        if view_mode_i < 0 {
+                            view_mode_i = CONFIG.view_modes.len() - 1;
+                        }
+                    } else if key == "right".to_owned() {
+                        view_mode_i += 1;
+                        if view_mode_i > CONFIG.view_modes.len() - 1 {
+                            view_mode_i = 0;
+                        }
+                    }
+                    CONFIG.view_mode = CONFIG.view_modes[view_mode_i];
+                    brshtop_box.proc_mode = CONFIG.view_mode == ViewMode::Proc;
+                    brshtop_box.stat_mode = CONFIG.view_mode == ViewMode::Stat;
+                    if ARG_MODE.clone() != ViewMode::None {
+                        mem::replace(ARG_MODE, ViewMode::None);
+                    }
+                    draw.clear(vec![], true);
+                    term.refresh(
+                        vec![],
+                        boxes,
+                        THREADS,
+                        collector,
+                        init,
+                        cpubox,
+                        draw,
+                        true,
+                        key_class,
+                        self,
+                        brshtop_box,
+                        timer,
+                        CONFIG,
+                        THEME,
+                        CPU_NAME,
+                    );
+                    self.resized = false;
+                } else if key == "up".to_owned() {
+                    selected_int -= 1;
+                    if selected_int < 0 {
+                        selected_int = option_items.len() - 1;
+                    }
+                    page = (selected_int as u32 * 2 / h) as u32 - 1;
+                } else if ["mouse_scroll_up", "page_up"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                    && pages > 0
+                {
+                    page -= 1;
+                    if page < 1 {
+                        page = pages;
+                    }
+                    selected_int = (page - 1) as usize * ceil((h as f64 / 2.0), 0) as usize;
+                } else if ["mouse_scroll_down", "page_down"]
+                    .iter()
+                    .map(|s| s.to_owned())
+                    .collect()
+                    .contains(key)
+                    && pages > 0
+                {
+                    page += 1;
+                    if page > pages {
+                        page = pages;
+                    }
+                    selected_int = (page - 1) as usize * ceil((h as f64 / 2.0), 0) as usize;
+                } else if has_sel {
+                    // pass
+                } else {
+                    redraw = false;
+                }
+            }
+
+            if timer.not_zero() && !self.resized {
+                skip = true;
+            } else {
+                collector.collect(
+                    collectors, CONFIG, CONFIG_DIR, true, false, false, false, false,
+                );
+                collector.collect_done = Event::Wait;
+                collector.collect_done.wait(2.0);
+                if CONFIG.background_update {
+                    self.background = format!(
+                        "{}{}{}",
+                        THEME.colors.inactive_fg,
+                        fx::Fx::uncolor(draw.saved_buffer()),
+                        term.fg,
+                    );
+                }
+                timer.stamp();
             }
         }
+
+        if main_active {
+            self.close = false;
+            return;
+        }
+        draw.now(vec![draw.saved_buffer()], key_class);
+        self.background = String::default();
+        self.active = false;
+        self.close = false;
     }
 }

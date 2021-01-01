@@ -169,7 +169,7 @@ impl CpuCollector {
         cpu_box.draw_fg();
     }
 
-    pub fn get_sensors(&mut self, CONFIG: Config, SYSTEM: String) {
+    pub fn get_sensors(&mut self, CONFIG: &mut Config, SYSTEM: String) {
         self.sensor_method = String::from("");
 
         if SYSTEM == "MacOS" {

@@ -2,6 +2,7 @@ use {
     crate::{
         brshtop_box::{Boxes, BrshtopBox},
         collector::*,
+        config::Config,
         cpubox::CpuBox,
         create_box,
         draw::Draw,
@@ -12,7 +13,7 @@ use {
         key::Key,
         menu::Menu,
         mv,
-        theme::Color,
+        theme::{Color, Theme},
         timer::Timer,
     },
     std::{
@@ -77,7 +78,7 @@ impl Term {
         &mut self,
         args: Vec<String>,
         boxes: Vec<Boxes>,
-        THREADS : u64,
+        THREADS: u64,
         collector: &mut Collector,
         init: &mut Init,
         cpu_box: &mut CpuBox,
@@ -87,7 +88,9 @@ impl Term {
         menu: &mut Menu,
         brshtop_box: &mut BrshtopBox,
         timer: &mut Timer,
-        term: &mut Term,
+        config : &mut Config,
+        theme : &mut Theme,
+        CPU_NAME : String,
     ) {
         if self.resized {
             self.winch = Event::Flag(true);
@@ -122,82 +125,87 @@ impl Term {
             self.height = self._h;
             draw.now(vec![self.clear], key);
             draw.now(
-                vec![create_box(
-                    (self._w / 2) as i32 - 25,
-                    (self._h / 2) as i32 - 2,
-                    50,
-                    3,
-                    Some(String::from("resizing")),
-                    None,
-                    Some(Color::Green()),
-                    Some(Color::White()),
-                    true,
-                    None,
-                ),
-                format!(
-                    "{}{}{}{}Width : {}   Height: {}{}{}{}",
-                    mv::right(120),
-                    Color::Default(),
-                    Color::BlackBg(),
-                    fx::bold,
-                    self._w,
-                    self._h,
-                    fx::ub,
-                    self.bg,
-                    self.fg
-                )],
+                vec![
+                    create_box(
+                        (self._w / 2) as i32 - 25,
+                        (self._h / 2) as i32 - 2,
+                        50,
+                        3,
+                        Some(String::from("resizing")),
+                        None,
+                        Some(Color::Green()),
+                        Some(Color::White()),
+                        true,
+                        None,
+                    ),
+                    format!(
+                        "{}{}{}{}Width : {}   Height: {}{}{}{}",
+                        mv::right(120),
+                        Color::Default(),
+                        Color::BlackBg(),
+                        fx::bold,
+                        self._w,
+                        self._h,
+                        fx::ub,
+                        self.bg,
+                        self.fg
+                    ),
+                ],
                 key,
             );
 
             while self._w < 80 || self._h < 24 {
                 draw.now(vec![self.clear], key);
                 draw.now(
-                    create_box(
-                        (self._w / 2) as i32 - 25,
-                        (self._h / 2) as i32 - 2,
-                        50,
-                        5,
-                        Some(String::from("warning")),
-                        None,
-                        Some(Color::Red()),
-                        Some(Color::White()),
-                        true,
-                        None,
-                    ),
-                    format!(
-                        "{}{}{}{}Width: {}{}   ",
-                        mv::right(12),
-                        Color::default(),
-                        Color::BlackBg(),
-                        fx::b,
-                        if self._w < 80 {
-                            Color::Red()
-                        } else {
-                            Color::Green()
-                        },
-                        self._w
-                    ),
-                    format!(
-                        "{}Height: {}{}{}{}",
-                        Color::Default(),
-                        if self._h < 24 {
-                            Color::Red()
-                        } else {
-                            Color::Green()
-                        },
-                        self._h,
-                        self.bg,
-                        self.fg
-                    ),
-                    format!(
-                        "{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}",
-                        mv::to((self._h / 2) as u32, (self._w / 2) as u32 - 23),
-                        Color::Default(),
-                        Color::BlackBg(),
-                        fx::ub,
-                        self.bg,
-                        self.fg
-                    ),
+                    vec![
+                        create_box(
+                            (self._w / 2) as i32 - 25,
+                            (self._h / 2) as i32 - 2,
+                            50,
+                            5,
+                            Some(String::from("warning")),
+                            None,
+                            Some(Color::Red()),
+                            Some(Color::White()),
+                            true,
+                            None,
+                        ),
+                        format!(
+                            "{}{}{}{}Width: {}{}   ",
+                            mv::right(12),
+                            Color::default(),
+                            Color::BlackBg(),
+                            fx::b,
+                            if self._w < 80 {
+                                Color::Red()
+                            } else {
+                                Color::Green()
+                            },
+                            self._w
+                        ),
+                        format!(
+                            "{}Height: {}{}{}{}",
+                            Color::Default(),
+                            if self._h < 24 {
+                                Color::Red()
+                            } else {
+                                Color::Green()
+                            },
+                            self._h,
+                            self.bg,
+                            self.fg
+                        ),
+                        format!(
+                            "{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}",
+                            mv::to((self._h / 2) as u32, (self._w / 2) as u32 - 23),
+                            Color::Default(),
+                            Color::BlackBg(),
+                            fx::ub,
+                            self.bg,
+                            self.fg
+                        ),
+                    ],
+                    key,
                 );
                 self.winch = Event::Wait;
                 self.winch.wait(0.3);
@@ -234,10 +242,10 @@ impl Term {
         }
 
         if menu.active {
-            menu.resize = true;
+            menu.resized = true;
         }
 
-        brshtop_box.draw_bg(false);
+        brshtop_box.draw_bg(false, draw, boxes, menu, config, cpu_box, key, theme, self, CPU_NAME);
         self.resized = false;
         timer.finish();
 
