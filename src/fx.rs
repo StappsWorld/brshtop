@@ -49,7 +49,7 @@ impl Fx {
         return string.replace(" ", "\033[1C").clone();
     }
 
-    pub fn uncolor(&mut self, string : String) -> String {
+    pub fn uncolor(string : String) -> String {
         format!("{}", Fx::color_re().replace_all("", string.as_str()))
     }
 }

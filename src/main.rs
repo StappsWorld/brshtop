@@ -12,6 +12,7 @@ mod event;
 mod fx;
 mod graph;
 mod key;
+mod menu;
 mod mv;
 mod nonblocking;
 mod raw;
@@ -20,6 +21,7 @@ mod symbol;
 mod term;
 mod theme;
 mod timeit;
+mod updatechecker;
 
 use {
     config::{Config, ViewMode},
@@ -272,9 +274,9 @@ pub fn main() {
     );
 
     MENUS.insert("quit", quit_hash);
-    let mut MENU_COLORS = HashMap::new();
-    MENU_COLORS.insert("normal", ("#0fd7ff", "#00bfe6", "#00a6c7", "#008ca8"));
-    MENU_COLORS.insert("selected", ("#ffa50a", "#f09800", "#db8b00", "#c27b00"));
+    let mut MENU_COLORS : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
+    MENU_COLORS.insert("normal".to_owned(), vec!["#0fd7ff", "#00bfe6", "#00a6c7", "#008ca8"].iter().map(|s| s.clone().to_owned()).collect::<Vec<String>>());
+    MENU_COLORS.insert("selected".to_owned(), vec!["#ffa50a", "#f09800", "#db8b00", "#c27b00"].iter().map(|s| s.clone().to_owned()).collect::<Vec<String>>());
     //Units for floating_humanizer function
     let mut UNITS = HashMap::new();
     UNITS.insert(
@@ -363,4 +365,8 @@ pub fn min_max(value : i32, min_value : i32, max_value : i32) -> i32 {
     } else {
         min
     }
+}
+
+pub fn clean_quit() {
+    
 }

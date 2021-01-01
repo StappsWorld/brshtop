@@ -161,7 +161,7 @@ impl Key {
     }
 
     /// Returns true if key is detected else waits out timer and returns false
-    pub fn input_wait(&mut self, sec : f64, mouse : bool, draw : Draw, term : Term) -> bool {
+    pub fn input_wait(&mut self, sec : f64, mouse : bool, draw : &mut Draw, term : &mut Term) -> bool {
         if self.list.len() > 0 {
             return true;
         }

@@ -57,6 +57,7 @@ impl BannerMeta {
     }
 }
 
+/// Defaults col: int = 0, center: bool = False, now: bool = False
 pub fn draw_banner(
     line: u32,    /* TODO: line number type*/
     mut col: u32, /*TODO: Same*/
