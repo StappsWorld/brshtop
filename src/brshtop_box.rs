@@ -7,6 +7,7 @@ use {
         fx,
         key::Key,
         membox::MemBox,
+        netbox::NetBox,
         menu::Menu,
         mv, symbol,
         term::Term,
@@ -22,6 +23,7 @@ pub enum Boxes<'a> {
     BrshtopBox(&'a mut BrshtopBox),
     CpuBox(&'a mut CpuBox),
     MemBox(&'a mut MemBox),
+    NetBox(&'a mut NetBox)
 }
 
 pub enum SubBoxes<'a> {
@@ -110,10 +112,14 @@ impl BrshtopBox {
                 Boxes::CpuBox(b) => {
                     b.calc_size(THREADS, term, self);
                     b.resized = true;
-                }
+                },
                 Boxes::MemBox(b) => {
                     b.calc_sizes(boxes);
                     b.resized = true;
+                },
+                Boxes::NetBox(n) => {
+                    n.calc_sizes(boxes);
+                    n.resized = true;
                 }
             }
         }
@@ -329,6 +335,8 @@ impl BrshtopBox {
                 .into_iter()
                 .map(|b| match b {
                     Boxes::CpuBox(cb) => cb.draw_bg(key, theme, term, config, CPU_NAME),
+                    Boxes::MemBox(mb) => mb.draw_bg(key, theme, term, config, CPU_NAME),
+                    Boxes::NetBox(nb) => nb.draw_bg(key, theme, term, config, CPU_NAME),
                     _ => String::default(),
                 })
                 .collect(),
@@ -344,7 +352,7 @@ impl BrshtopBox {
         self.draw_update_ms(now, config, cpu_box, key, draw, menu, theme, term);
 
         if config.draw_clock != String::default() {
-            self.draw_clock(true, term, config, theme, menu, cpu_box, draw);
+            self.draw_clock(true, term, config, theme, menu, cpu_box, draw, key);
         }
     }
 }

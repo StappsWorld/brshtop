@@ -150,7 +150,7 @@ impl Graph {
     }
 
     /// Defaults invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None
-    pub fn new_with_vec<C>(
+    pub fn new_with_vec<C : Into<Color>>(
         width: u32,
         height: u32,
         color: Vec<String>,

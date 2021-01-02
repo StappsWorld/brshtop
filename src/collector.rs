@@ -1,7 +1,9 @@
+use crate::cpucollector;
+
 use {
     crate::{
-        brshtop_box::BrshtopBox, cpubox::CpuBox, cpucollector::CpuCollector, draw::Draw,
-        event::Event, key::Key, menu::Menu, term::Term, timeit::TimeIt, Config,
+        brshtop_box::BrshtopBox, config::{Config, ViewMode}, cpubox::CpuBox, cpucollector::CpuCollector,
+        draw::Draw, event::Event, graph::Graphs, key::Key, menu::Menu, meter::Meters, term::Term, theme::Theme, timeit::TimeIt,
     },
     std::{path::*, sync::mpsc::*, time::Duration, *},
     thread_control::*,
@@ -91,26 +93,30 @@ impl Collector {
         self.collect_run = Event::Flag(true);
     }
 
-    pub fn start<P: AsRef<Path>>(
-        &mut self,
-        CONFIG: &mut Config,
+    pub fn start(
+        &'static mut self,
+        CONFIG: &'static mut Config,
         DEBUG: bool,
         collectors: Vec<Collectors>,
-        brshtop_box: &mut BrshtopBox,
-        timeit: &mut TimeIt,
-        menu: &mut Menu,
-        draw: &mut Draw,
-        term: &mut Term,
-        config_dir: P,
+        brshtop_box: &'static mut BrshtopBox,
+        timeit: &'static mut TimeIt,
+        menu: &'static mut Menu,
+        draw: &'static mut Draw,
+        term: &'static mut Term,
+        config_dir: &'static Path,
         THREADS: u64,
         CORES: u64,
         CORE_MAP: Vec<i32>,
-        cpu_box: &mut CpuBox,
+        cpu_box: &'static mut CpuBox,
+        key: &'static mut Key,
+        THEME: &'static mut Theme,
+        ARG_MODE : ViewMode,
+        graphs : &'static mut Graphs,
+        meters : &'static mut Meters,
     ) {
         self.stopping = false;
-        self.thread = thread::spawn(|| {
+        self.thread = Some(thread::spawn(|| {
             self.runner(
-                &self,
                 CONFIG,
                 DEBUG,
                 config_dir,
@@ -123,8 +129,13 @@ impl Collector {
                 CORES,
                 CORE_MAP,
                 cpu_box,
+                key,
+                THEME,
+                ARG_MODE,
+                graphs,
+                meters
             )
-        });
+        }));
         self.started = true;
         self.default_collect_queue = collectors.clone();
     }
@@ -147,11 +158,11 @@ impl Collector {
         }
     }
 
-    pub fn runner<P: AsRef<Path>>(
+    pub fn runner(
         &mut self,
         CONFIG: &mut Config,
         DEBUG: bool,
-        config_dir: P,
+        config_dir: &Path,
         THREADS: u64,
         brshtop_box: &mut BrshtopBox,
         timeit: &mut TimeIt,
@@ -161,7 +172,12 @@ impl Collector {
         CORES: u64,
         CORE_MAP: Vec<i32>,
         cpu_box: &mut CpuBox,
-        key : &mut Key,
+        key: &mut Key,
+        THEME: &mut Theme,
+        ARG_MODE : ViewMode,
+        graphs : &mut Graphs,
+        meters: &mut Meters,
+
     ) {
         let mut draw_buffers = Vec::<String>::new();
 
@@ -169,7 +185,7 @@ impl Collector {
 
         while !self.stopping {
             if CONFIG.draw_clock != String::default() && CONFIG.update_ms != 1000 {
-                brshtop_box.draw_clock();
+                brshtop_box.draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
             }
             self.collect_run = Event::Wait;
             self.collect_run.wait(0.1);
@@ -203,7 +219,20 @@ impl Collector {
                     }
                 }
                 match collector {
-                    Collectors::CpuCollector(c) => c.draw(cpu_box),
+                    Collectors::CpuCollector(c) => c.draw(
+                        cpu_box,
+                        CONFIG,
+                        key,
+                        THEME,
+                        term,
+                        draw,
+                        ARG_MODE,
+                        graphs,
+                        meters,
+                        THREADS,
+                        menu,
+                        config_dir
+                    ),
                 }
 
                 if self.use_draw_list {
@@ -231,14 +260,15 @@ impl Collector {
             }
 
             if CONFIG.draw_clock != String::default() && CONFIG.update_ms == 1000 {
-                brshtop_box.draw_clock();
+                brshtop_box.draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
             }
 
             self.collect_idle = Event::Flag(true);
             self.collect_done = Event::Flag(true);
         }
     }
-} impl Clone for Collector {
+}
+impl Clone for Collector {
     fn clone(&self) -> Self {
         let (tx_build, rx_build) = channel();
         let (flag_build, control_build) = make_pair();

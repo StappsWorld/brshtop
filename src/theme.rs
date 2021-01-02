@@ -404,7 +404,8 @@ pub struct Theme {
                 match f_unwrap.path().file_name(){
                     Some(path) => match path.to_str() {
                         Some(path_str) => if path_str.ends_with(".theme") {
-                            self.themes[format!("{}{}", if d == THEME_DIR {""} else {"+"}, path_str[..path_str.len() - 7])] = format!("{}/{:?}", d.to_str().unwrap(), f_unwrap.file_name());
+                            let index = format!("{}{}", if d == THEME_DIR {"".to_owned()} else {"+".to_owned()}, path_str[..path_str.len() - 7].to_owned());
+                            self.themes[&index] = format!("{}/{:?}", d.to_str().unwrap(), f_unwrap.file_name());
                         },
                         None => {
                             errlog(CONFIG_DIR, format!("Unable to convert path to str"));
@@ -418,31 +419,33 @@ pub struct Theme {
                 } 
             }
         }
+    }
         
-        pub fn _load_file<P: AsRef<Path>>(path : P, CONFIG_DIR : P) -> Result<HashMap<String, String>, String> {
-            let mut new_theme : HashMap<String, String> = HashMap::<String, String>::new();
-            let file = match File::open(path) {
-                Ok(f) => f,
-                Err(e) => {
-                    let error_string = format!("Unable to open path provided ({})", e);
-                    errlog(CONFIG_DIR, error_string.clone());
-                    return Err(error_string.clone());  
-                },
-            };
-            let reader = io::BufReader::new(file).lines();
+    pub fn _load_file<P: AsRef<Path>>(path : P, CONFIG_DIR : P) -> Result<HashMap<String, String>, String> {
+        let mut new_theme : HashMap<String, String> = HashMap::<String, String>::new();
+        let file = match File::open(path) {
+            Ok(f) => f,
+            Err(e) => {
+                let error_string = format!("Unable to open path provided ({})", e);
+                errlog(CONFIG_DIR, error_string.clone());
+                return Err(error_string.clone());  
+            },
+        };
+        let reader = io::BufReader::new(file).lines();
 
-            for Ok(line) in reader {
-                if !line.starts_with("theme[") {
-                    continue;
-                }
-                let key : String = line[6..line.chars().position(|c| c == ']').unwrap()].to_owned();
-                let s : usize = line.chars().position(|c| c == '"').unwrap();
-                let value : String = line[s + 1..line[s + 1..].chars().position(|c| c == '"').unwrap()].to_owned();
-                new_theme.insert(key, value);
+        for Ok(line) in reader {
+            if !line.starts_with("theme[") {
+                continue;
             }
-
-            Ok(new_theme)
+            let key : String = line[6..line.chars().position(|c| c == ']').unwrap()].to_owned();
+            let s : usize = line.chars().position(|c| c == '"').unwrap();
+            let value : String = line[s + 1..line[s + 1..].chars().position(|c| c == '"').unwrap()].to_owned();
+            new_theme.insert(key, value);
         }
+
+        Ok(new_theme)
+    }
+    
 }
 
 /*

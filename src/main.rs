@@ -13,6 +13,7 @@ mod fx;
 mod graph;
 mod key;
 mod menu;
+mod meter;
 mod mv;
 mod nonblocking;
 mod raw;
@@ -21,13 +22,17 @@ mod symbol;
 mod term;
 mod theme;
 mod timeit;
-mod updatechecker;
+//mod updatechecker;
 
 use {
     config::{Config, ViewMode},
     consts::*,
     crate::{
-        brshtop_box::{BrshtopBox, Boxes, SubBoxes}
+        brshtop_box::{BrshtopBox, Boxes, SubBoxes},
+        collector::Collector,
+        draw::Draw,
+        key::Key,
+        term::Term,
     },
     error::{errlog, throw_error},
 };
@@ -367,8 +372,24 @@ pub fn min_max(value : i32, min_value : i32, max_value : i32) -> i32 {
     }
 }
 
-pub fn clean_quit() {
-    
+pub fn clean_quit(errcode : Option<i32>, errmsg : Option<String>, key : &mut Key, collector : &mut Collector, draw : &mut Draw, term : &mut Term, CONFIG : &mut Config, CONFIG_DIR : &Path, SELF_START : Option<SystemTime>) {
+    key.stop();
+    collector.stop();
+    if errcode == None {
+        CONFIG.save_config();
+    }
+    draw.now(vec![term.clear, term.normal_screen, term.show_cursor, term.mouse_off, term.mouse_direct_off, Term::title(String::default(), CONFIG_DIR)], key);
+    Term::echo(true, CONFIG_DIR);
+    let now = SystemTime::now();
+    match errcode {
+        Some(0) => errlog(CONFIG_DIR, format!("Exiting, Runtime {} \n", now.duration_since(SELF_START.unwrap()).unwrap().as_secs_f64())),
+        Some(n) => {
+            errlog(CONFIG_DIR, format!("Exiting with errorcode {}, Runtime {} \n", n, now.duration_since(SELF_START.unwrap()).unwrap().as_secs_f64()));
+            print!("Brshtop exted with errorcode ({}). See {}/error.log for more information!", errcode.unwrap(), CONFIG_DIR.to_string_lossy());
+        },
+        None => (),
+    };
+    std::process::exit(errcode.unwrap_or(0));
 }
 
 pub fn first_letter_to_upper_case (s1: String) -> String {

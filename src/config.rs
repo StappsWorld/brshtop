@@ -1,11 +1,15 @@
-use lenient_bool::LenientBool;
-use psutil::sensors::*;
-use std::collections::*;
-use std::fmt::{self, Debug, Display, Formatter};
-use std::fs::{read, write, File};
-use std::io::prelude::*;
-use std::io::BufReader;
-use std::path::*;
+use {
+    crate::{error::{throw_error, errlog}},
+    lenient_bool::LenientBool,
+    psutil::sensors::*,
+    std::{
+        collections::*,
+        fmt::{self, Debug, Display, Formatter},
+        fs::{read, write, File},
+        io::{prelude::*, BufReader},
+        path::*,
+    },
+};
 
 // TODO : Fix macro scope
 #[derive(Clone, Debug, PartialEq)]
@@ -94,6 +98,7 @@ impl Display for ViewMode {
             ViewMode::Full => write!(f, "{:?}", "full"),
             ViewMode::Proc => write!(f, "{:?}", "proc"),
             ViewMode::Stat => write!(f, "{:?}", "stat"),
+            ViewMode::None => write!(f, "{:?}", "None"),
         }
     }
 }
@@ -153,7 +158,7 @@ pub enum ConfigAttr {
     LogLevel(LogLevel),
 }
 impl Display for ConfigAttr {
-    fn fmt(&self, f : &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             ConfigAttr::Bool(b) => write!(f, "{}", b),
             ConfigAttr::Int64(i) => write!(f, "{}", i),
@@ -335,18 +340,18 @@ impl Config {
             Err(e) => return Err(e),
         };
 
-        match conf.get(&"version".to_owned()) {
+        match conf.get(&"version") {
             Some(ConfigItem::Str(s)) => {
                 if *s != version {
                     initializing_config.recreate = true;
-                    initializing_config.warnings.push("Config file version and brshtop version mismatch, will be recreated on exit!".to_owned())
+                    initializing_config.warnings.push("Config file version and brshtop version mismatch, will be recreated on exit!")
                 }
             }
             _ => {
                 initializing_config.recreate = true;
                 initializing_config
                     .warnings
-                    .push("Config file is  or missing, will be recreated on exit!".to_owned())
+                    .push("Config file is  or missing, will be recreated on exit!")
             }
         }
 
@@ -411,7 +416,7 @@ impl Config {
             match line {
                 Ok(l) => {
                     // TODO: split into a separate function please and thank you @me
-                    let stripped = l.trim().to_owned();
+                    let stripped = l.trim();
 
                     if stripped.starts_with("#? Config") {
                         let index_of_version = match stripped.find("v. ") {
@@ -429,9 +434,9 @@ impl Config {
                     for key in &self.keys {
                         let mut l_stripped = stripped.clone();
                         if l_stripped.starts_with(key) {
-                            l_stripped = l_stripped.replace(&(key.to_owned() + "="), "");
+                            l_stripped = l_stripped.to_owned().replace(&(key.clone() + "="), "").as_str();
                             if l_stripped.starts_with('"') {
-                                l_stripped.retain(|c| c != '"');
+                                l_stripped.to_owned().retain(|c| c != '"');
                             }
 
                             type ConversionFunction = fn(&String) -> Result<ConfigItem, String>;
@@ -445,7 +450,7 @@ impl Config {
                             };
 
                             if let Some(f) = conversion_function {
-                                let config_item = match f(&l_stripped) {
+                                let config_item = match f(&(l_stripped.to_owned())) {
                                     Ok(item) => item,
                                     Err(e) => {
                                         self.warnings.push(e);
@@ -453,7 +458,7 @@ impl Config {
                                     }
                                 };
 
-                                new_config.insert(key.to_owned(), config_item);
+                                new_config.insert(key.clone(), config_item);
                             } else if !l_stripped.chars().all(char::is_numeric) {
                                 let i = match l_stripped.parse::<i64>() {
                                     Ok(i) => i,
@@ -467,10 +472,8 @@ impl Config {
                                 };
 
                                 if key == "update_ms" && i < 100 {
-                                    self.warnings.push(
-                                        "Config key \"update_ms\" can\'t be lower than 100!"
-                                            .to_owned(),
-                                    );
+                                    self.warnings
+                                        .push("Config key \"update_ms\" can\'t be lower than 100!".to_owned());
                                     new_config.insert(key.to_owned(), ConfigItem::Int(100));
                                     continue;
                                 }
@@ -480,14 +483,13 @@ impl Config {
                             } else {
                                 match l_stripped.parse::<LenientBool>() {
                                     Ok(b) => {
-                                        new_config
-                                            .insert(key.to_owned(), ConfigItem::Bool(b.into()));
+                                        new_config.insert(key.to_owned(), ConfigItem::Bool(b.into()));
                                         continue;
                                     }
                                     Err(e) => (),
                                 };
 
-                                new_config.insert(key.to_owned(), ConfigItem::Str(l_stripped));
+                                new_config.insert(key.to_owned(), ConfigItem::Str(l_stripped.to_owned()));
                             }
                         }
                     }
@@ -496,15 +498,14 @@ impl Config {
             };
         }
 
-        for net_name in ["net_download", "net_upload"].iter() {
-            if new_config.contains_key(net_name.to_owned()) {
-                match new_config.get(net_name.to_owned()).unwrap() {
+        for net_name in ["net_download", "net_upload"].iter().map(|s| s.to_owned().to_owned()).collect::<Vec<String>>() {
+            if new_config.contains_key(&net_name) {
+                match new_config.get(&net_name).unwrap() {
                     ConfigItem::Str(s) => {
                         match s.chars().next() {
                             Some(c) => {
                                 if !c.is_numeric() {
-                                    new_config
-                                        .insert(net_name.to_owned().to_string(), ConfigItem::Error);
+                                    new_config.insert(net_name, ConfigItem::Error);
                                     self.warnings.push(format!(
                                         "Config key \"{}\" didn\'t get an acceptable value!",
                                         net_name
@@ -512,8 +513,7 @@ impl Config {
                                 }
                             }
                             None => {
-                                new_config
-                                    .insert(net_name.to_owned().to_string(), ConfigItem::Error);
+                                new_config.insert(net_name, ConfigItem::Error);
                                 self.warnings.push(format!(
                                     "Config key \"{}\" didn\'t get an acceptable value!",
                                     net_name
@@ -522,7 +522,7 @@ impl Config {
                         };
                     }
                     _ => {
-                        new_config.insert(net_name.to_owned().to_string(), ConfigItem::Error);
+                        new_config.insert(net_name, ConfigItem::Error);
                         self.warnings.push(format!(
                             "Config key \"{}\" didn\'t get an acceptable value!",
                             net_name
@@ -575,173 +575,333 @@ impl Config {
         }
     }
 
-    pub fn getattr(&mut self, attr : String) -> ConfigAttr {
-        match attr {
-            "color_theme".to_owned() => ConfigAttr::String(self.color_theme.clone()),
-            "theme_background".to_owned() => ConfigAttr::Bool(self.theme_background),
-            "view_mode".to_owned() => ConfigAttr::ViewMode(self.view_mode),
-            "update_ms".to_owned() => ConfigAttr::Int64(self.update_ms),
-            "proc_sorting".to_owned() => ConfigAttr::SortingOption(self.proc_sorting),
-            "proc_reversed".to_owned() => ConfigAttr::Bool(self.proc_reversed),
-            "proc_tree".to_owned() => ConfigAttr::Bool(self.proc_tree),
-            "tree_depth".to_owned() => ConfigAttr::Int64(self.tree_depth as i64),
-            "proc_colors".to_owned() => ConfigAttr::Bool(self.proc_colors),
-            "proc_gradient".to_owned() => ConfigAttr::Bool(self.proc_gradient),
-            "proc_per_core".to_owned() => ConfigAttr::Bool(self.proc_per_core),
-            "proc_mem_bytes".to_owned() => ConfigAttr::Bool(self.proc_mem_bytes),
-            "check_temp".to_owned() => ConfigAttr::Bool(self.check_temp),
-            "cpu_sensor".to_owned() => ConfigAttr::String(self.cpu_sensor.clone()),
-            "show_coretemp".to_owned() => ConfigAttr::Bool(self.show_coretemp),
-            "draw_clock".to_owned() => ConfigAttr::String(self.draw_clock.clone()),
-            "background_update".to_owned() => ConfigAttr::Bool(self.background_update),
-            "custom_cpu_name".to_owned() => ConfigAttr::String(self.custom_cpu_name.clone()),
-            "disks_filter".to_owned() => ConfigAttr::String(self.disks_filter.clone()),
-            "mem_graphs".to_owned() => ConfigAttr::Bool(self.mem_graphs),
-            "show_swap".to_owned() => ConfigAttr::Bool(self.show_swap),
-            "swap_disk".to_owned() => ConfigAttr::Bool(self.swap_disk),
-            "show_disks".to_owned() => ConfigAttr::Bool(self.show_disks),
-            "net_download".to_owned() => ConfigAttr::String(self.net_download.clone()),
-            "net_upload".to_owned() => ConfigAttr::String(self.net_upload.clone()),
-            "net_auto".to_owned() => ConfigAttr::Bool(self.net_auto),
-            "net_sync".to_owned() => ConfigAttr::Bool(self.net_sync),
-            "net_color_fixed".to_owned() => ConfigAttr::Bool(self.net_color_fixed),
-            "show_battery".to_owned() => ConfigAttr::Bool(self.show_battery),
-            "show_init".to_owned() => ConfigAttr::Bool(self.show_init),
-            "update_check".to_owned() => ConfigAttr::Bool(self.update_check),
-            "log_level".to_owned() => ConfigAttr::LogLevel(self.log_level),
+    pub fn getattr(&mut self, attr: String) -> ConfigAttr {
+        match attr.as_str() {
+            "color_theme" => ConfigAttr::String(self.color_theme.clone()),
+            "theme_background" => ConfigAttr::Bool(self.theme_background),
+            "view_mode" => ConfigAttr::ViewMode(self.view_mode),
+            "update_ms" => ConfigAttr::Int64(self.update_ms),
+            "proc_sorting" => ConfigAttr::SortingOption(self.proc_sorting),
+            "proc_reversed" => ConfigAttr::Bool(self.proc_reversed),
+            "proc_tree" => ConfigAttr::Bool(self.proc_tree),
+            "tree_depth" => ConfigAttr::Int64(self.tree_depth as i64),
+            "proc_colors" => ConfigAttr::Bool(self.proc_colors),
+            "proc_gradient" => ConfigAttr::Bool(self.proc_gradient),
+            "proc_per_core" => ConfigAttr::Bool(self.proc_per_core),
+            "proc_mem_bytes" => ConfigAttr::Bool(self.proc_mem_bytes),
+            "check_temp" => ConfigAttr::Bool(self.check_temp),
+            "cpu_sensor" => ConfigAttr::String(self.cpu_sensor.clone()),
+            "show_coretemp" => ConfigAttr::Bool(self.show_coretemp),
+            "draw_clock" => ConfigAttr::String(self.draw_clock.clone()),
+            "background_update" => ConfigAttr::Bool(self.background_update),
+            "custom_cpu_name" => ConfigAttr::String(self.custom_cpu_name.clone()),
+            "disks_filter" => ConfigAttr::String(self.disks_filter.clone()),
+            "mem_graphs" => ConfigAttr::Bool(self.mem_graphs),
+            "show_swap" => ConfigAttr::Bool(self.show_swap),
+            "swap_disk" => ConfigAttr::Bool(self.swap_disk),
+            "show_disks" => ConfigAttr::Bool(self.show_disks),
+            "net_download" => ConfigAttr::String(self.net_download.clone()),
+            "net_upload" => ConfigAttr::String(self.net_upload.clone()),
+            "net_auto" => ConfigAttr::Bool(self.net_auto),
+            "net_sync" => ConfigAttr::Bool(self.net_sync),
+            "net_color_fixed" => ConfigAttr::Bool(self.net_color_fixed),
+            "show_battery" => ConfigAttr::Bool(self.show_battery),
+            "show_init" => ConfigAttr::Bool(self.show_init),
+            "update_check" => ConfigAttr::Bool(self.update_check),
+            "log_level" => ConfigAttr::LogLevel(self.log_level),
         }
     }
 
-    pub fn setattr_configattr(&mut self, attr : String , to_set : ConfigAttr) {
-        match attr {
-            "color_theme".to_owned() => self.color_theme = match to_set {
-                ConfigAttr::String(s) => s.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "theme_background".to_owned() => self.theme_background = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "view_mode".to_owned() => self.view_mode = match to_set {
-                ConfigAttr::ViewMode(v) => v.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "update_ms".to_owned() => self.update_ms = match to_set {
-                ConfigAttr::Int64(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "proc_sorting".to_owned() => self.proc_sorting = match to_set {
-                ConfigAttr::SortingOption(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "proc_reversed".to_owned() => self.proc_reversed = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "proc_tree".to_owned() => self.proc_tree = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "tree_depth".to_owned() => self.tree_depth  = match to_set {
-                ConfigAttr::Int64(b) => b.clone() as i32,
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "proc_colors".to_owned() => self.proc_colors = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "proc_gradient".to_owned() => self.proc_gradient = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "proc_per_core".to_owned() => self.proc_per_core = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "proc_mem_bytes".to_owned() => self.proc_mem_bytes = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "check_temp".to_owned() => self.check_temp = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "cpu_sensor".to_owned() => self.cpu_sensor = match to_set {
-                ConfigAttr::String(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "show_coretemp".to_owned() => self.show_coretemp = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "draw_clock".to_owned() => self.draw_clock = match to_set {
-                ConfigAttr::String(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "background_update".to_owned() => self.background_update = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "custom_cpu_name".to_owned() => self.custom_cpu_name = match to_set {
-                ConfigAttr::String(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "disks_filter".to_owned() => self.disks_filter = match to_set {
-                ConfigAttr::String(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "mem_graphs".to_owned() => self.mem_graphs = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "show_swap".to_owned() => self.show_swap = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "swap_disk".to_owned() => self.swap_disk = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "show_disks".to_owned() => self.show_disks = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "net_download".to_owned() => self.net_download = match to_set {
-                ConfigAttr::String(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "net_upload".to_owned() => self.net_upload = match to_set {
-                ConfigAttr::String(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "net_auto".to_owned() => self.net_auto = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "net_sync".to_owned() => self.net_sync = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "net_color_fixed".to_owned() => self.net_color_fixed = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "show_battery".to_owned() => self.show_battery = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "show_init".to_owned() => self.show_init = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "update_check".to_owned() => self.update_check = match to_set {
-                ConfigAttr::Bool(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
-            "log_level".to_owned() => self.log_level = match to_set {
-                ConfigAttr::LogLevel(b) => b.clone(),
-                _ => throw_error("Illegal attribute set in CONFIG"),
-            },
+    pub fn setattr_configattr(&mut self, attr: String, to_set: ConfigAttr) {
+        match attr.as_str() {
+            "color_theme" => {
+                self.color_theme = match to_set {
+                    ConfigAttr::String(s) => s.clone(),
+                    _ => {
+                        throw_error("Illegal attribute set in CONFIG");
+                        String::default()
+                    },
+                }
+            }
+            "theme_background" => {
+                self.theme_background = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "view_mode" => {
+                self.view_mode = match to_set {
+                    ConfigAttr::ViewMode(v) => v.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    ViewMode::None
+                    },
+                }
+            }
+            "update_ms" => {
+                self.update_ms = match to_set {
+                    ConfigAttr::Int64(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    0
+                    },
+                }
+            }
+            "proc_sorting" => {
+                self.proc_sorting = match to_set {
+                    ConfigAttr::SortingOption(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    SortingOption::Arguments
+                    },
+                }
+            }
+            "proc_reversed" => {
+                self.proc_reversed = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "proc_tree" => {
+                self.proc_tree = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "tree_depth" => {
+                self.tree_depth = match to_set {
+                    ConfigAttr::Int64(b) => b.clone() as i32,
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    0
+                    },
+                }
+            }
+            "proc_colors" => {
+                self.proc_colors = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "proc_gradient" => {
+                self.proc_gradient = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "proc_per_core" => {
+                self.proc_per_core = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "proc_mem_bytes" => {
+                self.proc_mem_bytes = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "check_temp" => {
+                self.check_temp = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "cpu_sensor" => {
+                self.cpu_sensor = match to_set {
+                    ConfigAttr::String(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    String::default()
+                    },
+                }
+            }
+            "show_coretemp" => {
+                self.show_coretemp = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                        throw_error("Illegal attribute set in CONFIG");
+                        false
+                        },
+                }
+            }
+            "draw_clock" => {
+                self.draw_clock = match to_set {
+                    ConfigAttr::String(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    String::default()
+                    },
+                }
+            }
+            "background_update" => {
+                self.background_update = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "custom_cpu_name" => {
+                self.custom_cpu_name = match to_set {
+                    ConfigAttr::String(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    String::default()
+                    },
+                }
+            }
+            "disks_filter" => {
+                self.disks_filter = match to_set {
+                    ConfigAttr::String(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    String::default()
+                    },
+                }
+            }
+            "mem_graphs" => {
+                self.mem_graphs = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "show_swap" => {
+                self.show_swap = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                throw_error("Illegal attribute set in CONFIG");
+                false
+                },
+                }
+            }
+            "swap_disk" => {
+                self.swap_disk = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "show_disks" => {
+                self.show_disks = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "net_download" => {
+                self.net_download = match to_set {
+                    ConfigAttr::String(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    String::default()
+                    },
+                }
+            }
+            "net_upload" => {
+                self.net_upload = match to_set {
+                    ConfigAttr::String(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    String::default()
+                    },
+                }
+            }
+            "net_auto" => {
+                self.net_auto = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "net_sync" => {
+                self.net_sync = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "net_color_fixed" => {
+                self.net_color_fixed = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "show_battery" => {
+                self.show_battery = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "show_init" => {
+                self.show_init = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "update_check" => {
+                self.update_check = match to_set {
+                    ConfigAttr::Bool(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    false
+                    },
+                }
+            }
+            "log_level" => {
+                self.log_level = match to_set {
+                    ConfigAttr::LogLevel(b) => b.clone(),
+                    _ => {
+                    throw_error("Illegal attribute set in CONFIG");
+                    LogLevel::Debug
+                    },
+                }
+            }
         }
     }
 

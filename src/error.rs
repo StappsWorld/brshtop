@@ -1,5 +1,6 @@
 use log::{debug, LevelFilter};
 use std::path::*;
+use crate::clean_quit;
 
 pub fn errlog<P: AsRef<Path>>(config_dir: P, message: String) {
     // TODO: I know there's a better way to do this

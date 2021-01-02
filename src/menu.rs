@@ -68,7 +68,7 @@ impl Menu {
                             "{}{}",
                             mv::down(1),
                             mv::left(iterable[i].to_string().len() as u32)
-                        );
+                        ).as_str();
                     }
                 }
             }
@@ -177,17 +177,19 @@ impl Menu {
                 out = String::default();
                 for (name, menu) in self.menus {
                     out.push_str(format!(
-                        "{}{}",
-                        mv::to(
-                            mouse_items[&name][&"y1".to_owned()] as u32,
-                            mouse_items[&name][&"x1".to_owned()] as u32
-                        ),
-                        menu[&(if name == menu_current {
-                            "selected".to_owned()
-                        } else {
-                            "normal".to_owned()
-                        })],
-                    ));
+                            "{}{}",
+                            mv::to(
+                                mouse_items[&name][&"y1".to_owned()] as u32,
+                                mouse_items[&name][&"x1".to_owned()] as u32
+                            ),
+                            menu[&(if name == menu_current {
+                                "selected".to_owned()
+                            } else {
+                                "normal".to_owned()
+                            })],
+                        )
+                        .as_str()
+                    );
                 }
             }
 
@@ -241,7 +243,7 @@ impl Menu {
                 }
 
                 if key == "q".to_owned() {
-                    clean_quit();
+                    clean_quit(None, None, key_class, collector, draw, term, CONFIG, CONFIG_DIR.as_ref(), None);
                 } else if vec!["up", "mouse_scroll_up", "shift_tab"]
                     .iter()
                     .map(|s| s.clone().to_owned())

@@ -8,7 +8,7 @@ use {
         graph::{Graph, Graphs},
         key::Key,
         menu::Menu,
-        meters::{Meter, Meters},
+        meter::{Meter, Meters},
         mv, readfile,
         subbox::SubBox,
         symbol,
@@ -308,6 +308,7 @@ impl CpuBox {
                 State::Full => "Full".to_owned(),
                 State::Unknown => "Unknown".to_owned(),
                 State::Empty => "Empty".to_owned(),
+                State::__Nonexhaustive => "Nonexhaustive".to_owned(),
             };
         }
         if status != self.battery_status {
@@ -327,11 +328,12 @@ impl CpuBox {
         term: &mut Term,
         draw : &mut Draw,
         ARG_MODE: ViewMode,
-        graphs: Graphs,
-        meters : Meters,
+        graphs: &mut Graphs,
+        meters : &mut Meters,
         THREADS : u64,
-        menu : Menu,
+        menu : &mut Menu,
         config_dir : P,
+        THEME : &mut Theme,
     ) {
         if cpu.parent.redraw {
             self.redraw = true;
@@ -391,7 +393,7 @@ impl CpuBox {
             ).as_str();
             graphs.cpu.insert(
                 "up".to_owned(),
-                Graph::new_with_vec(
+                Graph::new_with_vec::<Color>(
                     (w - bw - 3) as u32,
                     hh as u32,
                     theme.gradient.get(&"cpu".to_owned()).unwrap().clone(),
@@ -405,7 +407,7 @@ impl CpuBox {
             );
             graphs.cpu.insert(
                 "down".to_owned(),
-                Graph::new_with_vec(
+                Graph::new_with_vec::<Color>(
                     (w - bw - 3) as u32,
                     hh as u32,
                     theme.gradient.get(&"cpu".to_owned()).unwrap().clone(),
@@ -418,14 +420,17 @@ impl CpuBox {
                 ),
             );
             meters.cpu = Meter::new(
-                cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2],
+                cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2] as i32,
                 bw - (if cpu.got_sensors {21} else {9}),
                 "cpu".to_owned(),
+                false,
+                THEME,
+                term,
             );
 
             if self.sub.column_size > 0 || ct_width > 0 {
                 for n in 0..THREADS as usize {
-                    graphs.cores[n] = Graph::new(
+                    graphs.cores[n] = Graph::new::<Color>(
                         5, 
                         1, 
                         None, 
@@ -439,7 +444,7 @@ impl CpuBox {
                 }
             }
             if cpu.got_sensors {
-                graphs.temps[0] = Graph::new(
+                graphs.temps[0] = Graph::new::<Color>(
                     5, 
                     1, 
                     None, 
@@ -455,7 +460,7 @@ impl CpuBox {
                         if cpu.cpu_temp[n].len() == 0 {
                             continue;
                         }
-                        graphs.temps[n] = Graph::new(
+                        graphs.temps[n] = Graph::new::<Color>(
                             5, 
                             1, 
                             None, 
@@ -482,7 +487,14 @@ impl CpuBox {
 
             if self.resized {
                 // TODO : Fix meter initialization, invert=true
-                meters.battery = Meter::new(self.battery_percent, 10, "cpu".to_owned(), true);
+                meters.battery = Meter::new(
+                    self.battery_percent as i32, 
+                    10, 
+                    "cpu".to_owned(),
+                    true,
+                    THEME,
+                    term
+                );
             }
             
             let mut battery_symbol : String = self.battery_symbols.get(&self.battery_status).unwrap().clone();
@@ -507,11 +519,11 @@ impl CpuBox {
                     battery_symbol,
                     self.battery_percent,
                     if self.parent.width < 100 {
-                        ""
+                        String::default()
                     } else {
                         format!(" {}{}{}",
                             fx::ub,
-                            meters.battery.call(symbol::title_right, term),
+                            meters.battery.call(Some(self.battery_percent as i32), term),
                             fx::b,
                         )
                     },
@@ -603,7 +615,7 @@ impl CpuBox {
                 fx::b,
                 "CPU ",
                 fx::ub,
-                meters.cpu.call(cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2]),
+                meters.cpu.call(Some(cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2] as i32), term),
                 theme.gradient[&"cpu".to_owned()][cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2] as usize],
                 cpu.cpu_usage[0][cpu.cpu_usage.len() - 2],
                 theme.colors.main_fg

@@ -1,10 +1,16 @@
 use crate::{
     brshtop_box::BrshtopBox,
-    collector::{Collector, Collectors}, 
-    config::Config,
-    cpubox::CpuBox, 
-    error, 
-    term::Term, 
+    collector::{Collector, Collectors},
+    config::{Config, ViewMode},
+    cpubox::CpuBox,
+    draw::Draw,
+    error,
+    graph::Graphs,
+    key::Key,
+    menu::Menu,
+    meter::Meters,
+    term::Term,
+    theme::Theme,
 };
 use hhmmss::Hhmmss;
 use psutil::sensors::*;
@@ -15,7 +21,7 @@ use sys_info::*;
 use which::which;
 
 pub struct CpuCollector {
-    pub parent : Collector,
+    pub parent: Collector,
     pub cpu_usage: Vec<Vec<u32>>,
     pub cpu_temp: Vec<Vec<u32>>,
     pub cpu_temp_high: i32,
@@ -40,7 +46,7 @@ impl CpuCollector {
         }
 
         let mut CpuCollector_initialize = CpuCollector {
-            parent : Collector::new(),
+            parent: Collector::new(),
             cpu_usage: cpu_usage_mut,
             cpu_temp: cpu_temp_mut,
             cpu_temp_high: 0,
@@ -67,7 +73,7 @@ impl CpuCollector {
         CORES: u64,
         CORE_MAP: Vec<i32>,
         cpu_box: &mut CpuBox,
-        brshtop_box : &mut BrshtopBox,
+        brshtop_box: &mut BrshtopBox,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -122,7 +128,7 @@ impl CpuCollector {
 
         self.cpu_freq = cpu_frequency;
 
-        let lavg : Vec<f64> = match sys_info::loadavg() {
+        let lavg: Vec<f64> = match sys_info::loadavg() {
             Ok(l) => vec![
                 format!("{:.2}", l.one).parse::<f64>().unwrap(),
                 format!("{:.2}", l.five).parse::<f64>().unwrap(),
@@ -161,12 +167,49 @@ impl CpuCollector {
         };
 
         if CONFIG.check_temp && self.got_sensors {
-            self.collect_temps(CONFIG, CONFIG_DIR, THREADS, CORES, CORE_MAP, cpu_box, brshtop_box, term);
+            self.collect_temps(
+                CONFIG,
+                CONFIG_DIR,
+                THREADS,
+                CORES,
+                CORE_MAP,
+                cpu_box,
+                brshtop_box,
+                term,
+            );
         }
     }
 
-    pub fn draw(&mut self, cpu_box : &mut CpuBox) {
-        cpu_box.draw_fg();
+    pub fn draw<P: AsRef<Path>>(
+        &mut self,
+        cpu_box: &mut CpuBox,
+        CONFIG: &mut Config,
+        key: &mut Key,
+        THEME: &mut Theme,
+        term: &mut Term,
+        draw: &mut Draw,
+        ARG_MODE: ViewMode,
+        graphs: &mut Graphs,
+        meters: &mut Meters,
+        THREADS: u64,
+        menu: &mut Menu,
+        CONFIG_DIR: P,
+    ) {
+        cpu_box.draw_fg(
+            self,
+            CONFIG,
+            key,
+            THEME,
+            term,
+            draw,
+            ARG_MODE,
+            graphs,
+            meters,
+            THREADS,
+            menu,
+            CONFIG_DIR,
+            THEME
+        );
     }
 
     pub fn get_sensors(&mut self, CONFIG: &mut Config, SYSTEM: String) {
@@ -260,9 +303,9 @@ impl CpuCollector {
         THREADS: u64,
         CORES: u64,
         CORE_MAP: Vec<i32>,
-        cpu_box : &mut CpuBox,
-        brshtop_box : &mut BrshtopBox,
-        term : &mut Term,
+        cpu_box: &mut CpuBox,
+        brshtop_box: &mut BrshtopBox,
+        term: &mut Term,
     ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
@@ -667,10 +710,11 @@ impl CpuCollector {
             }
         }
     }
-} impl Clone for CpuCollector {
+}
+impl Clone for CpuCollector {
     fn clone(&self) -> Self {
         CpuCollector {
-            parent : self.parent.clone(),
+            parent: self.parent.clone(),
             cpu_usage: self.cpu_usage.clone(),
             cpu_temp: self.cpu_temp.clone(),
             cpu_temp_high: self.cpu_temp_high.clone(),
