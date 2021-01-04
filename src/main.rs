@@ -15,6 +15,7 @@ mod key;
 mod menu;
 mod meter;
 mod mv;
+mod netbox;
 mod nonblocking;
 mod raw;
 mod subbox;
