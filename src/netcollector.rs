@@ -8,32 +8,33 @@ use {
 
 
 
-
+#[derive(Clone, Debug, PartialEq)]
 pub enum NetCollectorStat {
     Int(i32),
     Vec(Vec<i32>),
     Bool(bool),
 }
 
+#[derive(Clone)]
 pub struct NetCollector {
-    parent : Collector,
-    buffer: String,
-    nics: Vec<String>,
-    nic_i: usize,
-    nic: String,
-    new_nic: String,
-    nic_error: bool,
-    reset: bool,
-    graph_raise: HashMap<String, i32>,
-    graph_lower: HashMap<String, i32>,
-    stats: HashMap<String, HashMap<String, HashMap<String, NetCollectorStat>>>,
-    strings: HashMap<String, HashMap<String, HashMap<String, String>>>,
-    switched: bool,
-    timestamp: f64,
-    net_min: HashMap<String, i32>,
-    auto_min: bool,
-    sync_top: i32,
-    sync_string: String,
+    pub parent : Collector,
+    pub buffer: String,
+    pub nics: Vec<String>,
+    pub nic_i: usize,
+    pub nic: String,
+    pub new_nic: String,
+    pub nic_error: bool,
+    pub reset: bool,
+    pub graph_raise: HashMap<String, i32>,
+    pub graph_lower: HashMap<String, i32>,
+    pub stats: HashMap<String, HashMap<String, HashMap<String, NetCollectorStat>>>,
+    pub strings: HashMap<String, HashMap<String, HashMap<String, String>>>,
+    pub switched: bool,
+    pub timestamp: f64,
+    pub net_min: HashMap<String, i32>,
+    pub auto_min: bool,
+    pub sync_top: i32,
+    pub sync_string: String,
 } impl NetCollector {
 
     pub fn new() -> Self {
@@ -52,7 +53,6 @@ pub struct NetCollector {
 
     }
 
-    pub fn draw(&mut self, netbox : &mut NetBox) {
-        netbox.draw_fg()
-    }
+    /// JUST CALL NETBOX.draw_fg()
+    pub fn draw(&mut self) {}
 }

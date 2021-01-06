@@ -1,9 +1,9 @@
-use crate::cpucollector;
+use crate::{cpucollector, netbox};
 
 use {
     crate::{
         brshtop_box::BrshtopBox, config::{Config, ViewMode}, cpubox::CpuBox, cpucollector::CpuCollector,
-        draw::Draw, event::Event, graph::Graphs, key::Key, menu::Menu, meter::Meters, netcollector::NetCollector, term::Term, theme::Theme, timeit::TimeIt,
+        draw::Draw, event::Event, graph::Graphs, key::Key, menu::Menu, meter::Meters, netbox::NetBox, netcollector::NetCollector, term::Term, theme::Theme, timeit::TimeIt,
     },
     std::{path::*, sync::mpsc::*, time::Duration, *},
     thread_control::*,
@@ -114,6 +114,7 @@ impl Collector {
         ARG_MODE : ViewMode,
         graphs : &'static mut Graphs,
         meters : &'static mut Meters,
+        netbox: &'static mut NetBox
     ) {
         self.stopping = false;
         self.thread = Some(thread::spawn(|| {
@@ -134,7 +135,8 @@ impl Collector {
                 THEME,
                 ARG_MODE,
                 graphs,
-                meters
+                meters,
+                netbox
             )
         }));
         self.started = true;
@@ -178,6 +180,7 @@ impl Collector {
         ARG_MODE : ViewMode,
         graphs : &mut Graphs,
         meters: &mut Meters,
+        netbox: &mut NetBox
 
     ) {
         let mut draw_buffers = Vec::<String>::new();
@@ -217,6 +220,7 @@ impl Collector {
                             cpu_box,
                             brshtop_box,
                         ),
+                        Collectors::NetCollector(n) => n.collect(),
                     }
                 }
                 match collector {
@@ -234,11 +238,13 @@ impl Collector {
                         menu,
                         config_dir
                     ),
+                    Collectors::NetCollector(_) => netbox.draw_fg(THEME, key, term, CONFIG, draw, graphs, menu),
                 }
 
                 if self.use_draw_list {
                     draw_buffers.push(match collector {
                         Collectors::CpuCollector(c) => c.buffer,
+                        Collectors::NetCollector(n) => n.buffer,
                     });
                 }
 
