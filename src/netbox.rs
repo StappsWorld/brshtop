@@ -5,6 +5,10 @@ use {
         brshtop_box::BrshtopBox,
         config::{Config, ViewMode},
         subbox::SubBox,
+        term::Term,
+    },
+    std::{
+        convert::TryFrom,
     },
 };
 
@@ -44,7 +48,7 @@ pub struct NetBox {
         net
     }
 
-    pub fn calc_size(term : &mut Term) {
+    pub fn calc_size(term : &mut Term, brshtop_box : &mut BrshtopBox) {
         let mut width_p : u32 = 0;
 
         if self.parent.stat_mode {
@@ -53,6 +57,18 @@ pub struct NetBox {
             width_p = self.width_p;
         }
         self.parent.width = (term.width * width_p / 100) as u32;
+        self.parent.height = u32::try_from(term.height as i32 - brshtop_box._b_cpu_h - brshtop_box._b_mem_h).unwrap_or(0);
+        self.y = (term.height - self.parent.height + 1) as i32;
+        self.sub.box_width = if self.parent.width > 45 {
+            27
+        } else {
+            19
+        };
+        self.sub.box_height = if self.parent.height > 10 {
+            9
+        } else {
+            self.parent.height - 2
+        };
     }
 
 }
