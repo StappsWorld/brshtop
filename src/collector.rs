@@ -3,7 +3,7 @@ use crate::cpucollector;
 use {
     crate::{
         brshtop_box::BrshtopBox, config::{Config, ViewMode}, cpubox::CpuBox, cpucollector::CpuCollector,
-        draw::Draw, event::Event, graph::Graphs, key::Key, menu::Menu, meter::Meters, term::Term, theme::Theme, timeit::TimeIt,
+        draw::Draw, event::Event, graph::Graphs, key::Key, menu::Menu, meter::Meters, netcollector::NetCollector, term::Term, theme::Theme, timeit::TimeIt,
     },
     std::{path::*, sync::mpsc::*, time::Duration, *},
     thread_control::*,
@@ -12,6 +12,7 @@ use {
 #[derive(Clone)]
 pub enum Collectors {
     CpuCollector(CpuCollector),
+    NetCollector(NetCollector),
 }
 
 pub struct Collector {

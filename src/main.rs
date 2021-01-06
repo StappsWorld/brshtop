@@ -16,6 +16,7 @@ mod menu;
 mod meter;
 mod mv;
 mod netbox;
+mod netcollector;
 mod nonblocking;
 mod raw;
 mod subbox;
