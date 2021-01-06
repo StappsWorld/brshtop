@@ -1,14 +1,16 @@
-use crate::config::ViewMode;
-
 use {
     crate::{
         brshtop_box::BrshtopBox,
-        config::{Config, ViewMode},
+        config::{
+            Config, 
+            ViewMode,
+        },
         subbox::SubBox,
         term::Term,
     },
     std::{
         convert::TryFrom,
+        collections::HashMap,
     },
 };
 
@@ -48,7 +50,7 @@ pub struct NetBox {
         net
     }
 
-    pub fn calc_size(term : &mut Term, brshtop_box : &mut BrshtopBox) {
+    pub fn calc_size(&mut self, term : &mut Term, brshtop_box : &mut BrshtopBox) {
         let mut width_p : u32 = 0;
 
         if self.parent.stat_mode {
@@ -69,6 +71,8 @@ pub struct NetBox {
         } else {
             self.parent.height - 2
         };
+        self.parent.box_x = self.parent.width - self.box_width - 1;
+        self.parent.box_y = self.y + ((self.parent.height - 2) / 2) as u32 - (self.sub.box_height / 2) as u32 + 1;
     }
 
 }
