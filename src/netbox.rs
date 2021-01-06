@@ -73,6 +73,7 @@ pub struct NetBox {
         };
         self.parent.box_x = self.parent.width - self.box_width - 1;
         self.parent.box_y = self.y + ((self.parent.height - 2) / 2) as u32 - (self.sub.box_height / 2) as u32 + 1;
+        self.graph_height.insert("download".to_owned(), )
     }
 
 }
