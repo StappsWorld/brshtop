@@ -54,7 +54,7 @@ impl Brshtop {
             }
         }
 
-        println!("{:#?}\n\n{:#?}", self.theme_cache, errors);
+        //println!("{:#?}\n\n{:#?}", self.theme_cache, errors);
         errors
     }
 }

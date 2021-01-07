@@ -38,7 +38,7 @@ pub struct NetCollector {
 } impl NetCollector {
 
     pub fn new() -> Self {
-        NetCollector
+        Self
     }
 
     pub fn get_nics(&mut self) {

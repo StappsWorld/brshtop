@@ -3,7 +3,7 @@ use crate::{cpucollector, netbox};
 use {
     crate::{
         brshtop_box::BrshtopBox, config::{Config, ViewMode}, cpubox::CpuBox, cpucollector::CpuCollector,
-        draw::Draw, event::Event, graph::Graphs, key::Key, menu::Menu, meter::Meters, netbox::NetBox, netcollector::NetCollector, term::Term, theme::Theme, timeit::TimeIt,
+        draw::Draw, event::Event, graph::Graphs, key::Key, menu::Menu, meter::Meters, netbox::NetBox, netcollector::NetCollector, proccollector::ProcCollector, term::Term, theme::Theme, timeit::TimeIt,
     },
     std::{path::*, sync::mpsc::*, time::Duration, *},
     thread_control::*,
@@ -11,8 +11,9 @@ use {
 
 #[derive(Clone)]
 pub enum Collectors {
-    CpuCollector(CpuCollector),
-    NetCollector(NetCollector),
+    CpuCollector(&'static CpuCollector),
+    NetCollector(&'static NetCollector),
+    ProcCollector(&'static ProcCollector),
 }
 
 pub struct Collector {
@@ -221,6 +222,7 @@ impl Collector {
                             brshtop_box,
                         ),
                         Collectors::NetCollector(n) => n.collect(),
+                        Collectors::ProcCollector(p) => p.collect(),
                     }
                 }
                 match collector {
@@ -239,12 +241,15 @@ impl Collector {
                         config_dir
                     ),
                     Collectors::NetCollector(_) => netbox.draw_fg(THEME, key, term, CONFIG, draw, graphs, menu),
+                    Collectors::ProcCollector(p) => p.draw_fg(),
+
                 }
 
                 if self.use_draw_list {
                     draw_buffers.push(match collector {
                         Collectors::CpuCollector(c) => c.buffer,
                         Collectors::NetCollector(n) => n.buffer,
+                        Collectors::ProcCollector(p) => p.buffer,
                     });
                 }
 

@@ -20,6 +20,7 @@ use subprocess::Exec;
 use sys_info::*;
 use which::which;
 
+#[derive(Clone)]
 pub struct CpuCollector {
     pub parent: Collector,
     pub cpu_usage: Vec<Vec<u32>>,
@@ -708,26 +709,6 @@ impl CpuCollector {
                     self.cpu_temp.remove(n);
                 }
             }
-        }
-    }
-}
-impl Clone for CpuCollector {
-    fn clone(&self) -> Self {
-        CpuCollector {
-            parent: self.parent.clone(),
-            cpu_usage: self.cpu_usage.clone(),
-            cpu_temp: self.cpu_temp.clone(),
-            cpu_temp_high: self.cpu_temp_high.clone(),
-            cpu_temp_crit: self.cpu_temp_crit.clone(),
-            freq_error: self.freq_error.clone(),
-            cpu_freq: self.cpu_freq.clone(),
-            load_avg: self.load_avg.clone(),
-            uptime: self.uptime.clone(),
-            buffer: self.buffer.clone(),
-            sensor_method: self.sensor_method.clone(),
-            got_sensors: self.got_sensors.clone(),
-            sensor_swap: self.sensor_swap.clone(),
-            cpu_temp_only: self.cpu_temp_only.clone(),
         }
     }
 }

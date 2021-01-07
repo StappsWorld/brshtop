@@ -1,3 +1,5 @@
+use crate::{brshtop_box, consts::THEME_DIRS, cpucollector};
+
 use {
     crate::{
         banner,
@@ -68,7 +70,8 @@ impl Menu {
                             "{}{}",
                             mv::down(1),
                             mv::left(iterable[i].to_string().len() as u32)
-                        ).as_str();
+                        )
+                        .as_str();
                     }
                 }
             }
@@ -98,6 +101,21 @@ impl Menu {
         collectors: Vec<Collectors>,
         CONFIG_DIR: P,
         CONFIG: &mut Config,
+        ARG_MODE: &mut ViewMode,
+        THEME_DIR: &Path,
+        USER_THEME_DIR: &Path,
+        netcollector: &mut NetCollector,
+        brshtop_box: &mut BrshtopBox,
+        THREADS: u64,
+        init: &mut Init,
+        cpubox: &mut CpuBox,
+        CPU_NAME: String,
+        cpucollector: &mut CpuCollector,
+        SYSTEM: String,
+        boxes: Vec<Boxes>,
+        netbox: &mut NetBox,
+        proccollector: &mut ProcCollector,
+        DEFAULT_THEME: HashMap<String, String>,
     ) {
         let mut out: String = String::default();
         let mut banner_mut: String = String::default();
@@ -176,7 +194,8 @@ impl Menu {
             if redraw {
                 out = String::default();
                 for (name, menu) in self.menus {
-                    out.push_str(format!(
+                    out.push_str(
+                        format!(
                             "{}{}",
                             mv::to(
                                 mouse_items[&name][&"y1".to_owned()] as u32,
@@ -188,7 +207,7 @@ impl Menu {
                                 "normal".to_owned()
                             })],
                         )
-                        .as_str()
+                        .as_str(),
                     );
                 }
             }
@@ -243,7 +262,17 @@ impl Menu {
                 }
 
                 if key == "q".to_owned() {
-                    clean_quit(None, None, key_class, collector, draw, term, CONFIG, CONFIG_DIR.as_ref(), None);
+                    clean_quit(
+                        None,
+                        None,
+                        key_class,
+                        collector,
+                        draw,
+                        term,
+                        CONFIG,
+                        CONFIG_DIR.as_ref(),
+                        None,
+                    );
                 } else if vec!["up", "mouse_scroll_up", "shift_tab"]
                     .iter()
                     .map(|s| s.clone().to_owned())
@@ -272,12 +301,52 @@ impl Menu {
                     || (key == "mouse_click".to_owned() && mouse_over)
                 {
                     if menu_current == "quit".to_owned() {
-                        clean_quit()
+                        clean_quit(
+                            None,
+                            None,
+                            key_class,
+                            collector,
+                            draw,
+                            term,
+                            CONFIG,
+                            CONFIG_DIR.as_ref(),
+                            None,
+                        );
                     } else if menu_current == "options".to_owned() {
-                        self.options();
+                        self.options(
+                            ARG_MODE,
+                            THEME,
+                            theme,
+                            THEME_DIRS,
+                            USER_THEME_DIR,
+                            CONFIG_DIR,
+                            draw,
+                            term,
+                            CONFIG,
+                            VERSION,
+                            key_class,
+                            timer,
+                            netcollector,
+                            brshtop_box,
+                            boxes,
+                            THREADS,
+                            collector,
+                            init,
+                            cpubox,
+                            CPU_NAME,
+                            cpucollector,
+                            SYSTEM,
+                            netbox,
+                            DEFAULT_THEME,
+                            proccollector,
+                            collectors,
+                        );
                         self.resized = true;
                     } else if menu_current == "help".to_owned() {
-                        self.help(THEME, draw, term, VERSION, key_class, collector, collectors, CONFIG, CONFIG_DIR);
+                        self.help(
+                            THEME, draw, term, VERSION, key_class, collector, collectors, CONFIG,
+                            CONFIG_DIR, timer,
+                        );
                         self.resized = true;
                     }
                 }
@@ -322,6 +391,7 @@ impl Menu {
         collectors: Vec<Collectors>,
         CONFIG: &mut Config,
         CONFIG_DIR: P,
+        timer: &mut Timer,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -453,37 +523,43 @@ impl Menu {
                     out = String::default();
                     let mut cy = 0;
                     if pages != 0 {
-                        out.push_str(format!(
-                            "{}{}{}{}{}{} {}{}{}/{} pg{}{}{}",
-                            mv::to(y, x + 56),
-                            theme
-                                .colors
-                                .div_line
-                                .call(symbol::title_left.to_owned(), term),
-                            fx::b,
-                            theme.colors.title.call("pg".to_owned(), term),
-                            fx::ub,
-                            theme.colors.main_fg.call(symbol::up.to_owned(), term),
-                            fx::b,
-                            theme.colors.title,
-                            page,
-                            pages,
-                            fx::ub,
-                            theme.colors.main_fg.call(symbol::down.to_owned(), term),
-                            theme
-                                .colors
-                                .div_line
-                                .call(symbol::title_right.to_owned(), term),
-                        ));
+                        out.push_str(
+                            format!(
+                                "{}{}{}{}{}{} {}{}{}/{} pg{}{}{}",
+                                mv::to(y, x + 56),
+                                theme
+                                    .colors
+                                    .div_line
+                                    .call(symbol::title_left.to_owned(), term),
+                                fx::b,
+                                theme.colors.title.call("pg".to_owned(), term),
+                                fx::ub,
+                                theme.colors.main_fg.call(symbol::up.to_owned(), term),
+                                fx::b,
+                                theme.colors.title,
+                                page,
+                                pages,
+                                fx::ub,
+                                theme.colors.main_fg.call(symbol::down.to_owned(), term),
+                                theme
+                                    .colors
+                                    .div_line
+                                    .call(symbol::title_right.to_owned(), term),
+                            )
+                            .as_str(),
+                        );
                     }
-                    out.push_str(format!(
-                        "{}{}{}{:^20}Description:{}",
-                        mv::to(y + 1, x + 1),
-                        theme.colors.title,
-                        fx::b,
-                        "Keys",
-                        theme.colors.main_fg
-                    ));
+                    out.push_str(
+                        format!(
+                            "{}{}{}{:^20}Description:{}",
+                            mv::to(y + 1, x + 1),
+                            theme.colors.title,
+                            fx::b,
+                            "Keys",
+                            theme.colors.main_fg
+                        )
+                        .as_str(),
+                    );
 
                     let mut n: usize = 0;
                     for (keys, desc) in help_items {
@@ -491,18 +567,21 @@ impl Menu {
                             n += 1;
                             continue;
                         }
-                        out.push_str(format!(
-                            "{}{}{:^20.20}{}{:50.50}",
-                            mv::to(y + 2 + cy, x + 1),
-                            fx::b,
-                            if keys.starts_with("_") {
-                                "".to_owned()
-                            } else {
-                                keys
-                            },
-                            fx::ub,
-                            desc
-                        ));
+                        out.push_str(
+                            format!(
+                                "{}{}{:^20.20}{}{:50.50}",
+                                mv::to(y + 2 + cy, x + 1),
+                                fx::b,
+                                if keys.starts_with("_") {
+                                    "".to_owned()
+                                } else {
+                                    keys
+                                },
+                                fx::ub,
+                                desc
+                            )
+                            .as_str(),
+                        );
                         cy += 1;
                         if cy == h {
                             break;
@@ -511,11 +590,14 @@ impl Menu {
                     }
                     if cy < h {
                         for i in 0..h - cy {
-                            out.push_str(format!(
-                                "{}{}",
-                                mv::to(y + 2 + cy + i, x + 1),
-                                " ".repeat((w - 2) as usize),
-                            ));
+                            out.push_str(
+                                format!(
+                                    "{}{}",
+                                    mv::to(y + 2 + cy + i, x + 1),
+                                    " ".repeat((w - 2) as usize),
+                                )
+                                .as_str(),
+                            );
                         }
                     }
                 }
@@ -564,7 +646,17 @@ impl Menu {
                     }
 
                     if key == "q".to_owned() {
-                        clean_quit();
+                        clean_quit(
+                            None,
+                            None,
+                            key_class,
+                            collector,
+                            draw,
+                            term,
+                            CONFIG,
+                            CONFIG_DIR.as_ref(),
+                            None,
+                        );
                     } else if vec!["escape", "M", "enter", "backspace", "h", "f1"]
                         .contains(&key.as_str())
                     {
@@ -1075,7 +1167,7 @@ impl Menu {
                     h = option_len as u32;
                     pages = 0;
                 }
-                selected_int: usize = 0;
+                let mut selected_int: usize = 0;
                 out_misc.push_str(
                     create_box(
                         x as i32,
@@ -1105,28 +1197,31 @@ impl Menu {
                 let cy: u32 = 0;
 
                 if pages > 0 {
-                    out.push_str(format!(
-                        "{}{}{}{}{}{} {}{}{}/{}pg{}{}{}",
-                        mv::to(y + h + 1, x + 11),
-                        THEME
-                            .colors
-                            .main_fg
-                            .call(symbol::title_left.to_owned(), term),
-                        fx::b,
-                        THEME.colors.title.call("pg".to_owned(), term),
-                        fx::ub,
-                        THEME.colors.main_fg.call(symbol::up.to_owned(), term),
-                        fx::b,
-                        THEME.colors.title,
-                        page,
-                        pages,
-                        fx::ub,
-                        THEME.colors.main_fg.call(symbol::down.to_owned(), term),
-                        THEME
-                            .colors
-                            .div_line
-                            .call(symbol::title_right.to_owned(), term),
-                    ));
+                    out.push_str(
+                        format!(
+                            "{}{}{}{}{}{} {}{}{}/{}pg{}{}{}",
+                            mv::to(y + h + 1, x + 11),
+                            THEME
+                                .colors
+                                .main_fg
+                                .call(symbol::title_left.to_owned(), term),
+                            fx::b,
+                            THEME.colors.title.call("pg".to_owned(), term),
+                            fx::ub,
+                            THEME.colors.main_fg.call(symbol::up.to_owned(), term),
+                            fx::b,
+                            THEME.colors.title,
+                            page,
+                            pages,
+                            fx::ub,
+                            THEME.colors.main_fg.call(symbol::down.to_owned(), term),
+                            THEME
+                                .colors
+                                .div_line
+                                .call(symbol::title_right.to_owned(), term),
+                        )
+                        .as_str(),
+                    );
                 }
 
                 let mut n: usize = 0;
@@ -1187,17 +1282,20 @@ impl Menu {
                         counter = String::default();
                     }
 
-                    out.push_str(format!(
-                        "{}{}{}{:^24.24}{}{}{}",
-                        mv::to(y + 1 + cy, x + 1),
-                        t_color,
-                        fx::b,
-                        first_letter_to_upper_case(opt.replace("_", " ").to_owned())
-                            + counter.as_str(),
-                        fx::ub,
-                        mv::to(y + 2 + cy, x + 1),
-                        v_color,
-                    ));
+                    out.push_str(
+                        format!(
+                            "{}{}{}{:^24.24}{}{}{}",
+                            mv::to(y + 1 + cy, x + 1),
+                            t_color,
+                            fx::b,
+                            first_letter_to_upper_case(opt.replace("_", " ").to_owned())
+                                + counter.as_str(),
+                            fx::ub,
+                            mv::to(y + 2 + cy, x + 1),
+                            v_color,
+                        )
+                        .as_str(),
+                    );
 
                     if opt == selected {
                         if attr == "bool".to_owned()
@@ -1213,66 +1311,84 @@ impl Menu {
                             .collect()
                             .contains(opt)
                         {
-                            out.push_str(format!(
-                                "{} {}{}{:^20.20}{}{}",
-                                t_color,
-                                symbol::left,
-                                v_color,
+                            out.push_str(
+                                format!(
+                                    "{} {}{}{:^20.20}{}{}",
+                                    t_color,
+                                    symbol::left,
+                                    v_color,
+                                    d_quote
+                                        + match value {
+                                            ConfigAttr::Bool(b) => &b.to_string(),
+                                            _ => "",
+                                        }
+                                        + d_quote.as_str(),
+                                    t_color,
+                                    symbol::right
+                                )
+                                .as_str(),
+                            );
+                        } else if inputting {
+                            out.push_str(
+                                format!(
+                                    "{:^33.33}",
+                                    input_val[input_val.len() - 18..].to_owned()
+                                        + fx::bl
+                                        + "█"
+                                        + fx::ubl
+                                        + ""
+                                        + symbol::enter,
+                                )
+                                .as_str(),
+                            );
+                        } else {
+                            out.push_str(
+                                format!(
+                                    "{}{:^20.20}{}",
+                                    if attr == "i64".to_owned() {
+                                        format!("{} {}{}", t_color, symbol::left, v_color,)
+                                    } else {
+                                        "  ".to_owned()
+                                    },
+                                    match value {
+                                        ConfigAttr::Bool(b) => &b.to_string(),
+                                        ConfigAttr::Int64(i) => &i.to_string(),
+                                        ConfigAttr::String(s) => &s.clone(),
+                                        ConfigAttr::LogLevel(l) => &l.clone().to_string(),
+                                        ConfigAttr::SortingOption(s) => &s.clone().to_string(),
+                                        ConfigAttr::ViewMode(v) => &v.clone().to_string(),
+                                    }
+                                    .clone()
+                                        + " "
+                                        + symbol::enter,
+                                    if attr == "i64".to_owned() {
+                                        format!("{}{} ", t_color, symbol::right)
+                                    } else {
+                                        "  ".to_owned()
+                                    }
+                                )
+                                .as_str(),
+                            );
+                        }
+                    } else {
+                        out.push_str(
+                            format!(
+                                "{:^24.24}",
                                 d_quote
                                     + match value {
                                         ConfigAttr::Bool(b) => &b.to_string(),
-                                        _ => "",
+                                        ConfigAttr::Int64(i) => &i.to_string(),
+                                        ConfigAttr::String(s) => &s.clone(),
+                                        ConfigAttr::LogLevel(l) => &l.clone().to_string(),
+                                        ConfigAttr::SortingOption(s) => &s.clone().to_string(),
+                                        ConfigAttr::ViewMode(v) => &v.clone().to_string(),
                                     }
-                                    + d_quote.as_str(),
-                                t_color,
-                                symbol::right
-                            ));
-                        } else if inputting {
-                            out.push_str(format!(
-                                "{:^33.33}",
-                                input_val[input_val.len() - 18..].to_owned()
-                                    + fx::bl
-                                    + "█"
-                                    + fx::ubl
-                                    + ""
-                                    + symbol::enter,
-                            ));
-                        } else {
-                            out.push_str(format!(
-                                "{}{:^20.20}{}",
-                                if attr == "i64".to_owned() {
-                                    format!("{} {}{}", t_color, symbol::left, v_color,)
-                                } else {
-                                    "  ".to_owned()
-                                },
-                                match value {
-                                    ConfigAttr::Bool(b) => &b.to_string(),
-                                    ConfigAttr::Int64(i) => &i.to_string(),
-                                    ConfigAttr::String(s) => &s.clone(),
-                                }
-                                .clone()
-                                    + " "
-                                    + symbol::enter,
-                                if attr == "i64".to_owned() {
-                                    format!("{}{} ", t_color, symbol::right)
-                                } else {
-                                    "  ".to_owned()
-                                }
-                            ));
-                        }
-                    } else {
-                        out.push_str(format!(
-                            "{:^24.24}",
-                            d_quote
-                                + match value {
-                                    ConfigAttr::Bool(b) => &b.to_string(),
-                                    ConfigAttr::Int64(i) => &i.to_string(),
-                                    ConfigAttr::String(s) => &s.clone(),
-                                }
-                                .clone()
-                                .as_str()
-                                + d_quote.as_str()
-                        ))
+                                    .clone()
+                                    .as_str()
+                                    + d_quote.as_str()
+                            )
+                            .as_str(),
+                        )
                     }
                     out.push_str(term.bg.to_string().as_str());
                     if opt == selected {
@@ -1313,17 +1429,23 @@ impl Menu {
                 }
                 if cy < h {
                     for i in 0..h - cy {
-                        out.push_str(format!(
-                            "{}{}",
-                            mv::to(y + 1 + cy + i, x + 1),
-                            " ".repeat((w - 2) as usize)
-                        ));
+                        out.push_str(
+                            format!(
+                                "{}{}",
+                                mv::to(y + 1 + cy + i, x + 1),
+                                " ".repeat((w - 2) as usize)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
             }
 
             if !skip || redraw {
-                draw.now(format!("{}{}{}", self.background, out_misc, out), key_class);
+                draw.now(
+                    vec![format!("{}{}{}", self.background, out_misc, out)],
+                    key_class,
+                );
             }
             skip = false;
             redraw = false;
@@ -1470,7 +1592,17 @@ impl Menu {
                         input_val.push_str(key.as_str());
                     }
                 } else if key == "q".to_owned() {
-                    clean_quit();
+                    clean_quit(
+                        None,
+                        None,
+                        key_class,
+                        collector,
+                        draw,
+                        term,
+                        CONFIG,
+                        CONFIG_DIR.as_ref(),
+                        None,
+                    );
                 } else if ["escape", "o", "M", "f2"]
                     .iter()
                     .map(|s| s.to_owned())

@@ -18,6 +18,8 @@ mod mv;
 mod netbox;
 mod netcollector;
 mod nonblocking;
+mod procbox;
+mod proccollector;
 mod raw;
 mod subbox;
 mod symbol;

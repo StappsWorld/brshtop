@@ -9,7 +9,9 @@ use {
         membox::MemBox,
         netbox::NetBox,
         menu::Menu,
-        mv, symbol,
+        mv, 
+        procbox::ProcBox,
+        symbol,
         term::Term,
         theme::Theme,
     },
@@ -23,7 +25,8 @@ pub enum Boxes<'a> {
     BrshtopBox(&'a mut BrshtopBox),
     CpuBox(&'a mut CpuBox),
     MemBox(&'a mut MemBox),
-    NetBox(&'a mut NetBox)
+    NetBox(&'a mut NetBox),
+    ProcBox(&'a mut ProcBox),
 }
 
 pub enum SubBoxes<'a> {
@@ -120,6 +123,10 @@ impl BrshtopBox {
                 Boxes::NetBox(n) => {
                     n.calc_sizes(boxes);
                     n.resized = true;
+                },
+                Boxes::ProcBox(p) => {
+                    p.calc_sizes(boxes);
+                    p.resized = true;
                 }
             }
         }
@@ -337,6 +344,7 @@ impl BrshtopBox {
                     Boxes::CpuBox(cb) => cb.draw_bg(key, theme, term, config, CPU_NAME),
                     Boxes::MemBox(mb) => mb.draw_bg(key, theme, term, config, CPU_NAME),
                     Boxes::NetBox(nb) => nb.draw_bg(key, theme, term, config, CPU_NAME),
+                    Boxes::ProcBox(pb) => pb.draw_bg(key, theme, term, config, CPU_NAME),
                     _ => String::default(),
                 })
                 .collect(),

@@ -1,11 +1,11 @@
 use {
-    crate::{error::{throw_error, errlog}},
+    crate::{error::throw_error},
     lenient_bool::LenientBool,
     psutil::sensors::*,
     std::{
         collections::*,
         fmt::{self, Debug, Display, Formatter},
-        fs::{read, write, File},
+        fs::{write, File},
         io::{prelude::*, BufReader},
         path::*,
     },
@@ -340,18 +340,18 @@ impl Config {
             Err(e) => return Err(e),
         };
 
-        match conf.get(&"version") {
+        match conf.get(&"version".to_owned()) {
             Some(ConfigItem::Str(s)) => {
                 if *s != version {
                     initializing_config.recreate = true;
-                    initializing_config.warnings.push("Config file version and brshtop version mismatch, will be recreated on exit!")
+                    initializing_config.warnings.push("Config file version and brshtop version mismatch, will be recreated on exit!".to_owned())
                 }
             }
             _ => {
                 initializing_config.recreate = true;
                 initializing_config
                     .warnings
-                    .push("Config file is  or missing, will be recreated on exit!")
+                    .push("Config file is or missing, will be recreated on exit!".to_owned())
             }
         }
 
