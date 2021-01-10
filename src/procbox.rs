@@ -2,17 +2,17 @@ use {
     crate::{
         brshtop_box::{Boxes, BrshtopBox},
         collector::{Collector, Collectors},
-        config::{Config, ViewMode},
-        create_box,
+        config::{Config, ViewMode, SortingOption},
+        create_box, fx,
+        graph::{Graph, Graphs},
         key::Key,
+        mv,
         proccollector::ProcCollector,
+        symbol,
         term::Term,
-        theme::Theme,
+        theme::{Color, Theme},
     },
-    std::{
-        path::*,
-        collections::HashMap,
-    },
+    std::{collections::HashMap, path::*},
 };
 
 pub struct ProcBox {
@@ -34,8 +34,6 @@ pub struct ProcBox {
     detailed_y: u32,
     detailed_width: u32,
     detailed_height: u32,
-    resized: bool,
-    redraw: bool,
     buffer: String,
     pid_counter: HashMap<i32, i32>,
 }
@@ -61,8 +59,6 @@ impl ProcBox {
             detailed_y: 0,
             detailed_width: 0,
             detailed_height: 8,
-            resized: true,
-            redraw: true,
             buffer: "proc".to_owned(),
             pid_counter: HashMap::<i32, i32>::new(),
         };
@@ -70,6 +66,8 @@ impl ProcBox {
         procbox.parent.y = 1;
         procbox.parent.height_p = 68;
         procbox.parent.width_p = 55;
+        procbox.parent.resized = true;
+        procbox.parent.redraw = true;
         procbox
     }
 
@@ -89,8 +87,8 @@ impl ProcBox {
         self.parent.x = term.width as u32 - self.parent.width + 1;
         self.parent.y = brshtop_box._b_cpu_h as u32 + 1;
         self.select_max = self.parent.height as usize - 3;
-        self.redraw = true;
-        self.resized = true;
+        self.redraw.resized = true;
+        self.parent.resized = true;
     }
 
     pub fn draw_bg(&mut self, theme: &mut Theme) -> String {
@@ -119,8 +117,8 @@ impl ProcBox {
         proc_collector: &mut ProcCollector,
         key_class: &mut Key,
         collector: &mut Collector,
-        CONFIG : &mut Config,
-        CONFIG_DIR : P,
+        CONFIG: &mut Config,
+        CONFIG_DIR: P,
     ) {
         let old = (self.start, self.selected);
 
@@ -218,7 +216,9 @@ impl ProcBox {
         if self.start < 1 {
             self.start = 1;
         }
-        if self.selected as u32 > proc_collector.num_procs && proc_collector.num_procs < self.select_max as u32 {
+        if self.selected as u32 > proc_collector.num_procs
+            && proc_collector.num_procs < self.select_max as u32
+        {
             self.selected = proc_collector.num_procs as usize;
         } else if self.selected > self.select_max {
             self.selected = self.select_max;
@@ -242,18 +242,791 @@ impl ProcBox {
         }
     }
 
-    pub fn draw_fg(&mut self) {
+    pub fn draw_fg(
+        &mut self,
+        CONFIG: &mut Config,
+        key: &mut Key,
+        THEME: &mut Theme,
+        graphs: &mut Graphs,
+        term: &mut Term,
+    ) {
         if self.parent.stat_mode {
             return;
         }
-        // TODO : Fix ProcCollector initialization
         let mut proc = ProcCollector::new(self.buffer.clone());
 
         if proc.parent.proc_interrupt {
             return;
         }
 
+        if proc.parent.redraw {
+            self.redraw.resized = true;
+        }
+
+        let mut out: String = String::default();
+        let mut out_misc: String = String::default();
+        let mut n: u32 = 0;
+        let mut x: u32 = self.parent.x + 1;
+        let mut y: u32 = self.current_y + 1;
+        let mut w: u32 = self.width - 2;
+        let mut h: u32 = self.current_h - 2;
+        let mut prog_len: usize = 0;
+        let mut arg_len: usize = 0;
+        let mut val: i32 = 0;
+        let mut c_color: String = String::default();
+        let mut m_color: String = String::default();
+        let mut t_color: String = String::default();
+        let mut sort_pos: usize = 0;
+        let mut tree_len: usize = 0;
+        let mut is_selected: bool = false;
+        let mut calc: u32 = 0;
+        let mut dgx: u32 = 0;
+        let mut dgw: u32 = 0;
+        let mut dx: u32 = 0;
+        let mut dw: u32 = 0;
+        let mut dy: u32 = 0;
+        let mut l_count: u32 = 0;
+        let mut scroll_pos: u32 = 0;
+        let mut killed: bool = true;
+        let mut indent: String = String::default();
+        let mut offset: u32 = 0;
+        let mut tr_show: bool = true;
+        let mut usr_show: bool = true;
+        let mut vals: Vec<String> = Vec::<String>::new();
+        let mut g_color: String = String::default();
+        let mut s_len: usize = 0;
+
+        if proc.search_filter.len() > 0 {
+            s_len = proc.search_filter[..10].len();
+        }
+        let mut loc_string: String = format!(
+            "{}/{}",
+            self.start + self.selected as i32 - 1,
+            proc.num_procs
+        );
+        let mut end: String = String::default();
+
+        if proc.detailed {
+            dgx = x;
+            dgw = w / 3;
+            dw = w - dgw - 1;
+
+            if dw > 120 {
+                dw = 120;
+                dgw = w - 121;
+            }
+            dx = x + dgw + 2;
+            dy = self.parent.y + 1;
+        }
+
+        if w > 67 {
+            arg_len = w
+                - 53
+                - if proc.num_procs > self.select_max as u32 {
+                    1
+                } else {
+                    0
+                };
+            prog_len = 15;
+        } else {
+            arg_len = 0;
+            prog_len = w
+                - 38
+                - if proc.num_procs > self.select_max as u32 {
+                    1
+                } else {
+                    0
+                };
+
+            if prog_len < 15 {
+                tr_show = false;
+                prog_len += 5;
+            }
+            if prog_len < 12 {
+                usr_show = false;
+                prog_len += 9;
+            }
+        }
+
+        if CONFIG.proc_tree {
+            tree_len = arg_len + prog_len + 6;
+            arg_len = 0;
+        }
+
+        // * Buttons and titles only redrawn if needed
+        if self.parent.resized || self.redraw.resized {
+            s_len += CONFIG.proc_sorting.to_string().len();
+            if self.parent.resized || s_len != self.s_len || proc.detailed {
+                self.s_len = s_len;
+                for k in [
+                    "e", "r", "c", "t", "k", "i", "enter", "left", " ", "f", "delete",
+                ]
+                .iter()
+                .map(|s| s.to_owned().to_owned())
+                .collect()
+                {
+                    if key.mouse.contains_key(&k) {
+                        key.mouse.remove(&k);
+                    }
+                }
+            }
+            if proc.detailed {
+                let mut killed: bool = match proc.details[&"killed".to_owned()] {
+                    ProcCollectorDetails::Bool(b) => b,
+                    _ => false,
+                };
+                let mut main: Color = if self.selected == 0 && !killed {
+                    THEME.colors.main_fg
+                } else {
+                    THEME.colors.inactive_fg
+                };
+                let mut hi: Color = if self.selected == 0 && !killed {
+                    THEME.colors.hi_fg
+                } else {
+                    THEME.colors.inactive_fg
+                };
+                let mut title: Color = if self.selected == 0 && !killed {
+                    THEME.colors.title
+                } else {
+                    THEME.colors.inactive_fg
+                };
+                if self.current_y != self.parent.y + 8
+                    || self.parent.resized
+                    || graphs.detailed_cpu.NotImplemented
+                {
+                    self.current_y = self.y + 8;
+                    self.current_h = self.parent.height - 8;
+                    for i in 0..7 as u32 {
+                        out_misc.push_str(
+                            format!("{}{}", mv::to(dy + i, x), " ".repeat(w as usize)).as_str(),
+                        );
+                    }
+                    out_misc.push_str(
+                        format!(
+                            "{}{}{}{}{}{}{}{}{}{}{}{}",
+                            mv::to(dy + 7, x - 1),
+                            THEME.colors.proc_box,
+                            symbol::title_right,
+                            symbol::h_line.repeat(w),
+                            symbol::title_left,
+                            mv::to(dy + 7, x + 1),
+                            THEME
+                                .colors
+                                .proc_box
+                                .call(symbol::title_left.to_owned(), term),
+                            fx::b,
+                            THEME.colors.title.call(self.name.clone(), term),
+                            fx::ub,
+                            THEME
+                                .colors
+                                .proc_box
+                                .call(symbol::title_right.to_owned(), term),
+                            THEME.colors.div_line,
+                        )
+                        .as_str(),
+                    );
+                    for i in 0..7 as u32 {
+                        out_misc.push_str(
+                            format!("{}{}", mv::to(dy + i, dgx + dgw + 1), symbol::v_line,)
+                                .as_str(),
+                        );
+                    }
+                }
+
+                out_misc.push_str(
+                    format!(
+                        "{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+                        mv::to(dy - 1, x - 1),
+                        THEME.colors.proc_box,
+                        symbol::left_up,
+                        symbol::h_line.repeat(w),
+                        symbol::right_up,
+                        mv::to(dy - 1, dgx + dgw + 1),
+                        symbol::div_up,
+                        mv::to(dy - 1, x + 1),
+                        THEME
+                            .colors
+                            .proc_box
+                            .call(symbol::title_left.to_owned(), term),
+                        fx::b,
+                        THEME
+                            .colors
+                            .title
+                            .call(proc.details["pid".to_owned()].to_string()),
+                        fx::ub,
+                        THEME
+                            .colors
+                            .proc_box
+                            .call(symbol::title_right.to_owned(), term),
+                        THEME
+                            .colors
+                            .proc_box
+                            .call(symbol::title_left.to_owned(), term),
+                        fx::b,
+                        THEME.colors.title.call(
+                            proc.details["name"].to_string()[..dgw as usize - 11].to_owned(),
+                            term
+                        ),
+                        fx::ub,
+                        THEME
+                            .colors
+                            .proc_box
+                            .call(symbol::title_right.to_owned(), term),
+                    )
+                    .as_str(),
+                );
+
+                if self.selected == 0 {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0..7 {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push((dx + dw) as i32 - 10 + i);
+                        pusher.push(dy as i32 - 1);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["enter".to_owned()] = top.clone();
+                }
+
+                if self.selected == 0 && !killed {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0..9 {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push((dx + 2) as i32 + i);
+                        pusher.push(dy as i32 - 1);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["t".to_owned()] = top.clone();
+                }
+
+                out_misc.push_str(
+                    format!(
+                        "{}{}{}{}close{} {}{}{}{}{}{}{}t{}erminate{}{}",
+                        mv::to(dy - 1, dx + dw - 11),
+                        THEME
+                            .colors
+                            .proc_box
+                            .call(symbol::title_left.to_owned(), term),
+                        fx::b,
+                        if self.selected > 0 {
+                            title
+                        } else {
+                            THEME.colors.title
+                        },
+                        fx::ub,
+                        if self.selected > 0 {
+                            main
+                        } else {
+                            THEME.colors.main_fg
+                        },
+                        symbol::enter,
+                        THEME
+                            .colors
+                            .proc_box
+                            .call(symbol::title_right.to_owned(), term),
+                        mv::to(dy - 1, dx + 1),
+                        THEME
+                            .colors
+                            .proc_box
+                            .call(symbol::title_left.to_owned(), term),
+                        fx::b,
+                        hi,
+                        title,
+                        fx::ub,
+                        THEME
+                            .colors
+                            .proc_box
+                            .call(symbol::title_right.to_owned(), term),
+                    )
+                    .as_str(),
+                );
+                if dw > 28 {
+                    if self.selected == 0 && !killed && !key.mouse.contains_key(&"k".to_owned()) {
+                        let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                        for i in 0..4 {
+                            let mut pusher: Vec<i32> = Vec::<i32>::new();
+                            pusher.push((dx + 13) as i32 + i);
+                            pusher.push(dy as i32 - 1);
+                            top.push(pusher);
+                        }
+
+                        key.mouse["k".to_owned()] = top.clone();
+                    }
+                    out_misc.push_str(
+                        format!(
+                            "{}{}{}k{}ill{}{}",
+                            THEME
+                                .colors
+                                .proc_box
+                                .call(symbol::title_left.to_owned(), term),
+                            fx::b,
+                            hi,
+                            title,
+                            fx::ub,
+                            THEME
+                                .colors
+                                .proc_box
+                                .call(symbol::title_right.to_owned(), term),
+                        )
+                        .as_str(),
+                    );
+                }
+
+                if dw > 39 {
+                    if self.selected == 0 && !killed && !key.mouse.contains_key(&"i".to_owned()) {
+                        let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                        for i in 0..9 {
+                            let mut pusher: Vec<i32> = Vec::<i32>::new();
+                            pusher.push((dx + 19) as i32 + i);
+                            pusher.push(dy as i32 - 1);
+                            top.push(pusher);
+                        }
+
+                        key.mouse["i".to_owned()] = top.clone();
+                    }
+                    out_misc.push_str(
+                        format!(
+                            "{}{}{}i{}nterrupt{}{}",
+                            THEME
+                                .colors
+                                .proc_box
+                                .call(symbol::title_left.to_owned(), term),
+                            fx::b,
+                            hi,
+                            title,
+                            fx::ub,
+                            THEME
+                                .colors
+                                .proc_box
+                                .call(symbol::title_right.to_owned(), term),
+                        )
+                        .as_str(),
+                    );
+                }
+
+                if graphs.detailed_cpu.NotImplemented || self.parent.resized {
+                    graphs.detailed_cpu = Graph::new(
+                        (dgw + 1) as i32,
+                        7,
+                        Some(Color::new(THEME.gradient["cpu".to_owned()])),
+                        proc.details_cpu.iter().map(|i| i as i32).collect(),
+                        term,
+                        false,
+                        0,
+                        0,
+                        None,
+                    );
+                    graphs.detailed_mem = Graph::new(
+                        (dw / 3) as i32,
+                        1,
+                        None,
+                        proc.details_mem.iter().map(|i| i as i32).collect(),
+                        term,
+                        false,
+                        0,
+                        0,
+                        None
+                    );
+                }
+                self.select_max = self.parent.height as usize - 11;
+                y = self.parent.y + 9;
+                h = self.parent.height - 10;
+            } else {
+                if self.current_y != self.parent.y || self.parent.resized {
+                    self.current_y = self.parent.y;
+                    self.current_h = self.parent.height;
+                    y = self.parent.y + 1;
+                    h = self.parent.height - 2;
+                    out_misc.push_str(format!("{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+                            mv::to(y - 1, x - 1),
+                            THEME.colors.proc_box,
+                            symbol::left_up,
+                            symbol::h_line.repeat(w),
+                            symbol::right_up,
+                            mv::to(y - 1, x + 1),
+                            THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                            fx::b,
+                            THEME.colors.title.call(self.name.clone(), term),
+                            fx::ub,
+                            THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                            mv::to(y + 7, x - 1),
+                            THEME.colors.proc_box.call(symbol::v_line.to_owned(), term),
+                            mv::right(w),
+                            THEME.colors.proc_box.call(symbol::v_line.to_owned(), term),
+                        )
+                        .as_str()
+                    );
+                }
+                self.select_max = self.parent.height as usize - 3;
+            }
+
+            sort_pos = (x + w) as usize - CONFIG.proc_sorting.to_string().len() - 7;
+            if !key.mouse.contains_key(&"left".to_owned()) {
+                let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                for i in 0..3 {
+                    let mut pusher: Vec<i32> = Vec::<i32>::new();
+                    pusher.push(sort_pos as i32 + i);
+                    pusher.push(y as i32 - 1);
+                    top.push(pusher);
+                }
+
+                key.mouse["left".to_owned()] = top.clone();
+
+                top = Vec::<Vec<i32>>::new();
+
+                for i in 0..3 {
+                    let mut pusher: Vec<i32> = Vec::<i32>::new();
+                    pusher.push(sort_pos as i32 + CONFIG.proc_sorting.to_string().len() as i32 + 3 + i);
+                    pusher.push(y as i32 - 1);
+                    top.push(pusher);
+                }
+
+                key.mouse["right".to_owned()] = top.clone();
+            }
+
+            out_misc.push_str(format!("{}{}{}{}{}{}{} {} {}{}{}",
+                    mv::to(y - 1, x + 8),
+                    THEME.colors.proc_box.call(symbol::h_line.repeat(w - 9).to_owned(), term),
+                    if !proc.detailed {
+                        "".to_owned()
+                    } else {
+                        format!("{}{}", 
+                            mv::to(dy + 7, dgx + dgw + 1),
+                            THEME.colors.proc_box.call(symbol::div_down.to_owned(), term)
+                        )
+                    },
+                    mv::to(y - 1, sort_pos as u32),
+                    THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                    fx::b,
+                    THEME.colors.hi_fg.call("<".to_owned(), term),
+                    THEME.colors.title.call(CONFIG.proc_sorting.to_string(), term),
+                    THEME.colors.hi_fg.call(">".to_owned(), term),
+                    fx::ub,
+                    THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                )
+                .as_str()
+            );
+
+            if w > 29 + s_len as u32 {
+                if !key.mouse.contains_key(&"e".to_owned()) {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0..4 {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push((sorting_pos - 5) as i32 + i);
+                        pusher.push(y as i32 - 1);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["e".to_owned()] = top.clone();
+                }
+                out_misc.push_str(format!("{}{}{}{}{}{}{}",
+                        mv::to(y - 1, sort_pos as u32 - 6),
+                        THEME.colors.call(symbol::title_left.to_owned(), term),
+                        if CONFIG.proc_tree {
+                            fx::b
+                        } else {
+                            "".to_owned()
+                        },
+                        THEME.colors.title.call("tre".to_owned(), term),
+                        THEME.colors.hi_fg.call("e".to_owned(), term),
+                        fx::ub,
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    )
+                    .as_str()
+                );
+            }
+
+            if w > 37 + s_len as u32 {
+                if !key.mouse.contains_key(&"r".to_owned()) {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0..7 {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push((sorting_pos - 14) as i32 + i);
+                        pusher.push(y as i32 - 1);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["r".to_owned()] = top.clone();
+                }
+                out_misc.push_str(format!("{}{}{}{}{}{}{}",
+                        mv::to(y - 1, sorting_pos as u32 - 15),
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        if CONFIG.proc_reversed {
+                            fx::b
+                        } else {
+                            "".to_owned()
+                        },
+                        THEME.colors.hi_fg.call("r".to_owned(), term),
+                        THEME.colors.title.call("everse".to_owned(), term),
+                        fx::ub,
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    )
+                    .as_str()
+                );
+            }
+
+            if w > 47 + s_len as u32 {
+                if !key.mouse.contains_key(&"c".to_owned()) {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0.. if proc.search_filter.len() == 0 {6} else {2 + proc.search_filter[(proc.search_filter.len() - 11)..].len()} {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push((sorting_pos - 24) as i32 + i as i32);
+                        pusher.push(y as i32 - 1);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["c".to_owned()] = top.clone();
+                }
+                out_misc.push_str(format!("{}{}{}{}{}{}{}{}",
+                        mv::to(y - 1, sort_pos as u32 - 25),
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        if CONFIG.proc_per_core {
+                            fx::b
+                        } else {
+                            ""
+                        },
+                        THEME.colors.title.call("per-".to_owned(), term),
+                        THEME.colors.hi_fg.call("c".to_owned(), term),
+                        THEME.colors.title.call("ore".to_owned(), term),
+                        fx::ub,
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    )
+                    .as_str()
+                );
+            }
+
+            if !key.mouse.contains_key(&"f".to_owned()) || self.parent.resized {
+                let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0.. if proc.search_filter.len() == 0 {6} else {2 + proc.search_filter[(proc.search_filter.len() - 11)..].len()} {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push((x + 5) as i32 + i as i32);
+                        pusher.push(y as i32 - 1);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["f".to_owned()] = top.clone();
+            }
+            if proc.search_filter.len() > 0 {
+                if !key.mouse.contains_key(&"delete".to_owned()) {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0..3 {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push((x + 11 + proc.search_filter[(proc.search_filter.len() - 11)..].len() as u32) as i32 + i);
+                        pusher.push(y as i32 - 1);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["delete".to_owned()] = top.clone();
+                }
+            } else if key.mouse.contains_key(&"delete".to_owned()) {
+                key.mouse.remove(&"delete".to_owned());
+            }
+
+            out_misc.push_str(format!("{}{}{}{}",
+                    mv::to(y - 1, x + 7),
+                    THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                    if self.filtering || proc.search_filter.len() > 0 {
+                        fx::b
+                    } else {
+                        ""
+                    },
+                    THEME.colors.hi_fg.call("f".to_owned(), term),
+                    THEME.colors.title,
+                    if proc.search_filter.len() == 0 && !self.filtering {
+                        "ilter".to_owned()
+                    } else {
+                        format!(" {}{}",
+                            proc.search_filter[(proc.search_filter.len() - 1 + (if w < 83 {10} else {w - 74}))..],
+                            if self.filtering {
+                                fx::bl.to_owned() + "█" + fx::ubl
+                            } else {
+                                THEME.colors.hi_fg.call(" del".to_owned(), term),
+                            }
+                        )
+                    },
+                    THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                )
+                .as_str()
+            );
+
+            main = if self.selected == 0 {
+                THEME.colors.inactive_fg
+            } else {
+                THEME.colors.main_fg
+            };
+            hi = if self.selected == 0 {
+                THEME.colors.inactive_fg
+            } else {
+                THEME.colors.hi_fg
+            };
+            title = if self.selected == 0 {
+                THEME.colors.inactive_fg
+            } else {
+                THEME.colors.title
+            };
+
+            out_misc.push_str(format!("{}{}{}{}{}{}{} {}{} {}{}{}{}{}{}{}info {}{}{}{}",
+                    mv::to(y + h, x + 1),
+                    THEME.colors.proc_box,
+                    symbol::h_line.repeat(w-4),
+                    mv::to(y + h, x + 1),
+                    THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                    main,
+                    symbol::up,
+                    fx::b,
+                    THEME.colors.main_fg.call("select".to_owned(), term),
+                    fx::ub,
+                    if self.selected == self.select_max {
+                        THEME.colors.inactive_fg
+                    } else {
+                        THEME.colors.main_fg
+                    },
+                    symbol::down,
+                    THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                    title,
+                    fx::b,
+                    fx::ub,
+                    main,
+                    symbol::enter,
+                    THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                )
+                .as_str()
+            );
+            if !key.mouse.contains_key(&"enter".to_owned()) {
+                let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                for i in 0..6 {
+                    let mut pusher: Vec<i32> = Vec::<i32>::new();
+                    pusher.push((x + 14) as i32 + i);
+                    pusher.push((y + h) as i32);
+                    top.push(pusher);
+                }
+
+                key.mouse["enter".to_owned()] = top.clone();
+            }
+            if w - loc_string.len() as u32 > 34 {
+                if !key.mouse.contains_key(&"t".to_owned()) {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0..9 {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push(x as i32 + 22 + i);
+                        pusher.push((y + h) as i32);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["t".to_owned()] = top.clone();
+                }
+                out_misc.push_str(format!("{}{}{}t{}erminate{}{}",
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        fx::b,
+                        hi,
+                        title,
+                        fx::ub,
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    )
+                    .as_str()
+                );
+            }
+            if w - loc_string.len() as u32 > 40 {
+                if !key.mouse.contains_key(&"k") {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0..4 {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push(x as i32 + 33 + i);
+                        pusher.push((y + h) as i32);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["k".to_owned()] = top.clone();
+                }
+                out_misc.push_str(format!("{}{}{}k{}ill{}{}",
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        fx::b,
+                        hi,
+                        title,
+                        fx::ub,
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    )
+                );
+            }
+            if w - loc_string.len() as u32 > 51 {
+                if !key.mouse.contains_key(&"i") {
+                    let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+
+                    for i in 0..9 {
+                        let mut pusher: Vec<i32> = Vec::<i32>::new();
+                        pusher.push(x as i32 + 39 + i);
+                        pusher.push((y + h) as i32);
+                        top.push(pusher);
+                    }
+
+                    key.mouse["i".to_owned()] = top.clone();
+                }
+                out_misc.push_str(format!("{}{}{}i{}terrupt{}{}",
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        fx::b,
+                        hi,
+                        title,
+                        fx::ub,
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    )
+                );
+            }
+            if CONFIG.proc_tree && w - loc_string.len() as u32 > 65 {
+                if w - loc_string.len() as u32 > 40 {
+                    if !key.mouse.contains_key(&" ") {
+                        let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
+    
+                        for i in 0..12 {
+                            let mut pusher: Vec<i32> = Vec::<i32>::new();
+                            pusher.push(x as i32 + 50 + i);
+                            pusher.push((y + h) as i32);
+                            top.push(pusher);
+                        }
+    
+                        key.mouse[" ".to_owned()] = top.clone();
+                    }
+                    out_misc.push_str(format!("{}{}{}spc {}collapse{}{}",
+                            THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                            fx::b,
+                            hi,
+                            title,
+                            fx::ub,
+                            THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                        )
+                    );
+                }
+            }
+
+            // * Processes labels
+            let mut selected : SortingOption = CONFIG.proc_sorting;
+            let mut label : String = String::default();
+            match selected {
+                SortingOption::Memory => selected = String::from("mem"),
+                SortingOption::Threads => if !CONFIG.proc_tree && arg_len == 0 {
+                        String::from("tr")
+                    },
+                _ => (),
+            }
+
+            if CONFIG.proc_tree {
+                label = format!("{}{}{}{}");
+            }
+
+        }
     }
-
-
 }

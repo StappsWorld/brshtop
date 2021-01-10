@@ -19,19 +19,20 @@ pub struct Graphs {
 
 #[derive(Debug)]
 pub struct Graph {
-    out: String,
-    width: u32,
-    height: u32,
-    graphs: HashMap<bool, Vec<String>>,
-    colors: Vec<Color>,
-    invert: bool,
-    max_value: i32,
-    color_max_value: i32,
-    offset: i32,
-    current: bool,
-    last: i32,
-    symbol: HashMap<u32, &'static str>,
-    _data: Vec<i32>, // TODO: Data type
+    pub out: String,
+    pub width: u32,
+    pub height: u32,
+    pub graphs: HashMap<bool, Vec<String>>,
+    pub colors: Vec<Color>,
+    pub invert: bool,
+    pub max_value: i32,
+    pub color_max_value: i32,
+    pub offset: i32,
+    pub current: bool,
+    pub last: i32,
+    pub symbol: HashMap<u32, &'static str>,
+    pub _data: Vec<i32>, // TODO: Data type
+    pub NotImplemented : bool,
 }
 impl Graph {
 
@@ -121,6 +122,7 @@ impl Graph {
             graphs,
             current: false,
             last: 0,
+            NotImplemented : false,
         };
 
         graph._refresh_data(term);
@@ -232,6 +234,7 @@ impl Graph {
             graphs,
             current: false,
             last: 0,
+            NotImplemented : false,
         };
 
         graph._refresh_data(term);

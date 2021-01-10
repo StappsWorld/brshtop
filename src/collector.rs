@@ -10,13 +10,13 @@ use {
 };
 
 #[derive(Clone)]
-pub enum Collectors {
-    CpuCollector(&'static CpuCollector),
-    NetCollector(&'static NetCollector),
-    ProcCollector(&'static ProcCollector),
+pub enum Collectors<'a> {
+    CpuCollector(&'a CpuCollector),
+    NetCollector(&'a NetCollector),
+    ProcCollector(&'a ProcCollector),
 }
 
-pub struct Collector {
+pub struct Collector{
     pub stopping: bool,
     pub started: bool,
     pub draw_now: bool,

@@ -16,7 +16,7 @@ use {
     users::get_user_by_uid,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Display)]
 // TODO : Fix rest of detail types
 pub enum ProcCollectorDetails {
     Bool(bool),
