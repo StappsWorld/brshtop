@@ -98,9 +98,9 @@ impl Key {
         }
     }
 
-    pub fn start(&'static mut self, draw : &'static mut Draw, CONFIG_DIR : &'static Path, menu : &'static mut Menu) {
+    pub fn start(&'static mut self, draw : &'static mut Draw, menu : &'static mut Menu) {
         self.stopping = false;
-        self.reader = Some(thread::spawn(|| self.get_key(draw, CONFIG_DIR, menu)));
+        self.reader = Some(thread::spawn(|| self.get_key(draw, menu)));
         self.started = true;
     }
 
@@ -192,7 +192,7 @@ impl Key {
     }
 
     /// Get a key or escape sequence from stdin, convert to readable format and save to keys list. Meant to be run in it's own thread
-    pub fn get_key(&mut self, draw : &mut Draw, CONFIG_DIR : &Path, menu : &mut Menu) {
+    pub fn get_key(&mut self, draw : &mut Draw, menu : &mut Menu) {
         let mut input_key : String = String::default();
         let mut clean_key : String = String::default();
 
@@ -213,7 +213,7 @@ impl Key {
                                 draw.idle.wait(-1.0);
 
                                 let mut nonblocking = Nonblocking::new(&mut current_stdin);
-                                nonblocking.enter(CONFIG_DIR);
+                                nonblocking.enter();
 
                                 match current_stdin.read_to_string(&mut input_key) {
                                     Ok(_) => {
@@ -223,7 +223,7 @@ impl Key {
                                     },
                                     Err(_) => ()
                                 }
-                                nonblocking.exit(CONFIG_DIR);
+                                nonblocking.exit();
                                 self.idle = Event::Flag(true);
                             }
 

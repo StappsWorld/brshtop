@@ -3,16 +3,29 @@ use {
         brshtop_box::{Boxes, BrshtopBox},
         collector::{Collector, Collectors},
         config::{Config, ViewMode, SortingOption},
-        create_box, fx,
+        create_box,
+        draw::Draw,
+        errlog,
+        fx,
         graph::{Graph, Graphs},
         key::Key,
         mv,
-        proccollector::ProcCollector,
+        proccollector::{
+            ProcCollector,
+            ProcCollectorDetails,
+        },
         symbol,
+        SYSTEM,
         term::Term,
         theme::{Color, Theme},
     },
-    std::{collections::HashMap, path::*},
+    inflector::Inflector,
+    psutil::process::Status,
+    std::{
+        collections::HashMap,
+        iter::Enumerate,
+        path::*
+    },
 };
 
 pub struct ProcBox {
@@ -36,6 +49,7 @@ pub struct ProcBox {
     detailed_height: u32,
     buffer: String,
     pid_counter: HashMap<i32, i32>,
+    redraw : bool,
 }
 impl ProcBox {
     pub fn new(brshtop_box: &mut BrshtopBox, CONFIG: &mut Config, ARG_MODE: ViewMode) -> Self {
@@ -61,13 +75,13 @@ impl ProcBox {
             detailed_height: 8,
             buffer: "proc".to_owned(),
             pid_counter: HashMap::<i32, i32>::new(),
+            redraw : true,
         };
         procbox.parent.x = 1;
         procbox.parent.y = 1;
         procbox.parent.height_p = 68;
         procbox.parent.width_p = 55;
         procbox.parent.resized = true;
-        procbox.parent.redraw = true;
         procbox
     }
 
@@ -87,7 +101,7 @@ impl ProcBox {
         self.parent.x = term.width as u32 - self.parent.width + 1;
         self.parent.y = brshtop_box._b_cpu_h as u32 + 1;
         self.select_max = self.parent.height as usize - 3;
-        self.redraw.resized = true;
+        self.redraw = true;
         self.parent.resized = true;
     }
 
@@ -110,7 +124,7 @@ impl ProcBox {
     }
 
     /// Default mouse_pos = (0, 0)
-    pub fn selector<P: AsRef<Path>>(
+    pub fn selector(
         &mut self,
         key: String,
         mouse_pos: (i32, i32),
@@ -118,7 +132,6 @@ impl ProcBox {
         key_class: &mut Key,
         collector: &mut Collector,
         CONFIG: &mut Config,
-        CONFIG_DIR: P,
     ) {
         let old = (self.start, self.selected);
 
@@ -232,7 +245,6 @@ impl ProcBox {
             collector.collect(
                 vec![Collectors::ProcCollector(proc_collector)],
                 CONFIG,
-                CONFIG_DIR,
                 true,
                 false,
                 true,
@@ -249,6 +261,7 @@ impl ProcBox {
         THEME: &mut Theme,
         graphs: &mut Graphs,
         term: &mut Term,
+        draw : &mut Draw,
     ) {
         if self.parent.stat_mode {
             return;
@@ -260,7 +273,7 @@ impl ProcBox {
         }
 
         if proc.parent.redraw {
-            self.redraw.resized = true;
+            self.redraw = true;
         }
 
         let mut out: String = String::default();
@@ -285,7 +298,7 @@ impl ProcBox {
         let mut dx: u32 = 0;
         let mut dw: u32 = 0;
         let mut dy: u32 = 0;
-        let mut l_count: u32 = 0;
+        let mut l_count: usize = 0;
         let mut scroll_pos: u32 = 0;
         let mut killed: bool = true;
         let mut indent: String = String::default();
@@ -354,7 +367,7 @@ impl ProcBox {
         }
 
         // * Buttons and titles only redrawn if needed
-        if self.parent.resized || self.redraw.resized {
+        if self.parent.resized || self.redraw {
             s_len += CONFIG.proc_sorting.to_string().len();
             if self.parent.resized || s_len != self.s_len || proc.detailed {
                 self.s_len = s_len;
@@ -373,7 +386,10 @@ impl ProcBox {
             if proc.detailed {
                 let mut killed: bool = match proc.details[&"killed".to_owned()] {
                     ProcCollectorDetails::Bool(b) => b,
-                    _ => false,
+                    _ => {
+                        errlog("ProcCollectorDetails contained non-numeric value for 'killed'".to_owned())
+                        false
+                    },
                 };
                 let mut main: Color = if self.selected == 0 && !killed {
                     THEME.colors.main_fg
@@ -1013,20 +1029,369 @@ impl ProcBox {
             }
 
             // * Processes labels
-            let mut selected : SortingOption = CONFIG.proc_sorting;
+            let mut selected : String = String::default();
             let mut label : String = String::default();
-            match selected {
-                SortingOption::Memory => selected = String::from("mem"),
+            selected = match CONFIG.proc_sorting {
+                SortingOption::Memory => String::from("mem"),
                 SortingOption::Threads => if !CONFIG.proc_tree && arg_len == 0 {
                         String::from("tr")
+                    } else {
+                        String::default()
                     },
-                _ => (),
-            }
+                _ => {
+                    errlog("Wrong sorting option in CONFIG.proc_sorting when processing lables...");
+                    String::default()
+                },
+            };
 
             if CONFIG.proc_tree {
-                label = format!("{}{}{}{}");
+                label = format!("{}{}{}{:<width$}{}{}Mem%{:>11}{}{} {}",
+                    THEME.colors.title,
+                    fx::b,
+                    mv::to(y , x),
+                    " Tree:",
+                    if tr_show {
+                        format!("{:>9}", "Threads: ")
+                    } else {
+                        " ".repeat(4).to_owned()
+                    },
+                    if usr_show {
+                        format!("{:<9}", "User:")
+                    } else {
+                        String::default()
+                    },
+                    "Cpu%",
+                    fx::ub,
+                    THEME.colors.main_fg,
+                    width : tree_len - 2,
+                );
+                if ["pid", "program", "arguments"].iter().map(|s| s.to_owned().to_owned()).collect().contains(selected) {
+                    selected = String::from("tree");
+                }
+            } else {
+                label = format!("{}{}{:>7} {}{}{}{}Mem%{:>11}{}{} ",
+                    THEME.colors.title,
+                    fx::b,
+                    mv::to(y, x),
+                    "Pid:",
+                    if prog_len > 8 {
+                        "Program:".to_owned()
+                    } else {
+                        format!("{:<width$}", "Prg:", width : prog_len)
+                    },
+                    if arg_len {
+                        format!("{:<width$}", "Arguments:", width : arg_len - 4)
+                    } else {
+                        "".to_owned()
+                    },
+                    if tr_show {
+                        if arg_len > 0 {
+                            format!("{:>9}", "Threads:")
+                        } else {
+                            format!("{:^5}", "Tr:")
+                        }
+                    } else {
+                        "".to_owned()
+                    },
+                    if usr_show {
+                        format!("{:<9}", "User:")
+                    } else {
+                        "".to_owned()
+                    },
+                    "Cpu%",
+                    fx::ub,
+                    THEME.colors.main_fg
+                    if proc.num_procs > self.select_max as u32 {
+                        " "
+                    } else {
+                        ""
+                    },
+                );
+
+                if selected == String::from("program") && prog_len <= 8 {
+                    selected = String::from("prg");
+                }
             }
 
+            selected = selected.split(" ")[0]..to_title_case();
+            if CONFIG.proc_mem_bytes {
+                label = label.replace("Mem%", "MemB");
+            }
+            label = label.replace(selected, format!("{}{}{}", fx::u, selected, fx::uu).as_str());
+            out_misc.push_str(label.as_str());
+            draw.buffer("proc_misc".to_owned(), [out_misc], false, false, 100, true, false, false, key);
         }
+
+        // * Detailed box draw
+        if proc.detailed {
+            let mut stat_color : String = match proc.details[&"status".to_owned()] {
+                ProcCollectorDetails::Status(s) => if s == Status::Running {
+                    fx::b.to_owned()
+                } else if [Status::Dead, Status::Stopped, Status::Zombie].contains(s) {
+                    THEME.colors.inactive_fg.to_string()
+                } else {
+                    String::default()
+                },
+                _ => {
+                    errlog("Wrong ProcCollectorDetails type when assigning stat_color");
+                    String::default()
+                },
+            };
+            let expand : u32 = proc.expand;
+            let iw : u32 = (dw - 3) / (4 + expand);
+            let iw : u32 = iw - 1;
+
+            out.push_str(format!("{}{}{}{}{}%{}{}",
+                    mv::to(dy, dgx),
+                    graphs.detailed_cpu.call(
+                        if self.moved || match proc.details["killed".to_owned()] {
+                            ProcCollectorDetails::Bool(b) => b,
+                            _ => {
+                                errlog("Wrong ProcCollectorDetails type from proc.details['killed']");
+                                false
+                            },
+                        } {
+                            None
+                        } else {
+                            Some(proc.details_cpu[proc.details_cpu.len() - 2])
+                        }, 
+                        term
+                    ),
+                    mv::to(dy , dgx),
+                    THEME.colors.title,
+                    fx::b,
+                    if match proc.details["killed".to_owned()] {
+                        ProcCollectorDetails::Bool(b) => b,
+                        _ => {
+                            errlog("Wrong ProcCollectorDetails type from proc.details['killed']");
+                            false
+                        },
+                    } {
+                        0
+                    } else {
+                        match proc.details["cpu_percent".to_owned()] {
+                            ProcCollectorDetails::U32(u) => u,
+                            _ => {
+                                errlog("Wrong ProcCollectorDetails type from proc.details['cpu_percent']");
+                                0
+                            },
+                        }
+                    },
+                    mv::right(1),
+                    (if SYSTEM == "MacOS".to_owned() {
+                        ""
+                    } else {
+                        if dgw < 20 {
+                            "C"
+                        } else {
+                            "Core"
+                        }
+                    }).to_owned() + proc.details["cpu_name".to_owned()].to_string().as_str(),
+                )
+                .as_str()
+            );
+
+            for (i, l) in vec!["C", "P", "U"].iter().map(|s| s.to_owned().to_owned()).enumerate() {
+                out.push_str(format!("{}{}", mv::to(dy + 2 + i as u32, dgx), l).as_str());
+            }
+            for (i, l) in vec!["C", "M", "D"].iter().map(|s| s.to_owned().to_owned()).enumerate() {
+                out.push_str(format!("{}{}", mv::to(dy + 4 + i as u32, dx + 1), l).as_str());
+            }
+            out.push_str(format!("{} {}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{} {}{}{}{} {}{}{}{}{}{}{}{}{}{}",
+                    mv::to(dy, dx + 1),
+                    format!("{:^first$.second$}", "Status:", first = iw, second = iw2)
+                    format!("{:^first$.second$}", "Elapsed:", first = iw, second = iw2)
+                    if dw > 28 {
+                        format!("{:^first$.second$}", "Parent:", first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if dw > 38 {
+                        format!("{:^first$.second$}", "User:", first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 0 {
+                        format!("{:^first$.second$}", "Threads:", first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 1 {
+                        format!("{:^first$.second$}", "Nice:", first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 2 {
+                        format!("{:^first$.second$}", "IO Read:", first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 3 {
+                        format!("{:^first$.second$}", "IO Write:", first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 4 {
+                        format!("{:^first$.second$}", "TTY:", first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    mv::to(dy + 3, dx),
+                    THEME.colors.title,
+                    fx::ub,
+                    THEME.colors.main_fg,
+                    stat_color,
+                    proc.details["status".to_owned()],
+                    fx::ub,
+                    THEME.colors.main_fg,
+                    proc.details["uptime".to_owned()],
+                    if dw > 28 {
+                        format!("{:^first$.second$}", proc.details["parent_name".to_owned()], first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if dw > 38 {
+                        format!("{:^first$.second$}", proc.details["username".to_owned()], first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 0 {
+                        format!("{:^first$.second$}", proc.details["threads".to_owned()], first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 1 {
+                        format!("{:^first$.second$}", proc.details["nice".to_owned()], first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 2 {
+                        format!("{:^first$.second$}", proc.details["io_read".to_owned()], first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 3 {
+                        format!("{:^first$.second$}", proc.details["io_write".to_owned()], first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    if expand > 4 {
+                        format!("{:^first$.second$}", proc.details["terminal".to_owned()].to_string()[(proc.details["terminal".to_owned()].to_string().len() - 1 - iw2)..], first = iw, second = iw2)
+                    } else {
+                        String::default()
+                    },
+                    mv::to(dy + 3, dx),
+                    THEME.colors.title,
+                    fx::b,
+                    format!("{:>width$}",
+                        (if dw > 42 {
+                            "Memory: "
+                        } else {
+                            "M:"
+                        }).to_owned() + proc.details["memory_percent"].to_string().as_str() + "%",
+                        width = (dw / 3) - 1,
+                    ),
+                    fx::ub,
+                    THEME.colors.inactive_fg,
+                    ". ".repeat(dw / 3),
+                    mv::left(dw / 3),
+                    THEME.colors.proc_misc,
+                    graphs.detailed_mem.call(
+                        if self.moved 
+                        {
+                            None
+                        } else {
+                            Some(
+                                match proc.details["memory_percent".to_owned()] {
+                                    ProcCollectorDetails::Bool(b) => if b {1} else {0},
+                                    ProcCollectorDetails::U32(u) => u,
+                                    _ => {
+                                        errlog("ProcCollectorDetails contained non-numeric value for 'memory_percent'".to_owned())
+                                        0
+                                    }
+                                }
+                            )
+                        }, 
+                        term
+                    ),
+                    THEME.colors.title,
+                    fx::b,
+                    format!("{:.width$}", proc.details["memory_bytes".to_owned()], width = (dw / 3) - 2),
+                    THEME.colors.main_fg,
+                    fx::ub,
+                )
+                .as_str()
+            );
+            let cy = dy + if match proc.details["cmdline".to_owned()] {
+                ProcCollectorDetails::Bool(b) => if b {1} else {0},
+                ProcCollectorDetails::U32(u) => u,
+                ProcCollectorDetails::String(s) => s.len() as u32,
+                ProcCollectorDetails::VecString(v) => v.len() as u32,
+                _ => {
+                    errlog("Wrong type in proc.details['cmdline']");
+                    0
+                },
+            } > d2 - 5 {
+                4
+            } else {
+                5
+            };
+            for i in 0..(proc.details["cmdline"].len() as u32 / (dw - 5)) {
+                out.push_str(format!("{}{}",
+                        mv::to(cy + i, dx + 3),
+                        format!("{:direction$width}",
+                            if dw - 5 >= 0 {
+                                proc.details["cmdline".to_owned()][((dw-5)*i)..][..(dw-5)]
+                            } else {
+                                proc.details["cmdline".to_owned()][((proc.details["cmdline".to_owned()].len() - 1 - 5)*i)..][..(proc.details["cmdline".to_owned()].len() - 1 -5)]
+                            },
+                            direction = if i == 0 {
+                                "^"
+                            } else {
+                                "<"
+                            },
+                            width = dw - 5,
+                        ),
+                    )
+                );
+                if i == 2 {
+                    break;
+                }
+            }
+        }
+
+        // * Checking for selection out of bounds
+        if self.start > (proc.num_procs - self.select_max as u32 + 1) as i32 && proc.num_procs > self.select_max as u32 {
+            self.start = (proc.num_procs - self.select_max as u32 + 1) as i32;
+        } else if self.start > proc.num_procs as i32 {
+            self.start = proc.num_procs as i32;
+        }
+        if self.start < 1 {
+            self.start = 1;
+        }
+        if self.selected as u32 > proc.num_procs && proc.num_procs < self.select_max as u32 {
+            self.selected = proc.num_procs as usize;
+        } else if self.selected > self.select_max {
+            self.selected = self.select_max;
+        }
+
+        // * Start iteration over all processes and info
+        let cy: u32 = 1;
+
+        for (n, (pid, items)) in proc.processes.enumerate() {
+            if n < self.start {
+                continue;
+            }
+            l_count += 1;
+            if l_count == self.selected {
+                is_selected = true;
+                self.selected_pid = pid;
+            } else {
+                is_selected = false;
+            }
+
+            indent = items.get
+        }
+        
     }
 }

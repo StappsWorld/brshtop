@@ -1,18 +1,18 @@
 use log::{debug, LevelFilter};
 use std::path::*;
-use crate::clean_quit;
+use crate::{clean_quit, CONFIG_DIR};
 
-pub fn errlog<P: AsRef<Path>>(config_dir: P, message: String) {
+pub fn errlog(message: String) {
     // TODO: I know there's a better way to do this
     let error_file = "log.log";
-    let error_dir = config_dir.as_ref().join(PathBuf::from(error_file));
+    let error_dir = CONFIG_DIR.join(PathBuf::from(error_file));
     let dir = error_dir.to_str().unwrap();
 
     match simple_logging::log_to_file(dir, LevelFilter::Debug) {
         Err(e) => throw_error(
             format!(
                 "ERROR!\nNo permission to write to \"{}\" directory with error {}!",
-                config_dir.as_ref().to_str().unwrap(),
+                CONFIG_DIR.to_str().unwrap(),
                 e
             )
             .as_str(),

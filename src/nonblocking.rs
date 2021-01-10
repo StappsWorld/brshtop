@@ -20,12 +20,11 @@ impl<'a> Nonblocking<'a> {
     }
 
 
-    pub fn enter<P: AsRef<Path>>(&mut self, CONFIG_DIR : P){
+    pub fn enter(&mut self){
         self.orig_fl = match fcntl::fcntl(self.fd, fcntl::FcntlArg::F_GETFL){
             Ok(o) => Some(o),
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!(
                         "Error getting fcntl data... (error {})",
                         e
@@ -39,7 +38,6 @@ impl<'a> Nonblocking<'a> {
             Ok(_) => (),
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!(
                         "Error setting fcntl data... (error {})",
                         e
@@ -50,12 +48,11 @@ impl<'a> Nonblocking<'a> {
         }
     }
 
-    pub fn exit<P: AsRef<Path>>(&mut self, CONFIG_DIR : P) {
+    pub fn exit(&mut self) {
         match fcntl::fcntl(self.fd, fcntl::FcntlArg::F_SETFL(fcntl::OFlag{bits : self.orig_fl.unwrap()})) {
             Ok(_) => (),
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!(
                         "Error setting fcntl data... (error {})",
                         e

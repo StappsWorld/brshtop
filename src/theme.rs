@@ -379,7 +379,7 @@ pub struct Theme {
         Ok(Self::new(File::open(path)?, DEFAULT_THEME))
     }
 
-    pub fn refresh<P: AsRef<Path>>(&mut self, THEME_DIR : &Path, USER_THEME_DIR : &Path, CONFIG_DIR : P) {
+    pub fn refresh(&mut self, THEME_DIR : &Path, USER_THEME_DIR : &Path) {
         self.themes = vec![("Default", "Default")].iter().map(|(s1, s2)| (s1.clone().to_owned(), s2.clone().to_owned())).collect();
     
         for d in vec![THEME_DIR, USER_THEME_DIR] {
@@ -389,14 +389,14 @@ pub struct Theme {
             for f in match d.read_dir() {
                 Ok(dir) => dir,
                 Err(e) => {
-                    errlog(CONFIG_DIR, format!("Unable to read theme directory ({})", e));
+                    errlog(format!("Unable to read theme directory ({})", e));
                     return;  
                 },
             } {
                 let f_unwrap = match f {
                     Ok(f) => f,
                     Err(e) => {
-                        errlog(CONFIG_DIR, format!("Unable to read theme files ({})", e));
+                        errlog(format!("Unable to read theme files ({})", e));
                         return;  
                     },
                 };
@@ -408,12 +408,12 @@ pub struct Theme {
                             self.themes[&index] = format!("{}/{:?}", d.to_str().unwrap(), f_unwrap.file_name());
                         },
                         None => {
-                            errlog(CONFIG_DIR, format!("Unable to convert path to str"));
+                            errlog(format!("Unable to convert path to str"));
                             return;  
                         },
                     },
                     None => {
-                        errlog(CONFIG_DIR, format!("Unable to read file name"));
+                        errlog(format!("Unable to read file name"));
                         return;  
                     },
                 } 
@@ -421,13 +421,13 @@ pub struct Theme {
         }
     }
         
-    pub fn _load_file<P: AsRef<Path>>(path : P, CONFIG_DIR : P) -> Result<HashMap<String, String>, String> {
+    pub fn _load_file<P: AsRef<Path>>(path : P) -> Result<HashMap<String, String>, String> {
         let mut new_theme : HashMap<String, String> = HashMap::<String, String>::new();
         let file = match File::open(path) {
             Ok(f) => f,
             Err(e) => {
                 let error_string = format!("Unable to open path provided ({})", e);
-                errlog(CONFIG_DIR, error_string.clone());
+                errlog(error_string.clone());
                 return Err(error_string.clone());  
             },
         };

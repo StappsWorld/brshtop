@@ -3,6 +3,7 @@ use {
         brshtop_box::{Boxes, BrshtopBox, SubBoxes},
         config::{Config, ViewMode},
         cpucollector::CpuCollector,
+        CPU_NAME,
         create_box, error, fx, min_max,
         draw::Draw,
         graph::{Graph, Graphs},
@@ -143,7 +144,6 @@ impl CpuBox {
         theme: &mut Theme,
         term: &mut Term,
         config: &mut Config,
-        CPU_NAME: String,
     ) -> String {
         if !key.mouse.contains_key(&"M".to_owned()) {
             let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
@@ -202,7 +202,7 @@ impl CpuBox {
         );
     }
 
-    pub fn battery_activity<P: AsRef<Path>>(&mut self, config_dir: P, menu: &mut Menu) -> bool {
+    pub fn battery_activity(&mut self, menu: &mut Menu) -> bool {
         let battery_manager = match Manager::new() {
             Ok(m) => m,
             Err(_) => {
@@ -246,10 +246,7 @@ impl CpuBox {
                                         let filename = match entry.file_name().into_string() {
                                             Ok(f) => f,
                                             Err(e) => {
-                                                error::errlog(
-                                                    config_dir,
-                                                    format!("Unable to read a filename ({:#?})", e),
-                                                );
+                                                error::errlog(format!("Unable to read a filename ({:#?})", e));
                                                 continue;
                                             }
                                         };
@@ -332,7 +329,6 @@ impl CpuBox {
         meters : &mut Meters,
         THREADS : u64,
         menu : &mut Menu,
-        config_dir : P,
         THEME : &mut Theme,
     ) {
         if cpu.parent.redraw {
@@ -478,7 +474,7 @@ impl CpuBox {
             draw.buffer("cpu_misc".to_owned(), vec![out_misc.clone()], false, false, 100, true, false, false, key);
         }
 
-        if config.show_battery && self.battery_activity(config_dir, menu) {
+        if config.show_battery && self.battery_activity(menu) {
             let mut bat_out : String = String::default();
             let mut battery_time : String = String::default();
             if self.battery_secs > 0.0 {

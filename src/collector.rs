@@ -2,7 +2,7 @@ use crate::{cpucollector, netbox};
 
 use {
     crate::{
-        brshtop_box::BrshtopBox, config::{Config, ViewMode}, cpubox::CpuBox, cpucollector::CpuCollector,
+        brshtop_box::BrshtopBox, config::{Config, ViewMode}, CONFIG_DIR, cpubox::CpuBox, cpucollector::CpuCollector,
         draw::Draw, event::Event, graph::Graphs, key::Key, menu::Menu, meter::Meters, netbox::NetBox, netcollector::NetCollector, proccollector::ProcCollector, term::Term, theme::Theme, timeit::TimeIt,
     },
     std::{path::*, sync::mpsc::*, time::Duration, *},
@@ -63,11 +63,10 @@ impl Collector {
     }
 
     /// Defaults draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False
-    pub fn collect<P: AsRef<Path>>(
+    pub fn collect(
         &mut self,
         collectors: Vec<Collectors>,
         CONFIG: &mut Config,
-        CONFIG_DIR: P,
         draw_now: bool,
         interrupt: bool,
         proc_interrupt: bool,
@@ -105,7 +104,6 @@ impl Collector {
         menu: &'static mut Menu,
         draw: &'static mut Draw,
         term: &'static mut Term,
-        config_dir: &'static Path,
         THREADS: u64,
         CORES: u64,
         CORE_MAP: Vec<i32>,
@@ -122,7 +120,6 @@ impl Collector {
             self.runner(
                 CONFIG,
                 DEBUG,
-                config_dir,
                 THREADS,
                 brshtop_box,
                 timeit,
@@ -166,7 +163,6 @@ impl Collector {
         &mut self,
         CONFIG: &mut Config,
         DEBUG: bool,
-        config_dir: &Path,
         THREADS: u64,
         brshtop_box: &mut BrshtopBox,
         timeit: &mut TimeIt,
@@ -214,7 +210,6 @@ impl Collector {
                         Collectors::CpuCollector(c) => c.collect(
                             CONFIG,
                             THREADS,
-                            config_dir,
                             term,
                             CORES,
                             CORE_MAP,
@@ -238,7 +233,6 @@ impl Collector {
                         meters,
                         THREADS,
                         menu,
-                        config_dir
                     ),
                     Collectors::NetCollector(_) => netbox.draw_fg(THEME, key, term, CONFIG, draw, graphs, menu),
                     Collectors::ProcCollector(p) => p.draw_fg(),
@@ -259,7 +253,7 @@ impl Collector {
             }
 
             if DEBUG && !debugged {
-                timeit.stop("Collect and draw".to_owned(), config_dir);
+                timeit.stop("Collect and draw".to_owned());
                 debugged = true;
             }
 

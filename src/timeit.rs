@@ -43,7 +43,7 @@ impl TimeIt {
         }
     }
 
-    pub fn stop<P: AsRef<Path>>(&mut self, name: String, config_dir: P) {
+    pub fn stop(&mut self, name: String) {
         let name_copy = name.clone();
         if self.timers.contains_key(&name_copy) {
             if let Some(x) = self.timers.get(&name_copy) {
@@ -58,7 +58,6 @@ impl TimeIt {
                     self.paused.remove(&name_copy);
                 }
                 errlog(
-                    config_dir,
                     format!("{} completed in {:.6} seconds", name_copy, total),
                 );
             }

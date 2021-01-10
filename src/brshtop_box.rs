@@ -2,6 +2,7 @@ use {
     crate::{
         config::{Config, ViewMode},
         cpubox::CpuBox,
+        CPU_NAME,
         draw::Draw,
         error::*,
         fx,
@@ -333,7 +334,6 @@ impl BrshtopBox {
         key: &mut Key,
         theme: &mut Theme,
         term: &mut Term,
-        CPU_NAME : String,
     ) {
         // TODO : Handle the rest of the possible boxes...
         draw.buffer(
@@ -341,10 +341,10 @@ impl BrshtopBox {
             subclasses
                 .into_iter()
                 .map(|b| match b {
-                    Boxes::CpuBox(cb) => cb.draw_bg(key, theme, term, config, CPU_NAME),
-                    Boxes::MemBox(mb) => mb.draw_bg(key, theme, term, config, CPU_NAME),
-                    Boxes::NetBox(nb) => nb.draw_bg(key, theme, term, config, CPU_NAME),
-                    Boxes::ProcBox(pb) => pb.draw_bg(key, theme, term, config, CPU_NAME),
+                    Boxes::CpuBox(cb) => cb.draw_bg(key, theme, term, config),
+                    Boxes::MemBox(mb) => mb.draw_bg(key, theme, term, config),
+                    Boxes::NetBox(nb) => nb.draw_bg(key, theme, term, config),
+                    Boxes::ProcBox(pb) => pb.draw_bg(key, theme, term, config),
                     _ => String::default(),
                 })
                 .collect(),

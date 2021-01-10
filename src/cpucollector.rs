@@ -1,4 +1,5 @@
 use crate::{
+    CONFIG_DIR,
     brshtop_box::BrshtopBox,
     collector::{Collector, Collectors},
     config::{Config, ViewMode},
@@ -9,6 +10,7 @@ use crate::{
     key::Key,
     menu::Menu,
     meter::Meters,
+    SYSTEM,
     term::Term,
     theme::Theme,
 };
@@ -69,7 +71,6 @@ impl CpuCollector {
         &mut self,
         CONFIG: &mut Config,
         THREADS: u64,
-        CONFIG_DIR: P,
         term: &mut Term,
         CORES: u64,
         CORE_MAP: Vec<i32>,
@@ -93,7 +94,6 @@ impl CpuCollector {
                 Ok(p) => p,
                 Err(e) => {
                     error::errlog(
-                        CONFIG_DIR,
                         format!("Unable to collect CPU percentages! (error {})", e),
                     );
                     self.got_sensors = false;
@@ -102,7 +102,6 @@ impl CpuCollector {
             },
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!("Unable to collect CPU percentages! (error {})", e),
                 );
                 vec![-1.0]
@@ -120,7 +119,6 @@ impl CpuCollector {
             Ok(f) => f.current(),
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!("Unable to collect CPU frequency! (error {})", e),
                 );
                 -1.0
@@ -137,7 +135,6 @@ impl CpuCollector {
             ],
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!("Unable to collect load average! (error {})", e),
                 );
                 vec![-1.0]
@@ -157,7 +154,6 @@ impl CpuCollector {
             }
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!(
                         "Error finding the boot time of this system... (error {})",
                         e
@@ -170,7 +166,6 @@ impl CpuCollector {
         if CONFIG.check_temp && self.got_sensors {
             self.collect_temps(
                 CONFIG,
-                CONFIG_DIR,
                 THREADS,
                 CORES,
                 CORE_MAP,
@@ -194,7 +189,6 @@ impl CpuCollector {
         meters: &mut Meters,
         THREADS: u64,
         menu: &mut Menu,
-        CONFIG_DIR: P,
     ) {
         cpu_box.draw_fg(
             self,
@@ -208,15 +202,14 @@ impl CpuCollector {
             meters,
             THREADS,
             menu,
-            CONFIG_DIR,
             THEME
         );
     }
 
-    pub fn get_sensors(&mut self, CONFIG: &mut Config, SYSTEM: String) {
+    pub fn get_sensors(&mut self, CONFIG: &mut Config) {
         self.sensor_method = String::from("");
 
-        if SYSTEM == "MacOS" {
+        if SYSTEM == "MacOS".to_owned() {
             match which("coretemp") {
                 Ok(_) => {
                     let output = Exec::shell("coretemp -p")
@@ -272,7 +265,7 @@ impl CpuCollector {
             }
         }
 
-        if self.sensor_method == "" && SYSTEM == "Linux" {
+        if self.sensor_method == "" && SYSTEM == "Linux".to_owned() {
             let output: Option<String> = match which("vcgencmd") {
                 Ok(s) => Some(
                     Exec::shell("vcgencmd measure_temp")
@@ -297,10 +290,9 @@ impl CpuCollector {
         }
     }
 
-    pub fn collect_temps<P: AsRef<Path>>(
+    pub fn collect_temps(
         &mut self,
         CONFIG: &mut Config,
-        CONFIG_DIR: P,
         THREADS: u64,
         CORES: u64,
         CORE_MAP: Vec<i32>,
@@ -564,12 +556,10 @@ impl CpuCollector {
                     let coretemp_p = match Exec::shell("coretemp -p").capture() {
                         Ok(o) => o.stdout_str().to_owned().trim().parse::<u32>().unwrap(),
                         Err(e) => {
-                            error::errlog(
-                                CONFIG_DIR,
-                                format!(
+                            error::errlog(format!(
                                     "Error getting temperature data for this system... (error {})",
                                     e
-                                ),
+                                )
                             );
                             self.got_sensors = false;
                             cpu_box.calc_size(THREADS, term, brshtop_box);
@@ -589,7 +579,6 @@ impl CpuCollector {
                             .collect::<Vec<u32>>(),
                         Err(e) => {
                             error::errlog(
-                                CONFIG_DIR,
                                 format!(
                                     "Error getting temperature data for this system... (error {})",
                                     e
@@ -645,7 +634,6 @@ impl CpuCollector {
                         }
                         Err(e) => {
                             error::errlog(
-                                CONFIG_DIR,
                                 format!(
                                     "Error getting temperature data for this system... (error {})",
                                     e
@@ -674,7 +662,6 @@ impl CpuCollector {
                         }
                         Err(e) => {
                             error::errlog(
-                                CONFIG_DIR,
                                 format!(
                                     "Error getting temperature data for this system... (error {})",
                                     e

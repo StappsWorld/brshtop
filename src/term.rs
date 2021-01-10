@@ -90,7 +90,6 @@ impl Term {
         timer: &mut Timer,
         config : &mut Config,
         theme : &mut Theme,
-        CPU_NAME : String,
     ) {
         if self.resized {
             self.winch = Event::Flag(true);
@@ -245,7 +244,7 @@ impl Term {
             menu.resized = true;
         }
 
-        brshtop_box.draw_bg(false, draw, boxes, menu, config, cpu_box, key, theme, self, CPU_NAME);
+        brshtop_box.draw_bg(false, draw, boxes, menu, config, cpu_box, key, theme, self);
         self.resized = false;
         timer.finish();
 
@@ -253,14 +252,13 @@ impl Term {
     }
 
     /// Toggle input echo
-    pub fn echo<P: AsRef<Path>>(on: bool, CONFIG_DIR: P) {
+    pub fn echo(on: bool) {
         let fd = io::stdin().as_raw_fd().clone();
 
         let mut termios = match Termios::from_fd(fd) {
             Ok(t) => t,
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!("Error getting Termios data... (error {})", e),
                 );
                 return;
@@ -276,18 +274,16 @@ impl Term {
         match tcsetattr(fd, os::target::TCSANOW, &termios) {
             Ok(_) => (),
             Err(e) => error::errlog(
-                CONFIG_DIR,
                 format!("Error setting Termios data... (error {})", e),
             ),
         }
     }
 
-    pub fn title<P: AsRef<Path>>(text: String, CONFIG_DIR: P) -> String {
+    pub fn title<P: AsRef<Path>>(text: String) -> String {
         let out: String = match std::env::var("TERMINAL_TITLE") {
             Ok(o) => o,
             Err(e) => {
                 error::errlog(
-                    CONFIG_DIR,
                     format!("Error setting Termios data... (error {})", e),
                 );
                 return String::default();

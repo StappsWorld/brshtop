@@ -87,7 +87,7 @@ impl Menu {
         }
     }
 
-    pub fn main<P: AsRef<Path>>(
+    pub fn main(
         &mut self,
         theme: &mut Theme,
         draw: &mut Draw,
@@ -99,7 +99,6 @@ impl Menu {
         timer: &mut Timer,
         collector: &mut Collector,
         collectors: Vec<Collectors>,
-        CONFIG_DIR: P,
         CONFIG: &mut Config,
         ARG_MODE: &mut ViewMode,
         THEME_DIR: &Path,
@@ -109,9 +108,7 @@ impl Menu {
         THREADS: u64,
         init: &mut Init,
         cpubox: &mut CpuBox,
-        CPU_NAME: String,
         cpucollector: &mut CpuCollector,
-        SYSTEM: String,
         boxes: Vec<Boxes>,
         netbox: &mut NetBox,
         proccollector: &mut ProcCollector,
@@ -270,7 +267,6 @@ impl Menu {
                         draw,
                         term,
                         CONFIG,
-                        CONFIG_DIR.as_ref(),
                         None,
                     );
                 } else if vec!["up", "mouse_scroll_up", "shift_tab"]
@@ -309,7 +305,6 @@ impl Menu {
                             draw,
                             term,
                             CONFIG,
-                            CONFIG_DIR.as_ref(),
                             None,
                         );
                     } else if menu_current == "options".to_owned() {
@@ -319,7 +314,6 @@ impl Menu {
                             theme,
                             THEME_DIRS,
                             USER_THEME_DIR,
-                            CONFIG_DIR,
                             draw,
                             term,
                             CONFIG,
@@ -333,9 +327,7 @@ impl Menu {
                             collector,
                             init,
                             cpubox,
-                            CPU_NAME,
                             cpucollector,
-                            SYSTEM,
                             netbox,
                             DEFAULT_THEME,
                             proccollector,
@@ -344,8 +336,7 @@ impl Menu {
                         self.resized = true;
                     } else if menu_current == "help".to_owned() {
                         self.help(
-                            THEME, draw, term, VERSION, key_class, collector, collectors, CONFIG,
-                            CONFIG_DIR, timer,
+                            THEME, draw, term, VERSION, key_class, collector, collectors, CONFIG, timer
                         );
                         self.resized = true;
                     }
@@ -356,7 +347,7 @@ impl Menu {
                 skip = true;
             } else {
                 collector.collect(
-                    collectors, CONFIG, CONFIG_DIR, true, false, false, false, false,
+                    collectors, CONFIG, true, false, false, false, false,
                 );
                 collector.collect_done = Event::Wait;
                 collector.collect_done.wait(2.0);
@@ -380,7 +371,7 @@ impl Menu {
         self.close = false;
     }
 
-    pub fn help<P: AsRef<Path>>(
+    pub fn help(
         &mut self,
         theme: &mut Theme,
         draw: &mut Draw,
@@ -390,7 +381,6 @@ impl Menu {
         collector: &mut Collector,
         collectors: Vec<Collectors>,
         CONFIG: &mut Config,
-        CONFIG_DIR: P,
         timer: &mut Timer,
     ) {
         let mut out: String = String::default();
@@ -654,7 +644,6 @@ impl Menu {
                             draw,
                             term,
                             CONFIG,
-                            CONFIG_DIR.as_ref(),
                             None,
                         );
                     } else if vec!["escape", "M", "enter", "backspace", "h", "f1"]
@@ -685,7 +674,7 @@ impl Menu {
                     skip = true;
                 } else {
                     collector.collect(
-                        collectors, CONFIG, CONFIG_DIR, true, false, false, false, false,
+                        collectors, CONFIG, true, false, false, false, false,
                     );
                     collector.collect_done = Event::Wait;
                     collector.collect_done.wait(2.0);
@@ -712,14 +701,13 @@ impl Menu {
         }
     }
 
-    pub fn options<P: AsRef<Path>>(
+    pub fn options(
         &mut self,
         ARG_MODE: &mut ViewMode,
         THEME: &mut Theme,
         theme: &mut Theme,
         THEME_DIR: &Path,
         USER_THEME_DIR: &Path,
-        CONFIG_DIR: P,
         draw: &mut Draw,
         term: &mut Term,
         CONFIG: &mut Config,
@@ -733,9 +721,7 @@ impl Menu {
         collector: &mut Collector,
         init: &mut Init,
         cpubox: &mut CpuBox,
-        CPU_NAME: String,
         cpucollector: &mut CpuCollector,
-        SYSTEM: String,
         netbox: &mut NetBox,
         DEFAULT_THEME: HashMap<String, String>,
         proc_collector: ProcCollector,
@@ -752,7 +738,7 @@ impl Menu {
         let mut d_quote: String = String::default();
         let mut inputting: bool = false;
         let mut input_val: String = String::default();
-        THEME.refresh(THEME_DIR, USER_THEME_DIR, CONFIG_DIR);
+        THEME.refresh(THEME_DIR, USER_THEME_DIR);
         if self.background == String::default() {
             self.background = format!(
                 "{}{}{}",
@@ -1564,7 +1550,6 @@ impl Menu {
                                             brshtop_box,
                                             timer,
                                             THEME,
-                                            CPU_NAME,
                                         );
                                         self.resized = false;
                                     }
@@ -1600,7 +1585,6 @@ impl Menu {
                         draw,
                         term,
                         CONFIG,
-                        CONFIG_DIR.as_ref(),
                         None,
                     );
                 } else if ["escape", "o", "M", "f2"]
@@ -1668,7 +1652,7 @@ impl Menu {
                     );
                     if selected == "check_temp".to_owned() {
                         if CONFIG.check_temp {
-                            cpucollector.get_sensors(CONFIG, SYSTEM);
+                            cpucollector.get_sensors(CONFIG);
                         } else {
                             cpucollector.sensor_method = String::default();
                             cpucollector.got_sensors = false;
@@ -1709,7 +1693,6 @@ impl Menu {
                         timer,
                         CONFIG,
                         THEME,
-                        CPU_NAME,
                     );
                     self.resized = true;
                 } else if ["left", "right"]
@@ -1753,7 +1736,6 @@ impl Menu {
                         timer,
                         CONFIG,
                         THEME,
-                        CPU_NAME,
                     );
                     timer.finished();
                 } else if ["left", "right"]
@@ -1785,7 +1767,6 @@ impl Menu {
                     CONFIG.log_level = CONFIG.log_levels[loglevel_i];
                     // TODO : Implement error logging level
                     error::errlog(
-                        CONFIG_DIR,
                         ("LogLevel set to ".to_owned() + CONFIG.log_level.to_string().as_str())
                             .to_owned(),
                     );
@@ -1832,7 +1813,6 @@ impl Menu {
                             timer,
                             CONFIG,
                             THEME,
-                            CPU_NAME,
                         );
                         self.resized = false;
                     }
@@ -1876,7 +1856,6 @@ impl Menu {
                         timer,
                         CONFIG,
                         THEME,
-                        CPU_NAME,
                     );
                     self.resized = false;
                 } else if key == "up".to_owned() {
@@ -1920,7 +1899,7 @@ impl Menu {
                 skip = true;
             } else {
                 collector.collect(
-                    collectors, CONFIG, CONFIG_DIR, true, false, false, false, false,
+                    collectors, CONFIG, true, false, false, false, false,
                 );
                 collector.collect_done = Event::Wait;
                 collector.collect_done.wait(2.0);
