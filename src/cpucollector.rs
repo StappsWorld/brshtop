@@ -137,7 +137,7 @@ impl CpuCollector {
                 error::errlog(
                     format!("Unable to collect load average! (error {})", e),
                 );
-                vec![-1.0]
+                vec![-1.0, -1.0, -1.0]
             }
         };
 

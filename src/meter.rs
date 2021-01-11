@@ -21,8 +21,8 @@ pub struct Meters {
     pub battery : Meter,
     pub mem : HashMap<String, MeterUnion>,
     pub swap : HashMap<String, MeterUnion>,
-    pub disk_used : HashMap<String, Meter>,
-    pub disk_free : HashMap<String, Meter>,
+    pub disks_used : HashMap<String, Meter>,
+    pub disks_free : HashMap<String, Meter>,
 }
 
 pub struct Meter {

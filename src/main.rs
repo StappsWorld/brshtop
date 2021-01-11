@@ -12,6 +12,7 @@ mod event;
 mod fx;
 mod graph;
 mod key;
+mod membox;
 mod menu;
 mod meter;
 mod mv;

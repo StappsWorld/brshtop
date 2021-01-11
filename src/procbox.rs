@@ -262,11 +262,11 @@ impl ProcBox {
         graphs: &mut Graphs,
         term: &mut Term,
         draw : &mut Draw,
+        proc : &mut ProcCollector,
     ) {
         if self.parent.stat_mode {
             return;
         }
-        let mut proc = ProcCollector::new(self.buffer.clone());
 
         if proc.parent.proc_interrupt {
             return;
@@ -387,7 +387,7 @@ impl ProcBox {
                 let mut killed: bool = match proc.details[&"killed".to_owned()] {
                     ProcCollectorDetails::Bool(b) => b,
                     _ => {
-                        errlog("ProcCollectorDetails contained non-numeric value for 'killed'".to_owned())
+                        errlog("ProcCollectorDetails contained non-numeric value for 'killed'".to_owned());
                         false
                     },
                 };
@@ -735,7 +735,7 @@ impl ProcBox {
 
                     for i in 0..4 {
                         let mut pusher: Vec<i32> = Vec::<i32>::new();
-                        pusher.push((sorting_pos - 5) as i32 + i);
+                        pusher.push((sort_pos - 5) as i32 + i);
                         pusher.push(y as i32 - 1);
                         top.push(pusher);
                     }
@@ -765,7 +765,7 @@ impl ProcBox {
 
                     for i in 0..7 {
                         let mut pusher: Vec<i32> = Vec::<i32>::new();
-                        pusher.push((sorting_pos - 14) as i32 + i);
+                        pusher.push((sort_pos - 14) as i32 + i);
                         pusher.push(y as i32 - 1);
                         top.push(pusher);
                     }
@@ -773,7 +773,7 @@ impl ProcBox {
                     key.mouse["r".to_owned()] = top.clone();
                 }
                 out_misc.push_str(format!("{}{}{}{}{}{}{}",
-                        mv::to(y - 1, sorting_pos as u32 - 15),
+                        mv::to(y - 1, sort_pos as u32 - 15),
                         THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                         if CONFIG.proc_reversed {
                             fx::b
@@ -795,7 +795,7 @@ impl ProcBox {
 
                     for i in 0.. if proc.search_filter.len() == 0 {6} else {2 + proc.search_filter[(proc.search_filter.len() - 11)..].len()} {
                         let mut pusher: Vec<i32> = Vec::<i32>::new();
-                        pusher.push((sorting_pos - 24) as i32 + i as i32);
+                        pusher.push((sort_pos - 24) as i32 + i as i32);
                         pusher.push(y as i32 - 1);
                         top.push(pusher);
                     }
@@ -849,7 +849,7 @@ impl ProcBox {
                 key.mouse.remove(&"delete".to_owned());
             }
 
-            out_misc.push_str(format!("{}{}{}{}",
+            out_misc.push_str(format!("{}{}{}{}{}{}{}",
                     mv::to(y - 1, x + 7),
                     THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                     if self.filtering || proc.search_filter.len() > 0 {
@@ -867,7 +867,7 @@ impl ProcBox {
                             if self.filtering {
                                 fx::bl.to_owned() + "█" + fx::ubl
                             } else {
-                                THEME.colors.hi_fg.call(" del".to_owned(), term),
+                                THEME.colors.hi_fg.call(" del".to_owned(), term)
                             }
                         )
                     },
@@ -876,17 +876,17 @@ impl ProcBox {
                 .as_str()
             );
 
-            main = if self.selected == 0 {
+            let main : Color = if self.selected == 0 {
                 THEME.colors.inactive_fg
             } else {
                 THEME.colors.main_fg
             };
-            hi = if self.selected == 0 {
+            let hi : Color = if self.selected == 0 {
                 THEME.colors.inactive_fg
             } else {
                 THEME.colors.hi_fg
             };
-            title = if self.selected == 0 {
+            let title : Color = if self.selected == 0 {
                 THEME.colors.inactive_fg
             } else {
                 THEME.colors.title
@@ -1063,13 +1063,13 @@ impl ProcBox {
                     "Cpu%",
                     fx::ub,
                     THEME.colors.main_fg,
-                    width : tree_len - 2,
+                    width = tree_len - 2,
                 );
                 if ["pid", "program", "arguments"].iter().map(|s| s.to_owned().to_owned()).collect().contains(selected) {
                     selected = String::from("tree");
                 }
             } else {
-                label = format!("{}{}{:>7} {}{}{}{}Mem%{:>11}{}{} ",
+                label = format!("{}{}{}{:>7} {}{}{}{}Mem%{:>11}{}{} {}",
                     THEME.colors.title,
                     fx::b,
                     mv::to(y, x),
@@ -1077,10 +1077,10 @@ impl ProcBox {
                     if prog_len > 8 {
                         "Program:".to_owned()
                     } else {
-                        format!("{:<width$}", "Prg:", width : prog_len)
+                        format!("{:<width$}", "Prg:", width = prog_len)
                     },
                     if arg_len {
-                        format!("{:<width$}", "Arguments:", width : arg_len - 4)
+                        format!("{:<width$}", "Arguments:", width = arg_len - 4)
                     } else {
                         "".to_owned()
                     },
@@ -1100,7 +1100,7 @@ impl ProcBox {
                     },
                     "Cpu%",
                     fx::ub,
-                    THEME.colors.main_fg
+                    THEME.colors.main_fg,
                     if proc.num_procs > self.select_max as u32 {
                         " "
                     } else {
@@ -1113,7 +1113,7 @@ impl ProcBox {
                 }
             }
 
-            selected = selected.split(" ")[0]..to_title_case();
+            selected = selected.split(" ")[0].to_title_case();
             if CONFIG.proc_mem_bytes {
                 label = label.replace("Mem%", "MemB");
             }
@@ -1139,9 +1139,9 @@ impl ProcBox {
             };
             let expand : u32 = proc.expand;
             let iw : u32 = (dw - 3) / (4 + expand);
-            let iw : u32 = iw - 1;
+            let iw2 : u32 = iw - 1;
 
-            out.push_str(format!("{}{}{}{}{}%{}{}",
+            out.push_str(format!("{}{}{}{}{}%{}{}{}",
                     mv::to(dy, dgx),
                     graphs.detailed_cpu.call(
                         if self.moved || match proc.details["killed".to_owned()] {
@@ -1199,8 +1199,8 @@ impl ProcBox {
             }
             out.push_str(format!("{} {}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{} {}{}{}{} {}{}{}{}{}{}{}{}{}{}",
                     mv::to(dy, dx + 1),
-                    format!("{:^first$.second$}", "Status:", first = iw, second = iw2)
-                    format!("{:^first$.second$}", "Elapsed:", first = iw, second = iw2)
+                    format!("{:^first$.second$}", "Status:", first = iw, second = iw2),
+                    format!("{:^first$.second$}", "Elapsed:", first = iw, second = iw2),
                     if dw > 28 {
                         format!("{:^first$.second$}", "Parent:", first = iw, second = iw2)
                     } else {
@@ -1306,7 +1306,7 @@ impl ProcBox {
                                     ProcCollectorDetails::Bool(b) => if b {1} else {0},
                                     ProcCollectorDetails::U32(u) => u,
                                     _ => {
-                                        errlog("ProcCollectorDetails contained non-numeric value for 'memory_percent'".to_owned())
+                                        errlog("ProcCollectorDetails contained non-numeric value for 'memory_percent'".to_owned());
                                         0
                                     }
                                 }
@@ -1331,24 +1331,60 @@ impl ProcBox {
                     errlog("Wrong type in proc.details['cmdline']");
                     0
                 },
-            } > d2 - 5 {
+            } > dw - 5 {
                 4
             } else {
                 5
             };
             for i in 0..(proc.details["cmdline"].len() as u32 / (dw - 5)) {
-                out.push_str(format!("{}{}",
+                if i == 0 {
+                    out.push_str(format!("{}{}",
                         mv::to(cy + i, dx + 3),
-                        format!("{:direction$width}",
+                        format!("{:^width$}",
                             if dw - 5 >= 0 {
                                 proc.details["cmdline".to_owned()][((dw-5)*i)..][..(dw-5)]
                             } else {
                                 proc.details["cmdline".to_owned()][((proc.details["cmdline".to_owned()].len() - 1 - 5)*i)..][..(proc.details["cmdline".to_owned()].len() - 1 -5)]
                             },
-                            direction = if i == 0 {
-                                "^"
+                            width = dw - 5,
+                        ),
+                    )
+                );
+                } else {
+                    out.push_str(format!("{}{}",
+                        mv::to(cy + i, dx + 3),
+                        format!("{:<width$}",
+                            if dw - 5 >= 0 {
+                                proc.details["cmdline".to_owned()][((dw-5)*i)..][..(dw-5)]
                             } else {
-                                "<"
+                                proc.details["cmdline".to_owned()][((proc.details["cmdline".to_owned()].len() - 1 - 5)*i)..][..(proc.details["cmdline".to_owned()].len() - 1 -5)]
+                            },
+                            width = dw - 5,
+                        ),
+                    )
+                );
+                }
+                if i == 0 {
+                    out.push_str(format!("{}{}",
+                        mv::to(cy + i, dx + 3),
+                        format!("{:^width$}",
+                            if dw - 5 >= 0 {
+                                proc.details["cmdline".to_owned()][((dw-5)*i)..][..(dw-5)]
+                            } else {
+                                proc.details["cmdline".to_owned()][((proc.details["cmdline".to_owned()].len() - 1 - 5)*i)..][..(proc.details["cmdline".to_owned()].len() - 1 -5)]
+                            },
+                            width = dw - 5,
+                        ),
+                    )
+                );
+                }
+                out.push_str(format!("{}{}",
+                        mv::to(cy + i, dx + 3),
+                        format!("{:<width$}",
+                            if dw - 5 >= 0 {
+                                proc.details["cmdline".to_owned()][((dw-5)*i)..][..(dw-5)]
+                            } else {
+                                proc.details["cmdline".to_owned()][((proc.details["cmdline".to_owned()].len() - 1 - 5)*i)..][..(proc.details["cmdline".to_owned()].len() - 1 -5)]
                             },
                             width = dw - 5,
                         ),
