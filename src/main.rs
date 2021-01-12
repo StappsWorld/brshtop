@@ -66,6 +66,7 @@ lazy_static! {
         }
     };
     static ref UNITS : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
+    static ref THREADS : u64 = 0;
 }
 
 pub fn main() {
@@ -210,7 +211,7 @@ pub fn main() {
     let USER_THEME_DIR = CONFIG_DIR.join("themes");
 
     let CORES = psutil::cpu::cpu_count_physical();
-    let THREADS = psutil::cpu::cpu_count();
+    THREADS = psutil::cpu::cpu_count();
 
     let THREAD_ERROR = 0;
 

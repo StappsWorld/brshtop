@@ -1414,7 +1414,7 @@ impl ProcBox {
         // * Start iteration over all processes and info
         let cy: u32 = 1;
 
-        for (n, (pid, items)) in proc.processes.enumerate() {
+        for (n, (pid, items)) in proc.processes.iter().enumerate() {
             if n < self.start {
                 continue;
             }
