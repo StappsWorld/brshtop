@@ -1,8 +1,15 @@
 use {
     crate::{
         brshtop_box::{Boxes, BrshtopBox},
-        config::{Config, ViewMode},
-        create_box, fx,
+        collector::Collector,
+        config::{
+            Config, 
+            ViewMode
+        },
+        create_box, 
+        draw::Draw,
+        fx,
+        fx::Fx,
         graph::{Graph, Graphs},
         key::Key,
         memcollector::MemCollector,
@@ -15,6 +22,7 @@ use {
         },
     },
     math::round::ceil,
+    inflector::Inflector,
     std::collections::HashMap,
 };
 
@@ -237,7 +245,9 @@ impl MemBox {
         CONFIG: &mut Config,
         meters: &mut Meters,
         THEME: &mut Theme,
-        key : &mut Key
+        key : &mut Key,
+        collector : &mut Collector,
+        draw : &mut Draw,
     ) {
         if self.parent.proc_mode {
             return;
@@ -317,7 +327,7 @@ impl MemBox {
                     }
                 }
             }
-            if key.mouse.contains_key(&"g".to_owned()) {
+            if !key.mouse.contains_key(&"g".to_owned()) {
                 let mut top = Vec::<Vec<i32>>::new();
                 for i in 0..5 {
                     let mut adder : Vec<i32> = Vec::<i32>::new();
@@ -369,6 +379,105 @@ impl MemBox {
                     .as_str()
                 );
             }
+            if collector.collect_interrupt {
+                return;
+            }
+            draw.buffer("mem_misc".to_owned(), vec![out_misc.clone()], false, false, 100, true, false, false, key);
         }
+        let mut cx : u32 = 1;
+        let mut cy : u32 = 1;
+
+        out.push_str(format!("{}{}{}Total:{:>width$}{}{}",
+                mv::to(y, x + 1),
+                THEME.colors.title,
+                fx::b,
+                mem.string["total".to_owned()],
+                fx::ub,
+                THEME.colors.main_fg,
+                width = self.mem_width - 9,
+            )
+            .as_str()
+        );
+        if self.graph_height > 0 {
+            gli = format!("{}{}{}{}{}{}{}{}",
+                mv::left(2),
+                THEME.colors.mem_box.call(symbol::title_right.to_owned(), term),
+                THEME.colors.div_line,
+                symbol::h_line.repeat(self.mem_width - 1),
+                if CONFIG.show_disks {
+                    "".to_owned()
+                } else {
+                    THEME.colors.mem_box.to_string()
+                },
+                symbol::title_left,
+                mv::l(self.mem_width - 1),
+                THEME.colors.title,
+            );
+            if self.graph_height >= 2 {
+                gbg = mv::left(1);
+                gmv = format!("{}{}", mv::left(self.mem_width - 2), mv::up(self.graph_height - 1));
+            }
+        }
+
+        let big_mem : bool = false;
+        for name in self.mem_names {
+            if collector.collect_interrupt {
+                return;
+            }
+            if self.mem_size > 2 {
+                out.push_str(format!("{}{}{:<width$}{}{}{}{}{}{}{:>4}",
+                        mv::to(y + cy, x + cx),
+                        gli,
+                        name.to_title_case()[if big_mem {
+                            
+                        } else {
+                            ..5
+                        }] + ":",
+                        mv::to(y + cy, x + cx + self.mem_width - 3 - mem.string[name].len() as u32),
+                        Fx::trans(mem.string[name]),
+                        mv::to(y + cy + 1, x + cx),
+                        gbg,
+                        match meters.mem[name] {
+                            MeterUnion::Meter(m) => m.call(if self.parent.resized {
+                                None
+                            } else {
+                                Some(mem.percent[name])
+                            }, term),
+                            MeterUnion::Graph(g) => g.call(if self.parent.resized {
+                                None
+                            } else {
+                                Some(mem.percent[name])
+                            }, term),
+                        },
+                        gmv,
+                        mem.percent[name].to_string() + "%",
+                        width = if big_mem {
+                            1.0
+                        } else {
+                            6.6
+                        }
+                    )
+                    .as_str()
+                );
+                cy += if self.graph_height == 0 {
+                    2
+                } else {
+                    self.graph_height + 1
+                };
+            } else {
+                out.push_str( format!("{}{:width$} {}{}{:width2$}",
+                        mv::to(y + cy, x + cx),
+                        name.to_title_case()[if big_mem {
+
+                        } else {
+                            ..5
+                        }] + ":",
+                        
+                    )
+                    .as_str()
+                );
+            }
+        }
+        
     }
 }
