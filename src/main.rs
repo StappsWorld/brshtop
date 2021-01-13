@@ -13,6 +13,7 @@ mod fx;
 mod graph;
 mod key;
 mod membox;
+mod memcollector;
 mod menu;
 mod meter;
 mod mv;
@@ -28,6 +29,7 @@ mod term;
 mod theme;
 mod timeit;
 //mod updatechecker;
+
 use {
     crate::{
         brshtop_box::{Boxes, BrshtopBox, SubBoxes},

@@ -1156,7 +1156,7 @@ impl ProcCollector {
     }
 
     /// JUST CALL ProcBox.draw_fg()
-    pub fn draw(&mut self, procbox : &mut ProcBox, CONFIG: &mut Config, key : &mut Key, THEME : &mut Theme, graphs : &mut Graphs, term : &mut Term, draw : &mut Draw) {
-        procbox.draw_fg(CONFIG, key, THEME, graphs, term, draw, self)
+    pub fn draw(&mut self, procbox : &mut ProcBox, CONFIG: &mut Config, key : &mut Key, THEME : &mut Theme, graphs : &mut Graphs, term : &mut Term, draw : &mut Draw, menu : &mut Menu) {
+        procbox.draw_fg(CONFIG, key, THEME, graphs, term, draw, self, menu)
     }
 }
