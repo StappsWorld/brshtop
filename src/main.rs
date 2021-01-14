@@ -11,6 +11,7 @@ mod error;
 mod event;
 mod fx;
 mod graph;
+mod init;
 mod key;
 mod membox;
 mod memcollector;

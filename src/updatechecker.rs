@@ -6,8 +6,8 @@ use {
 };
 
 pub struct UpdateChecker {
-    version: String,
-    thread: Option<thread::JoinHandle<()>>,
+    pub version: String,
+    pub thread: Option<thread::JoinHandle<()>>,
 }
 impl UpdateChecker {
     pub fn new() -> Self {

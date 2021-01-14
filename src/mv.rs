@@ -17,3 +17,6 @@ pub fn down(n: u32) -> String {
 pub fn to(line: u32, col: u32) -> String {
     format!("\033[{};{}f", line, col)
 }
+
+pub const save : String = String::from("\033[s");
+pub const restore : String = String::from("\033[u");

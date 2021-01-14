@@ -1,8 +1,13 @@
-use crate::{mv, symbol, theme::Color, term::Term};
-use maplit::hashmap;
-use std::collections::HashMap;
-use std::fmt::{self, Display, Formatter};
-use math::round::ceil;
+use  {
+    crate::{mv, symbol, theme::Color, term::Term};
+    maplit::hashmap,
+    std::{
+        collections::HashMap,
+        fmt::{self, Display, Formatter},
+        default::Default,
+    },
+    math::round::ceil,
+};
 
 pub struct Graphs {
     pub cpu: HashMap<String, Graph>,
@@ -17,7 +22,7 @@ pub struct Graphs {
 // FIXME
 // REMINDER: i store Colors, py stores Strings, convert them to escapes when used :)
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Graph {
     pub out: String,
     pub width: u32,
