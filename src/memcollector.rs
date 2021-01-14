@@ -30,8 +30,8 @@ pub enum DiskInfo {
     None,
 }
 
-pub struct MemCollector {
-    pub parent: Collector,
+pub struct MemCollector<'a> {
+    pub parent: Collector<'a>,
     pub values: HashMap<String, Bytes>,
     pub vlist: HashMap<String, Vec<Bytes>>,
     pub percent: HashMap<String, Bytes>,
@@ -48,7 +48,7 @@ pub struct MemCollector {
     pub excludes: Vec<FileSystem>,
     pub buffer: String,
 }
-impl MemCollector {
+impl<'a> MemCollector<'a> {
     pub fn new(membox: &mut MemBox) -> Self {
         let mem = MemCollector {
             parent: Collector::new(),

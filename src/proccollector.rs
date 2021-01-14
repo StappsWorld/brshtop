@@ -6,10 +6,15 @@ use {
         brshtop_box::{Boxes, BrshtopBox},
         collector::Collector,
         config::{Config, SortingOption},
+        draw::Draw,
         error::{errlog, throw_error},
         floating_humanizer,
+        graph::Graphs,
+        key::Key,
+        menu::Menu,
         procbox::ProcBox,
         SYSTEM,
+        term::Term,
         THREADS,
     },
     core::time::Duration,
@@ -28,6 +33,7 @@ use {
         cmp::Ordering,
         collections::HashMap,
         convert::TryInto,
+        fmt::Display,
         path::Path,
         time::{Duration, Instant},
     },
@@ -112,8 +118,8 @@ pub enum ProcessInfo {
 }
 
 #[derive(Clone)]
-pub struct ProcCollector {
-    pub parent: Collector,
+pub struct ProcCollector<'a> {
+    pub parent: Collector<'a>,
     pub buffer: String,
     pub search_filter: String,
     pub processes: HashMap<Pid, HashMap<String, ProcessInfo>>,
@@ -129,7 +135,7 @@ pub struct ProcCollector {
     pub tree_counter: usize,
     pub p_values: Vec<String>,
 }
-impl ProcCollector {
+impl<'a> ProcCollector<'a> {
     pub fn new(buffer: String) -> Self {
         let mut proc = ProcCollector {
             parent: Collector::new(),
@@ -783,7 +789,7 @@ impl ProcCollector {
                                     Ok(o) => match o {
                                         Some(s) => ProcCollectorDetails::String(s),
                                         None => {
-                                            errlog(format!("Error getting cmdline from process (error {:?})", e));
+                                            errlog("Error getting cmdline from process".to_owned());
                                             ProcCollectorDetails::F32(0.0)
                                         }
                                     },

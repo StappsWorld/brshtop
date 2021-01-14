@@ -28,8 +28,8 @@ pub enum NetCollectorStat {
 }
 
 #[derive(Clone)]
-pub struct NetCollector {
-    pub parent: Collector,
+pub struct NetCollector<'a> {
+    pub parent: Collector<'a>,
     pub buffer: String,
     pub nics: Vec<String>,
     pub nic_i: i32,
@@ -48,7 +48,7 @@ pub struct NetCollector {
     pub sync_top: i32,
     pub sync_string: String,
 }
-impl NetCollector {
+impl<'a> NetCollector<'a> {
     pub fn new(netbox: &mut NetBox, CONFIG: &mut Config) -> Self {
         NetCollector {
             parent: Collector::new(),

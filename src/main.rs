@@ -27,6 +27,7 @@ mod subbox;
 mod symbol;
 mod term;
 mod theme;
+mod timer;
 mod timeit;
 //mod updatechecker;
 
@@ -58,7 +59,7 @@ use {
 };
 
 lazy_static! {
-    static ref CONFIG_DIR: Path = Path::default();
+    static ref CONFIG_DIR: &'static Path = &Path::new(".");
     static ref SYSTEM: String = String::default();
     static ref CPU_NAME: String = match cpuid::identify() {
         Ok(info) => info.codename,
@@ -315,7 +316,7 @@ pub fn main() {
             .collect::<Vec<String>>(),
     );
     //Units for floating_humanizer function
-    UNITS : HashMap<String, Vec<String>> = vec![
+    UNITS = vec![
         (
             "bit".to_owned(),
             [
@@ -566,7 +567,7 @@ pub fn units_to_bytes(value : String) -> u64 {
     }
 
     if units.contains_key(value[value.len() - 2].to_ascii_lowercase()) {
-        mult = units.get(value[value.len() - 2].to_ascii_lowercase()).unwrap()
+        mult = units.get(value[value.len() - 2].to_ascii_lowercase()).unwrap();
         value = value[..value.len() - 2];
     }
 

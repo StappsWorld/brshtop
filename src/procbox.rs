@@ -6,6 +6,7 @@ use {
         create_box,
         draw::Draw,
         errlog,
+        floating_humanizer,
         fx,
         graph::{Graph, Graphs},
         key::Key,
@@ -22,9 +23,12 @@ use {
         theme::{Color, Theme},
     },
     inflector::Inflector,
-    psutil::process::{
-        Status,
-        MemoryInfo,
+    psutil::{
+        Bytes,
+        process::{
+            Status,
+            MemoryInfo,
+        },
     },
     std::{
         collections::HashMap,
@@ -1530,7 +1534,7 @@ impl ProcBox {
                 offset = prog_len as u32 - 1;
             }
             if cpu > 1.0 || graphs.pid_cpu.contains_key(pid) {
-                if !graph.pid_cpu.contains_key(pid) {
+                if !graphs.pid_cpu.contains_key(pid) {
                     graphs.pid_cpu.insert(pid,Graph::new(5, 1, None, vec![0], term, false, 0, 0, None));
                     self.pid_counter.insert(pid, 0);
                 } else if cpu < 1.0 {
@@ -1802,9 +1806,9 @@ impl ProcBox {
         if self.count == 100 {
             self.count = 0;
             for (pid, _) in self.pid_counter {
-                if !psutil::process::exists(pid) {
-                    self.pid_counter.remove(&p);
-                    graphs.pid_cpu.remove(&p);
+                if !psutil::process::pid_exists(pid) {
+                    self.pid_counter.remove(&pid);
+                    graphs.pid_cpu.remove(&pid);
                 }
             }
         }

@@ -23,8 +23,8 @@ use sys_info::*;
 use which::which;
 
 #[derive(Clone)]
-pub struct CpuCollector {
-    pub parent: Collector,
+pub struct CpuCollector<'a> {
+    pub parent: Collector<'a>,
     pub cpu_usage: Vec<Vec<u32>>,
     pub cpu_temp: Vec<Vec<u32>>,
     pub cpu_temp_high: i32,
@@ -39,7 +39,7 @@ pub struct CpuCollector {
     pub sensor_swap: bool,
     pub cpu_temp_only: bool,
 }
-impl CpuCollector {
+impl<'a> CpuCollector<'a> {
     pub fn new(THREADS: u64) -> Self {
         let mut cpu_usage_mut = Vec::<Vec<u32>>::new();
         let mut cpu_temp_mut = Vec::<Vec<u32>>::new();
