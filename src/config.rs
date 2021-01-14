@@ -1,5 +1,5 @@
 use {
-    crate::{error::throw_error},
+    crate::{error::throw_error, VERSION},
     lenient_bool::LenientBool,
     psutil::sensors::*,
     std::{
@@ -219,7 +219,7 @@ pub struct Config {
     pub _initialized: bool,
 }
 impl Config {
-    pub fn new(path: PathBuf, version: String) -> Result<Self, &'static str> {
+    pub fn new(path: PathBuf) -> Result<Self, &'static str> {
         let mut cpu_sensors_mut: Vec<String> = vec!["Auto".into()];
         let mut num = 1;
         for res in temperatures() {
@@ -342,7 +342,7 @@ impl Config {
 
         match conf.get(&"version".to_owned()) {
             Some(ConfigItem::Str(s)) => {
-                if *s != version {
+                if s.clone() != VERSION {
                     initializing_config.recreate = true;
                     initializing_config.warnings.push("Config file version and brshtop version mismatch, will be recreated on exit!".to_owned())
                 }

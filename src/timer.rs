@@ -48,6 +48,7 @@ pub struct Timer {
     pub fn finish(&mut self, key : &mut Key, CONFIG : &mut Config) {
         self.return_zero = true;
         self.timestamp = SystemTime::now().checked_sub(Duration::from_millis(CONFIG.update_ms as u64)).unwrap();
+        key.break_wait();
     }
 
 }

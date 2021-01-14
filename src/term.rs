@@ -49,7 +49,6 @@ pub struct Term {
 }
 impl Term {
     pub fn new() -> Self {
-        let (winch_s_mut, winch_r_mut) = channel::<Event>();
         Term {
             width: 0,
             height: 0,

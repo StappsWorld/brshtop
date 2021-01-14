@@ -29,7 +29,7 @@ mod term;
 mod theme;
 mod timer;
 mod timeit;
-//mod updatechecker;
+mod updatechecker;
 
 use {
     crate::{
@@ -70,6 +70,7 @@ lazy_static! {
     };
     static ref UNITS : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
     static ref THREADS : u64 = 0;
+    static ref VERSION : String = clap::crate_version!();
 }
 
 pub fn main() {
@@ -92,7 +93,7 @@ pub fn main() {
 
     //Argument Parsing
     let matches = App::new("brshtop")
-        .version(clap::crate_version!())
+        .version(VERSION)
         .author(
             ("Aristocratos (jakob@qvantnet.com)\n".to_owned()
                 + "Samuel Rembisz <sjrembisz07@gmail.com)\n"
@@ -152,8 +153,6 @@ pub fn main() {
     }
 
     let DEBUG = arg_debug.is_some();
-
-    let VERSION = clap::crate_version!();
 
     // Variables
 
@@ -331,17 +330,17 @@ pub fn main() {
         ),
     ].iter(|(s,v)| (s.clone(), v.iter().cloned().collect())).collect::<HashMap<String, Vec<String>>>();
 
-    let CONFIG = match Config::new(CONFIG_FILE.clone(), VERSION.to_owned()) {
+    let CONFIG = match Config::new(CONFIG_FILE.clone()) {
         Ok(c) => c,
         Err(e) => {
             throw_error(e);
-            Config::new(CONFIG_FILE.clone(), VERSION.to_owned()).unwrap() //Never reached, but compiler is unhappy, so I bend
+            Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
         }
     };
 
     errlog(format!(
         "New instance of brshtop version {} started with pid {}",
-        VERSION.to_owned(),
+        VERSION,
         std::process::id()
     ));
     errlog(format!(
