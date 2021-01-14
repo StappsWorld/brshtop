@@ -19,7 +19,7 @@ use {
         mv,
         netbox::NetBox,
         netcollector::NetCollector,
-        proc_collector::ProcCollector,
+        proccollector::ProcCollector,
         symbol,
         term::Term,
         theme::{Color, Colors, Theme},
@@ -493,16 +493,18 @@ impl Menu {
                 let mut page: i32 = 1;
                 out_misc.push_str(
                     create_box(
-                        x as i32,
-                        y as i32,
-                        w as i32,
-                        (h + 3) as i32,
+                        x,
+                        y,
+                        w,
+                        h + 3,
                         Some("help".to_owned()),
                         None,
                         Some(theme.colors.div_line),
                         None,
                         true,
                         None,
+                        term,
+                        theme,
                     )
                     .as_str(),
                 );
@@ -724,7 +726,7 @@ impl Menu {
         cpucollector: &mut CpuCollector,
         netbox: &mut NetBox,
         DEFAULT_THEME: HashMap<String, String>,
-        proc_collector: ProcCollector,
+        proc_collector: &mut ProcCollector,
         collectors: Vec<Collectors>,
     ) {
         let mut out: String = String::default();
@@ -1156,16 +1158,18 @@ impl Menu {
                 let mut selected_int: usize = 0;
                 out_misc.push_str(
                     create_box(
-                        x as i32,
-                        y as i32,
-                        w as i32,
-                        h as i32 + 2,
+                        x,
+                        y,
+                        w,
+                        h + 2,
                         Some("options".to_owned()),
                         None,
                         None,
                         None,
                         false,
                         None,
+                        term,
+                        theme,
                     )
                     .as_str(),
                 );
@@ -1385,16 +1389,18 @@ impl Menu {
                         }
                         out.push_str(
                             create_box(
-                                x2 as i32,
-                                y2 as i32,
-                                w2 as i32,
-                                h2 as i32,
+                                x2,
+                                y2,
+                                w2,
+                                h2,
                                 Some("description".to_owned()),
                                 None,
                                 Some(THEME.colors.div_line),
                                 None,
                                 true,
                                 None,
+                                term,
+                                theme,
                             )
                             .as_str(),
                         );
@@ -1631,8 +1637,7 @@ impl Menu {
                     && CONFIG.tree_depth > 0
                 {
                     CONFIG.tree_depth -= 1;
-                    // TODO : HashMap types
-                    proc_collector.collapsed = HashMap::new();
+                    proc_collector.collapsed = HashMap::<u64, bool>::new();
                 } else if ["left", "right"]
                     .iter()
                     .map(|s| s.to_owned())
@@ -1745,7 +1750,8 @@ impl Menu {
                     .contains(key)
                     && selected == "proc_sorting".to_owned()
                 {
-                    proc_collector.sorting(key);
+                    // TODO : Need to figure out how to do this...
+                    // proc_collector.sorting(key);
                 } else if ["left", "right"]
                     .iter()
                     .map(|s| s.to_owned())

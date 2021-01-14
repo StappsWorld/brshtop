@@ -110,7 +110,6 @@ impl BrshtopBox {
 
     pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, THREADS: u64, term: &mut Term) {
         for sub in boxes {
-            //TODO : Fill in rest of sub-boxes
             match sub {
                 Boxes::BrshtopBox(b) => (),
                 Boxes::CpuBox(b) => {
@@ -118,16 +117,16 @@ impl BrshtopBox {
                     b.resized = true;
                 },
                 Boxes::MemBox(b) => {
-                    b.calc_sizes(boxes);
-                    b.resized = true;
+                    b.calc_size(term, self, CONFIG);
+                    b.parent.resized = true;
                 },
                 Boxes::NetBox(n) => {
-                    n.calc_sizes(boxes);
-                    n.resized = true;
+                    n.calc_size(term, self);
+                    n.parent.resized = true;
                 },
                 Boxes::ProcBox(p) => {
-                    p.calc_sizes(boxes);
-                    p.resized = true;
+                    p.calc_size(term, self);
+                    p.parent.resized = true;
                 }
             }
         }
@@ -335,16 +334,15 @@ impl BrshtopBox {
         theme: &mut Theme,
         term: &mut Term,
     ) {
-        // TODO : Handle the rest of the possible boxes...
         draw.buffer(
             "bg".to_owned(),
             subclasses
                 .into_iter()
                 .map(|b| match b {
                     Boxes::CpuBox(cb) => cb.draw_bg(key, theme, term, config),
-                    Boxes::MemBox(mb) => mb.draw_bg(key, theme, term, config),
-                    Boxes::NetBox(nb) => nb.draw_bg(key, theme, term, config),
-                    Boxes::ProcBox(pb) => pb.draw_bg(key, theme, term, config),
+                    Boxes::MemBox(mb) => mb.draw_bg(theme, CONFIG, term),
+                    Boxes::NetBox(nb) => nb.draw_bg(theme),
+                    Boxes::ProcBox(pb) => pb.draw_bg(theme),
                     _ => String::default(),
                 })
                 .collect(),

@@ -205,7 +205,7 @@ impl<'a> MemCollector<'a> {
         let mut io_string: String = String::default();
         let mut u_percent: u32 = 0;
         let mut disk_list: Vec<String> = Vec::<String>::new();
-        self.disks = HashMap::<String, HashMap<String, String>>::new(); // TODO : Fix types
+        self.disks = HashMap::<String, HashMap<String, DiskInfo>>::new();
 
         if CONFIG.disks_filter.len() > 0 {
             if CONFIG.disks_filter.starts_with("exclude=") {

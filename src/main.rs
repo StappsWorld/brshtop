@@ -28,8 +28,8 @@ mod subbox;
 mod symbol;
 mod term;
 mod theme;
-mod timer;
 mod timeit;
+mod timer;
 mod updatechecker;
 
 use {
@@ -69,9 +69,9 @@ lazy_static! {
             String::default()
         }
     };
-    static ref UNITS : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
-    static ref THREADS : u64 = 0;
-    static ref VERSION : String = clap::crate_version!();
+    static ref UNITS: HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
+    static ref THREADS: u64 = 0;
+    static ref VERSION: String = clap::crate_version!();
 }
 
 pub fn main() {
@@ -321,15 +321,23 @@ pub fn main() {
             "bit".to_owned(),
             [
                 "bit", "Kib", "Mib", "Gib", "Tib", "Pib", "Eib", "Zib", "Yib", "Bib", "GEb",
-            ].iter().map(|s| s.to_owned()).collect::<Vec<String>>()
+            ]
+            .iter()
+            .map(|s| s.to_owned())
+            .collect::<Vec<String>>(),
         ),
         (
             "byte".to_owned(),
             [
                 "Byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "BiB", "GEB",
-            ].iter().map(|s| s.to_owned()).collect::<Vec<String>>()
+            ]
+            .iter()
+            .map(|s| s.to_owned())
+            .collect::<Vec<String>>(),
         ),
-    ].iter(|(s,v)| (s.clone(), v.iter().cloned().collect())).collect::<HashMap<String, Vec<String>>>();
+    ]
+    .iter(|(s, v)| (s.clone(), v.iter().cloned().collect()))
+    .collect::<HashMap<String, Vec<String>>>();
 
     let CONFIG = match Config::new(CONFIG_FILE.clone()) {
         Ok(c) => c,
@@ -361,18 +369,157 @@ pub fn main() {
 
 /// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
 pub fn create_box(
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
     title: Option<String>,
     title2: Option<String>,
     line_color: Option<Color>,
     title_color: Option<Color>,
     fill: bool,
     box_to_use: Option<Boxes>,
+    term: &mut Term,
+    THEME: &mut Theme,
 ) -> String {
-    String::default()
+    let mut out: String = format!("{}{}", term.fg, term.bg);
+    let mut lc: Color = match line_color {
+        Some(c) => c,
+        None => THEME.colors.div_line,
+    };
+    let mut tc: Color = match title_color {
+        Some(c) => c,
+        None => THEME.colors.title,
+    };
+
+    let mut wx: u32 = x;
+    let mut wy: u32 = y;
+    let mut ww: u32 = width;
+    let mut wh: u32 = height;
+    let mut wt: String = match title {
+        Some(s) => s.clone(),
+        None => String::default(),
+    };
+    // * Get values from box class if given
+    match box_to_use {
+        Some(o) => match o {
+            Boxes::BrshtopBox(b) => {
+                wx = b.x;
+                wy = b.y;
+                ww = b.width;
+                wh = b.height;
+                wt = b.name.clone();
+            }
+            Boxes::CpuBox(b) => {
+                wx = b.x;
+                wy = b.y;
+                ww = b.parent.width;
+                wh = b.parent.height;
+                wt = b.name.clone();
+            }
+            Boxes::MemBox(b) => {
+                wx = b.x;
+                wy = b.y;
+                ww = b.parent.width;
+                wh = b.parent.height;
+                wt = b.name.clone();
+            }
+            Boxes::NetBox(b) => {
+                wx = b.x;
+                wy = b.y;
+                ww = b.parent.width;
+                wh = b.parent.height;
+                wt = b.name.clone();
+            }
+            Boxes::ProcBox(b) => {
+                wx = b.parent.x;
+                wy = b.parent.y;
+                ww = b.parent.width;
+                wh = b.parent.height;
+                wt = b.name.clone();
+            }
+        },
+        None => (),
+    };
+    let hlines: Vec<u32> = vec![wy, wy + wh - 1];
+
+    out.push_str(lc.to_string().as_str());
+
+    // * Draw all horizontal lines
+    for hpos in hlines {
+        out.push_str(format!("{}{}", mv::to(hpos, wx), symbol::h_line.repeat(ww - 1)).as_str());
+    }
+
+    // * Draw all vertical lines and fill if enabled
+    for hpos in hlines[0] + 1..hlines[1] {
+        out.push_str(
+            format!(
+                "{}{}{}",
+                mv::to(hpos, wx),
+                symbol::v_line,
+                if fill {
+                    " ".repeat(ww - 2)
+                } else {
+                    mv::right(ww - 2)
+                },
+                symbol::v_line
+            )
+            .as_str(),
+        );
+    }
+
+    // * Draw corners
+    out.push_str(
+        format!(
+            "{}{}{}{}{}{}{}{}",
+            mv::to(wy, wx),
+            symbol::left_up,
+            mv::to(wt, wx + ww - 1),
+            symbol::right_up,
+            mv::to(wy + wh - 1, wx),
+            symbol::left_down,
+            mv::to(wy + wh - 1, wx + ww - 1),
+            symbol::right_down,
+        )
+        .as_str(),
+    );
+
+    // * Draw titles if enabled
+    match title {
+        Some(s) => out.push_str(
+            format!(
+                "{}{}{}{}{}{}{}{}",
+                mv::to(wy, wx + 2),
+                symbol::title_left,
+                tc,
+                fx::b,
+                s,
+                fx::ub,
+                lc,
+                symbol::title_right
+            )
+            .as_str(),
+        ),
+        None => (),
+    };
+
+    match title2 {
+        Some(s) => out.push_str(
+            format!(
+                "{}{}{}{}{}{}{}{}",
+                mv::to(hlines[1], wx + 2),
+                symbol::title_left,
+                tc,
+                fx::b,
+                s,
+                fx::ub,
+                lc,
+                symbol::title_right,
+            )
+            .as_str(),
+        ),
+        None => (),
+    }
 }
 
 pub fn readfile(file: File) -> Option<String> {
@@ -480,22 +627,21 @@ pub fn floating_humanizer(
     start: usize,
     short: bool,
 ) -> String {
-
-    let mut out : String = String::default();
-    let mut mult : f64 = if bit {8.0} else {1.0};
-    let mut selector : usize = start;
-    let mut unit : Vec<String> = if bit {
+    let mut out: String = String::default();
+    let mut mult: f64 = if bit { 8.0 } else { 1.0 };
+    let mut selector: usize = start;
+    let mut unit: Vec<String> = if bit {
         UNITS["bit".to_owned()]
     } else {
         UNITS["byte".to_owned()]
     };
 
-    let mut working_val : f64 = f64::round(value * 100 * mult);
+    let mut working_val: f64 = f64::round(value * 100 * mult);
     if working_val < 0.0 {
-        working_val = 0.0; 
+        working_val = 0.0;
     }
 
-    let mut broke : bool = false;
+    let mut broke: bool = false;
     while working_val.to_string().len() > 5 && working_val >= 102400 {
         working_val >>= 10;
         if working_val < 100 {
@@ -507,9 +653,13 @@ pub fn floating_humanizer(
     }
     if !broke {
         if working_val.to_string().len() == 4 && selector > 0 {
-            out = working_val.to_string()[..working_val.to_string().len() - 3] + "." + working_val.to_string()[working_val.to_string().len() - 3];
+            out = working_val.to_string()[..working_val.to_string().len() - 3]
+                + "."
+                + working_val.to_string()[working_val.to_string().len() - 3];
         } else if working_val.to_string().len() == 3 && selector > 0 {
-            out = working_val.to_string()[..working_val.to_string().len() - 3] + "." + working_val.to_string()[(working_val.to_string().len() - 3)..];
+            out = working_val.to_string()[..working_val.to_string().len() - 3]
+                + "."
+                + working_val.to_string()[(working_val.to_string().len() - 3)..];
         } else if working_val.to_string().len() >= 2 {
             out = working_val.to_string()[..working_val.to_string().len() - 3];
         } else {
@@ -526,39 +676,37 @@ pub fn floating_humanizer(
             selector += 1;
         }
     }
-    out.push_str(format!("{}{}",
-            if short {
-                ""
-            } else {
-                " "
-            },
+    out.push_str(
+        format!(
+            "{}{}",
+            if short { "" } else { " " },
             if short {
                 unit[selector][0]
             } else {
                 unit[selector]
             }
         )
-        .as_str()
+        .as_str(),
     );
     if per_second {
-        out.push_str(if bit {"ps"} else {"/s"});
+        out.push_str(if bit { "ps" } else { "/s" });
     }
 
     out
 }
 
-pub fn units_to_bytes(value : String) -> u64 {
+pub fn units_to_bytes(value: String) -> u64 {
     if value.len() == 0 {
         return 0;
     }
-    let mut out : u32 = 0;
-    let mut mult : u32 = 0;
-    let mut bit : bool = false;
-    let mut value_i : u64 = 0;
-    let mut units : HashMap<String, u32> = HashMap::<String, u32>::new();
+    let mut out: u32 = 0;
+    let mut mult: u32 = 0;
+    let mut bit: bool = false;
+    let mut value_i: u64 = 0;
+    let mut units: HashMap<String, u32> = HashMap::<String, u32>::new();
     if value.to_ascii_lowercase().ends_with('s') {
         value = value[..value.len() - 2];
-    } 
+    }
     if value.to_ascii_lowercase().ends_with("bit") {
         bit = true;
         value = value[..value.len() - 4];
@@ -567,14 +715,18 @@ pub fn units_to_bytes(value : String) -> u64 {
     }
 
     if units.contains_key(value[value.len() - 2].to_ascii_lowercase()) {
-        mult = units.get(value[value.len() - 2].to_ascii_lowercase()).unwrap();
+        mult = units
+            .get(value[value.len() - 2].to_ascii_lowercase())
+            .unwrap();
         value = value[..value.len() - 2];
     }
 
-    if value.contains('.') && match value.replace(".", "").parse::<u64>() {
-        Ok(_) => true,
-        Err(_) => false,
-    } {
+    if value.contains('.')
+        && match value.replace(".", "").parse::<u64>() {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    {
         if mult > 0 {
             value_i = ((value.parse::<u64>() as f64) * 1024.0) as u64;
             mult -= 1;

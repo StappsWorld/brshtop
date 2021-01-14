@@ -125,8 +125,8 @@ impl Term {
             draw.now(
                 vec![
                     create_box(
-                        (self._w / 2) as i32 - 25,
-                        (self._h / 2) as i32 - 2,
+                        (self._w / 2) - 25,
+                        (self._h / 2) - 2,
                         50,
                         3,
                         Some(String::from("resizing")),
@@ -135,6 +135,8 @@ impl Term {
                         Some(Color::White()),
                         true,
                         None,
+                        term,
+                        theme,
                     ),
                     format!(
                         "{}{}{}{}Width : {}   Height: {}{}{}{}",
@@ -157,8 +159,8 @@ impl Term {
                 draw.now(
                     vec![
                         create_box(
-                            (self._w / 2) as i32 - 25,
-                            (self._h / 2) as i32 - 2,
+                            (self._w / 2) - 25,
+                            (self._h / 2) - 2,
                             50,
                             5,
                             Some(String::from("warning")),
@@ -167,6 +169,8 @@ impl Term {
                             Some(Color::White()),
                             true,
                             None,
+                            term,
+                            theme,
                         ),
                         format!(
                             "{}{}{}{}Width: {}{}   ",

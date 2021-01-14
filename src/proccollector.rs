@@ -41,7 +41,6 @@ use {
 };
 
 #[derive(Clone, Display)]
-// TODO : Fix rest of detail types
 pub enum ProcCollectorDetails {
     Bool(bool),
     Status(Status),
@@ -127,7 +126,7 @@ pub struct ProcCollector<'a> {
     pub det_cpu: f64,
     pub detailed: bool,
     pub detailed_pid: Option<Pid>,
-    pub details: HashMap<String, ProcCollectorDetails>, // TODO : Fix types
+    pub details: HashMap<String, ProcCollectorDetails>,
     pub details_cpu: Vec<u32>,
     pub details_mem: Vec<u32>,
     pub expand: u32,

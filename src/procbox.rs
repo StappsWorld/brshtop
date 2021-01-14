@@ -114,7 +114,7 @@ impl ProcBox {
         self.parent.resized = true;
     }
 
-    pub fn draw_bg(&mut self, theme: &mut Theme) -> String {
+    pub fn draw_bg(&mut self, theme: &mut Theme, term : &mut Term) -> String {
         if self.parent.stat_mode {
             return String::default();
         }
@@ -129,6 +129,8 @@ impl ProcBox {
             None,
             true,
             Some(Boxes::ProcBox(self)),
+            term,
+            theme,
         );
     }
 

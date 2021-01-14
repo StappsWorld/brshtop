@@ -192,6 +192,8 @@ impl MemBox {
                     None,
                     true,
                     Boxes::MemBox(self),
+                    term,
+                    THEME,
                 )
                 .as_str(),
             );

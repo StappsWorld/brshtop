@@ -168,7 +168,9 @@ impl CpuBox {
                 Some(theme.colors.cpu_box),
                 None,
                 true,
-                Some(Boxes::CpuBox(self))
+                Some(Boxes::CpuBox(self)),
+                term,
+                theme,
             ),
             mv::to(self.y, self.x + 10),
             theme
@@ -184,10 +186,10 @@ impl CpuBox {
                 .cpu_box
                 .call(symbol::title_right.to_owned(), term),
             create_box(
-                self.sub.box_x as i32,
-                self.sub.box_y as i32,
-                self.sub.box_width as i32,
-                self.sub.box_height as i32,
+                self.sub.box_x,
+                self.sub.box_y,
+                self.sub.box_width,
+                self.sub.box_height,
                 Some(if config.custom_cpu_name != String::default() {
                     CPU_NAME[..self.sub.box_width as usize - 14].to_owned()
                 } else {
@@ -197,7 +199,9 @@ impl CpuBox {
                 Some(theme.colors.div_line),
                 None,
                 true,
-                Some(Boxes::CpuBox(self))
+                Some(Boxes::CpuBox(self)),
+                term,
+                theme,
             )
         );
     }
@@ -482,7 +486,6 @@ impl CpuBox {
             }
 
             if self.resized {
-                // TODO : Fix meter initialization, invert=true
                 meters.battery = Meter::new(
                     self.battery_percent as i32, 
                     10, 
@@ -765,7 +768,6 @@ impl CpuBox {
             .as_str()
         );
 
-        // TODO : Fix buffer call, only_save = menu.active
         draw.buffer(
             self.buffer, 
             vec![format!("{}{}{}", 

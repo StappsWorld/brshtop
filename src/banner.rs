@@ -1,5 +1,5 @@
 use {
-    crate::{mv, theme::Color, BANNER_SRC, term::Term},
+    crate::{draw::Draw, mv, theme::Color, BANNER_SRC, term::Term, key::Key,},
     lazy_static::lazy_static,
 };
 lazy_static! {
@@ -63,7 +63,9 @@ pub fn draw_banner(
     mut col: u32, /*TODO: Same*/
     center: bool,
     now: bool,
-    term : &mut Term
+    term : &mut Term,
+    draw : &mut Draw,
+    key : &mut Key,
 ) -> String {
     let mut out = String::new();
     if center {
@@ -77,8 +79,7 @@ pub fn draw_banner(
     out.push_str(&term.fg.to_string());
 
     if now {
-        // TODO:
-        // Draw.out(out)
+        draw.out(vec![out], false, key);
     } else {
         return out;
     }

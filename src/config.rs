@@ -147,6 +147,24 @@ impl Display for SortingOption {
         }
     }
 }
+impl From<String> for SortingOption {
+    fn from(x : String) -> SortingOption {
+        match x.to_lowercase().as_str() {
+            "pid" => SortingOption::Pid,
+            "program" => SortingOption::Program,
+            "arguments" => SortingOption::Arguments,
+            "threads" => SortingOption::Threads,
+            "user" => SortingOption::User,
+            "memory" => SortingOption::Memory,
+            "cpu" => SortingOption::Cpu{lazy : false},
+            "cpu lazy" => SortingOption::Cpu{lazy : true},
+            _ => {
+                errlog(format!("Unable to convert {} to sortingoption. Defaulting to Arguments", x.clone()));
+                SortingOption::Arguments
+            }
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConfigAttr {
