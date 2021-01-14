@@ -545,3 +545,52 @@ pub fn floating_humanizer(
 
     out
 }
+
+pub fn units_to_bytes(value : String) -> u64 {
+    if value.len() == 0 {
+        return 0;
+    }
+    let mut out : u32 = 0;
+    let mut mult : u32 = 0;
+    let mut bit : bool = false;
+    let mut value_i : u64 = 0;
+    let mut units : HashMap<String, u32> = HashMap::<String, u32>::new();
+    if value.to_ascii_lowercase().ends_with('s') {
+        value = value[..value.len() - 2];
+    } 
+    if value.to_ascii_lowercase().ends_with("bit") {
+        bit = true;
+        value = value[..value.len() - 4];
+    } else if value.to_ascii_lowercase().ends_with("byte") {
+        value = value[..value.len() - 5];
+    }
+
+    if units.contains_key(value[value.len() - 2].to_ascii_lowercase()) {
+        mult = units.get(value[value.len() - 2].to_ascii_lowercase()).unwrap()
+        value = value[..value.len() - 2];
+    }
+
+    if value.contains('.') && match value.replace(".", "").parse::<u64>() {
+        Ok(_) => true,
+        Err(_) => false,
+    } {
+        if mult > 0 {
+            value_i = ((value.parse::<u64>() as f64) * 1024.0) as u64;
+            mult -= 1;
+        } else {
+            value_i = value.parse::<u64>();
+        }
+    } else {
+        match value.parse::<u64>() {
+            Ok(u) => value_i = u,
+            Err(_) => false,
+        }
+    }
+
+    if bit {
+        value_i = value_i / 8;
+    }
+    out = value_i << (10 * mult);
+
+    out
+}
