@@ -1,5 +1,3 @@
-use crate::{term::Term, theme::Theme};
-
 use {
     crate::{
         brshtop_box::BrshtopBox,
@@ -10,16 +8,23 @@ use {
         floating_humanizer,
         key::Key,
         membox::MemBox,
+        menu::Menu,
         meter::Meters,
         SYSTEM,
+        term::Term,
+        theme::Theme
     },
-    heim_disk::{io_counters, IoCounters},
+    futures::{Stream, task::Poll},
+    heim::{
+        disk::{io_counters, IoCounters},
+        units::information::Conversion,
+    },
     psutil::{
         disk::{DiskUsage, FileSystem},
-        memory::{swap_memory, virtual_memory, SwapMemory, VirtualMemory},
+        memory::{os::linux::VirtualMemoryExt, swap_memory, virtual_memory, SwapMemory, VirtualMemory},
         Bytes,
     },
-    std::{collections::HashMap, path::Path, time::SystemTime},
+    std::{collections::HashMap, fmt, path::Path, time::SystemTime},
 };
 
 #[derive(Clone)]
@@ -28,6 +33,15 @@ pub enum DiskInfo {
     U32(u32),
     U64(u64),
     None,
+} impl fmt::Display for DiskInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiskInfo::String(s) => write!(f, "{}", s.to_owned()),
+            DiskInfo::U32(u) => write!(f, "{}", u.to_owned()),
+            DiskInfo::U64(u) => write!(f, "{}", u.to_owned()),
+            DiskInfo::None => write!(f, ""),
+        }
+    }
 }
 
 pub struct MemCollector<'a> {
@@ -53,12 +67,12 @@ impl<'a> MemCollector<'a> {
         let mem = MemCollector {
             parent: Collector::new(),
             values: HashMap::<String, Bytes>::new(),
-            vlist: HashMap::<String, Vec<u32>>::new(),
-            percent: HashMap::<String, u32>::new(),
+            vlist: HashMap::<String, Vec<Bytes>>::new(),
+            percent: HashMap::<String, Bytes>::new(),
             string: HashMap::<String, String>::new(),
-            swap_values: HashMap::<String, u32>::new(),
-            swap_vlist: HashMap::<String, Vec<u32>>::new(),
-            swap_percent: HashMap::<String, String>::new(),
+            swap_values: HashMap::<String, Bytes>::new(),
+            swap_vlist: HashMap::<String, Vec<Bytes>>::new(),
+            swap_percent: HashMap::<String, Bytes>::new(),
             swap_string: HashMap::<String, String>::new(),
             disks: HashMap::<String, HashMap<String, DiskInfo>>::new(),
             disk_hist: HashMap::<String, Vec<Bytes>>::new(),
@@ -68,11 +82,11 @@ impl<'a> MemCollector<'a> {
             excludes: vec![FileSystem::Other("squashfs".to_owned())],
             buffer: membox.buffer.clone(),
         };
-        if SYSTEM == "BSD".to_owned() {
+        if SYSTEM.to_owned() == "BSD".to_owned() {
             for s in vec!["devfs", "tmpfs", "procfs", "linprocfs", "gvfs", "fusefs"]
                 .iter()
                 .map(|s| s.to_owned().to_owned())
-                .collect()
+                .collect::<Vec<String>>()
             {
                 mem.excludes.push(FileSystem::Other(s));
             }
@@ -95,6 +109,12 @@ impl<'a> MemCollector<'a> {
                     used: 0,
                     free: 0,
                     percent: 0.0,
+                    active: 0,
+                    inactive: 0,
+                    buffers: 0,
+                    cached: 0,
+                    shared: 0,
+                    slab: 0,
                 }
             }
         };
@@ -108,11 +128,11 @@ impl<'a> MemCollector<'a> {
 
         for (key, value) in self.values {
             self.string
-                .insert(&key, floating_humanizer(value, false, false, 0, false));
+                .insert(key, floating_humanizer(value as f64, false, false, 0, false));
             if key == "total".to_owned() {
                 continue;
             }
-            self.percent[key] = value * 100 / self.values["total".to_owned()];
+            self.percent[&key] = value * 100 / self.values[&"total".to_owned()];
             if CONFIG.mem_graphs {
                 if !self.vlist.contains_key(&key) {
                     self.vlist.insert(key, vec![]);
@@ -120,8 +140,8 @@ impl<'a> MemCollector<'a> {
                 self.vlist
                     .get_mut(&key)
                     .unwrap()
-                    .push(self.percent.get(&key).unwrap_or(0));
-                if self.vlist[key].len() > membox.parent.width {
+                    .push(self.percent.get(&key).unwrap_or(&0).clone());
+                if self.vlist[&key].len() as u32 > membox.parent.width {
                     self.vlist.get_mut(&key).unwrap().remove(0);
                 }
             }
@@ -159,21 +179,21 @@ impl<'a> MemCollector<'a> {
                 }
                 for (key, value) in self.swap_values {
                     self.swap_string
-                        .insert(&key, floating_humanizer(value, false, false, 0, false));
+                        .insert(key, floating_humanizer(value as f64, false, false, 0, false));
                     if key == "total".to_owned() {
                         continue;
                     }
                     self.swap_percent
-                        .insert(&key, value * 100 / self.swap_values[key].unwrap());
+                        .insert(key, value * 100 / self.swap_values[&key]);
                     if CONFIG.mem_graphs {
                         if !self.swap_vlist.contains_key(&key) {
-                            self.swap_vlist.insert(&key, vec![]);
+                            self.swap_vlist.insert(key, vec![]);
                         }
                         self.swap_vlist
                             .get_mut(&key)
                             .unwrap()
-                            .push(self.swap_percent.get(key).unwrap_or(0));
-                        if self.swap_vlist.get(&key).unwrap().len() > membox.parent.width {
+                            .push(self.swap_percent.get(&key).unwrap_or(&0).clone());
+                        if self.swap_vlist.get(&key).unwrap().len() as u32 > membox.parent.width {
                             self.vlist.get_mut(&key).unwrap().remove(0);
                         }
                     }
@@ -247,12 +267,11 @@ impl<'a> MemCollector<'a> {
         match psutil::disk::partitions() {
             Ok(disks) => {
                 for disk in disks {
-                    let mut disk_io: Option<IoCounters> = None;
-                    let mut io_string: String = String::default();
+                    let mut disk_io: &IoCounters;
                     let mut io_string: String = String::default();
                     let mut disk_name: String = if disk.mountpoint().is_file() {
                         match disk.mountpoint().file_name() {
-                            Some(s) => s.to_str().to_owned(),
+                            Some(s) => s.to_str().unwrap_or("").to_owned(),
                             None => String::default(),
                         }
                     } else {
@@ -264,16 +283,21 @@ impl<'a> MemCollector<'a> {
                     }
 
                     disk_list.push(disk_name);
-                    if self.excludes.len() > 0 && self.excludes.contains(disk.filesystems()) {
+                    if self.excludes.len() > 0 && self.excludes.contains(disk.filesystem()) {
                         continue;
                     }
-                    if filtering
-                        && ((!filter_exclude && !disk_name.ends_with(filtering))
-                            || (filter_exclude && disk_name.ends_with(filtering)))
+
+                    let mut ender : String = String::default();
+                    for s in filtering {
+                        ender.push_str(s.as_str());
+                    }
+                    if filtering.len() > 0
+                        && ((!filter_exclude && !disk_name.ends_with(ender.as_str()))
+                            || (filter_exclude && disk_name.ends_with(ender.as_str())))
                     {
                         continue;
                     }
-                    if SYSTEM == "MacOS".to_owned()
+                    if SYSTEM.to_owned() == "MacOS".to_owned()
                         && disk.mountpoint() == Path::new("/private/var/vm")
                     {
                         continue;
@@ -281,7 +305,7 @@ impl<'a> MemCollector<'a> {
                     let disk_u: DiskUsage = match psutil::disk::disk_usage(disk.mountpoint()) {
                         Ok(d) => d,
                         Err(e) => {
-                            errlog(format!("Unable to get disk usage of disk {}"));
+                            errlog(format!("Unable to get disk usage of disk {:?}", e));
                             DiskUsage {
                                 total: 0,
                                 used: 0,
@@ -312,7 +336,7 @@ impl<'a> MemCollector<'a> {
                     .collect::<HashMap<String, Bytes>>()
                     {
                         self.disks
-                            .get_mut(disk.device().to_owned())
+                            .get_mut(&disk.device().to_owned())
                             .unwrap()
                             .insert(
                                 name,
@@ -324,27 +348,27 @@ impl<'a> MemCollector<'a> {
 
                     // * Collect disk io
                     if io_counters.len() > 0 {
-                        if SYSTEM == "Linux".to_owned() {
-                            dev_name = disk.mountpoint().file_name().unwrap().as_str().to_owned();
+                        if SYSTEM.to_owned() == "Linux".to_owned() {
+                            dev_name = disk.mountpoint().file_name().unwrap().to_str().unwrap_or("").to_owned();
                             if dev_name.starts_with("md") {
                                 match dev_name.find('p') {
-                                    Some(u) => dev_name = dev_name[..u],
+                                    Some(u) => dev_name = dev_name[..u].to_owned(),
                                     None => (),
                                 }
                             }
-                            disk_io = io_counters.get(dev_name);
+                            disk_io = io_counters.get(&dev_name).unwrap().clone();
                         } else if disk.mountpoint() == Path::new("/") {
                             //Not sure if this is called with the heim library :/
-                            disk_io = io_counters.get("/".to_owned())
+                            disk_io = io_counters.get(&"/".to_owned()).unwrap();
                         } else {
                             throw_error("OS disk IO issue... Please post this as a problem in the GitHub with your current OS!!!")
                         }
                         match self.timestamp.elapsed() {
                             Ok(d) => {
-                                disk_read = (disk_io.read_bytes()
+                                disk_read = (disk_io.read_bytes().value
                                     - self.disk_hist[disk.device()][0])
                                     / d.as_secs();
-                                disk_write = (disk_io.write_bytes()
+                                disk_write = (disk_io.write_bytes().value
                                     - self.disk_hist[disk.device()][1])
                                     / d.as_secs();
                             }
@@ -360,53 +384,52 @@ impl<'a> MemCollector<'a> {
                         disk_write = 0;
                     }
 
-                    match disk_io {
-                        Some(i) => {
-                            match self.disk_hist.get_mut(disk.device().to_owned()) {
-                                Some(v) => v = vec![i.read_bytes::<u64>(), i.write_bytes::<u64>()],
-                                None => errlog(format!(
-                                    "disk_hist did not have {}...",
-                                    disk.device().to_owned()
-                                )),
-                            }
-                            if membox.disks_width > 30 {
-                                if disk_read > 0 {
-                                    io_string.push_str(format!(
-                                        "▲{}",
-                                        floating_humanizer(disk_read as f64, false, false, 0, true)
-                                    ));
-                                }
-                                if disk_write > 0 {
-                                    io_string.push_str(format!(
-                                        "▼{}",
-                                        floating_humanizer(
-                                            disk_write as f64,
-                                            false,
-                                            false,
-                                            0,
-                                            true
-                                        )
-                                    ));
-                                }
-                            } else if disk_read + disk_write > 0 {
-                                io_string.push_str(format!(
-                                    "▼▲{}",
-                                    floating_humanizer(
-                                        (disk_read + disk_write) as f64,
-                                        false,
-                                        false,
-                                        0,
-                                        true
-                                    )
-                                ));
-                            }
-                        }
-                        None => (),
+
+                    match self.disk_hist.get_mut(&disk.device().to_owned()) {
+                        Some(v) => v = &mut vec![disk_io.read_bytes().value, disk_io.write_bytes().value],
+                        None => errlog(format!(
+                            "disk_hist did not have {}...",
+                            disk.device().to_owned()
+                        )),
                     }
+                    if membox.disks_width > 30 {
+                        if disk_read > 0 {
+                            io_string.push_str(format!(
+                                "▲{}",
+                                floating_humanizer(disk_read as f64, false, false, 0, true)
+                            ).as_str());
+                        }
+                        if disk_write > 0 {
+                            io_string.push_str(format!(
+                                "▼{}",
+                                floating_humanizer(
+                                    disk_write as f64,
+                                    false,
+                                    false,
+                                    0,
+                                    true
+                                )
+                            ).as_str());
+                        }
+                    } else if disk_read + disk_write > 0 {
+                        io_string.push_str(format!(
+                            "▼▲{}",
+                            floating_humanizer(
+                                (disk_read + disk_write) as f64,
+                                false,
+                                false,
+                                0,
+                                true
+                            )
+                        ).as_str());
+                    }
+                
+
 
                     match self.disks.get_mut(&disk.device().to_owned()) {
                         Some(h) => {
-                            h.get_mut(&"io".to_owned()) = DiskInfo::String(io_string.clone())
+                            h.insert("io".to_owned(), DiskInfo::String(io_string.clone()));
+                            ()
                         }
                         None => errlog(format!("Unable to get {} from disks...", disk.device())),
                     }
@@ -415,15 +438,15 @@ impl<'a> MemCollector<'a> {
                 if CONFIG.swap_disk && membox.swap_on {
                     match self.disks.get_mut(&"__swap".to_owned()) {
                         Some(h) => {
-                            h = vec![
+                            h = &mut vec![
                                 ("name", DiskInfo::String("swap".to_owned())),
                                 (
                                     "used_percent",
-                                    DiskInfo::U64(self.swap_percent["used".to_owned()]),
+                                    DiskInfo::U64(self.swap_percent[&"used".to_owned()]),
                                 ),
                                 (
                                     "free_percent",
-                                    DiskInfo::U64(self.swap_percent["free".to_owned()]),
+                                    DiskInfo::U64(self.swap_percent[&"free".to_owned()]),
                                 ),
                                 ("io", DiskInfo::None),
                             ]
@@ -436,18 +459,19 @@ impl<'a> MemCollector<'a> {
                                 .map(|s| s.to_owned().to_owned())
                                 .collect::<Vec<String>>()
                             {
-                                h.insert(&name, self.swap_string.get(&name).clone());
+                                h.insert(name, DiskInfo::String(self.swap_string.get(&name).unwrap_or(&String::default()).clone()));
                             }
 
                             if self.disks.len() > 2 {
                                 let new: HashMap<String, HashMap<String, DiskInfo>> = vec![(
-                                    self.disks.keys()[0].clone(),
+                                    self.disks.keys().cloned().collect::<Vec<String>>()[0].clone(),
                                     self.disks
-                                        .get(self.disks.keys()[0].clone())
+                                        .get(self.disks.keys().cloned().collect()[0].clone())
                                         .unwrap()
                                         .clone()
                                 )]
                                 .iter()
+                                .cloned()
                                 .collect::<HashMap<String, HashMap<String, DiskInfo>>>();
 
                                 new.insert("__swap".to_owned(), h.clone());
@@ -478,8 +502,8 @@ impl<'a> MemCollector<'a> {
     }
 
     /// JUST CALL MemBox.draw_fg()
-    pub fn draw(&mut self, membox: &mut MemBox, term : &mut Term, brshtop_box : &mut BrshtopBox, CONFIG : &mut Config, meters : &mut Meters, THEME : &mut Theme, key : &mut Key, collector : &mut Collector, draw : &mut Draw) {
-        membox.draw_fg(self, term, brshtop_box, CONFIG, meters, THEME, key, collector, draw);
+    pub fn draw(&mut self, membox: &mut MemBox, term : &mut Term, brshtop_box : &mut BrshtopBox, CONFIG : &mut Config, meters : &mut Meters, THEME : &mut Theme, key : &mut Key, collector : &mut Collector, draw : &mut Draw, menu : &mut Menu) {
+        membox.draw_fg(self, term, brshtop_box, CONFIG, meters, THEME, key, collector, draw, menu);
     }
 
 }

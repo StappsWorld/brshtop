@@ -2,8 +2,8 @@ use crate::clean_quit;
 
 use {
     crate::{
-        banner::draw_banner, collector::Collector, config::Config, draw::Draw, fx, fx::Fx,
-        graph::Graph, key::Key, mv, symbol, term::Term, theme::Color, CONFIG_DIR, VERSION,
+        banner::draw_banner, collector::Collector, config::Config, draw::Draw, error::errlog, fx, fx::Fx,
+        graph::{Graph, ColorSwitch}, key::Key, mv, symbol, term::Term, theme::Color, CONFIG_DIR, VERSION,
     },
     rand::Rng,
     std::{thread, time},
@@ -55,25 +55,26 @@ impl Init {
         for i in 0..51 {
             for _ in 0..2 {
                 self.initbg_colors
-                    .append(Color::fg(format!("{} {} {}", i, i, i).unwrap()));
+                    .push(Color::fg(format!("{} {} {}", i, i, i)).unwrap_or(Color::default()));
             }
         }
         draw.buffer(
             "+banner".to_owned(),
             vec![format!(
                 "{}{}{}{}{}{}{}Version: {}{}{}{}{}{}",
-                draw_banner(((term.height / 2) - 10) as u32, 0, true, false, term),
+                draw_banner(((term.height / 2) - 10) as u32, 0, true, false, term, draw, key),
                 mv::down(1),
                 mv::left(11),
                 Color::BlackBg(),
                 Color::default(),
                 fx::b,
                 fx::i,
-                VERSION,
+                VERSION.to_owned(),
                 fx::ui,
                 fx::ub,
                 term.bg,
-                Color::fg("#50")
+                term.fg,
+                Color::fg("#50").unwrap_or(Color::default())
             )],
             false,
             false,
@@ -110,7 +111,7 @@ impl Init {
             "+init!".to_owned(),
             vec![format!(
                 "{}{}{}{}",
-                Color::Fg("#cc"),
+                Color::fg("#cc").unwrap_or(Color::default()),
                 fx::b,
                 mv::to((term.height as u32 / 2) - 2, (term.width as u32 / 2) - 21),
                 mv::save
@@ -133,7 +134,7 @@ impl Init {
         self.initbg_up = Graph::new(
             term.width as i32,
             term.height as i32 / 2,
-            Some(self.initbg_colors.get(0)),
+            Some(ColorSwitch::VecColor(self.initbg_colors)),
             self.initbg_data,
             term,
             true,
@@ -144,7 +145,7 @@ impl Init {
         self.initbg_down = Graph::new(
             term.width as i32,
             term.height as i32 / 2,
-            Some(self.initbg_colors.get(0)),
+            Some(ColorSwitch::VecColor(self.initbg_colors)),
             self.initbg_data,
             term,
             false,
@@ -164,12 +165,12 @@ impl Init {
             vec![format!(
                 "{}{}\n{}{}",
                 mv::restore,
-                symbol::ok,
+                symbol::ok(),
                 mv::right((term.width as u32 / 2) - 22),
                 mv::save
             )],
             false,
-            flase,
+            false,
             100,
             false,
             false,
@@ -184,6 +185,7 @@ impl Init {
         draw: &mut Draw,
         collector: &mut Collector,
         key: &mut Key,
+        term : &mut Term,
     ) {
         if CONFIG.show_init {
             draw.buffer(
@@ -204,7 +206,7 @@ impl Init {
             Some(1),
             Some(format!(
                 "Error during init! See {}/error.log for more information.",
-                CONFIG_DIR
+                CONFIG_DIR.to_owned().to_str().unwrap()
             )),
             key,
             collector,

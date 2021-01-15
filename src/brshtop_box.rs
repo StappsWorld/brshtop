@@ -108,7 +108,7 @@ impl BrshtopBox {
         }
     }
 
-    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, THREADS: u64, term: &mut Term) {
+    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, THREADS: u64, term: &mut Term, CONFIG : &mut Config) {
         for sub in boxes {
             match sub {
                 Boxes::BrshtopBox(b) => (),
@@ -340,9 +340,9 @@ impl BrshtopBox {
                 .into_iter()
                 .map(|b| match b {
                     Boxes::CpuBox(cb) => cb.draw_bg(key, theme, term, config),
-                    Boxes::MemBox(mb) => mb.draw_bg(theme, CONFIG, term),
-                    Boxes::NetBox(nb) => nb.draw_bg(theme),
-                    Boxes::ProcBox(pb) => pb.draw_bg(theme),
+                    Boxes::MemBox(mb) => mb.draw_bg(theme, config, term),
+                    Boxes::NetBox(nb) => nb.draw_bg(theme, term),
+                    Boxes::ProcBox(pb) => pb.draw_bg(theme, term),
                     _ => String::default(),
                 })
                 .collect(),

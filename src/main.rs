@@ -59,19 +59,47 @@ use {
     theme::{Color, Theme},
 };
 
+#[macro_use]
 lazy_static! {
-    static ref CONFIG_DIR: &'static Path = &Path::new(".");
-    static ref SYSTEM: String = String::default();
-    static ref CPU_NAME: String = match cpuid::identify() {
+    pub static ref CONFIG_DIR: &'static Path = {
+        let config_dir_builder =
+            expanduser("~").unwrap().to_str().unwrap().to_owned() + "/.config/brshtop";
+        Path::new(config_dir_builder.as_str());
+    };
+    pub static ref SYSTEM: String = match env::consts::OS {
+        "linux" => String::from("Linux"),
+        "netbsd" => String::from("BSD"),
+        "macos" => String::from("MacOS"),
+        &_ => String::from("Other"),
+    };
+    pub static ref CPU_NAME: String = match cpuid::identify() {
         Ok(info) => info.codename,
         Err(e) => {
             errlog(format!("Unable to get CPU name... (error {:?}", e));
             String::default()
         }
     };
-    static ref UNITS: HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
-    static ref THREADS: u64 = 0;
-    static ref VERSION: String = clap::crate_version!();
+    pub static ref UNITS: HashMap<String, Vec<String>> = vec![
+        (
+            "bit".to_owned(),
+            ["bit", "Kib", "Mib", "Gib", "Tib", "Pib", "Eib", "Zib", "Yib", "Bib", "GEb",]
+                .iter()
+                .map(|s| s.to_owned().to_owned())
+                .collect::<Vec<String>>(),
+        ),
+        (
+            "byte".to_owned(),
+            ["Byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "BiB", "GEB",]
+                .iter()
+                .map(|s| s.to_owned().to_owned())
+                .collect::<Vec<String>>(),
+        ),
+    ]
+    .iter()
+    .map(|(s, v)| (s.clone(), v.iter().cloned().collect()))
+    .collect::<HashMap<String, Vec<String>>>();
+    pub static ref THREADS: u64 = psutil::cpu::cpu_count();
+    pub static ref VERSION: String = clap::crate_version!().to_owned();
 }
 
 pub fn main() {
@@ -80,21 +108,15 @@ pub fn main() {
     let SELF_START = SystemTime::now();
 
     //Getting system information from env:consts:OS
-    match env::consts::OS {
-        "linux" => SYSTEM = String::from("Linux"),
-        "netbsd" => SYSTEM = String::from("BSD"),
-        "macos" => SYSTEM = String::from("MacOS"),
-        &_ => SYSTEM = String::from("Other"),
-    }
 
-    if SYSTEM == "Other".to_owned() {
+    if SYSTEM.to_string() == "Other".to_owned() {
         print!("\nUnsupported platform!\n");
         std::process::exit(1);
     }
 
     //Argument Parsing
     let matches = App::new("brshtop")
-        .version(VERSION)
+        .version(VERSION.as_str())
         .author(
             ("Aristocratos (jakob@qvantnet.com)\n".to_owned()
                 + "Samuel Rembisz <sjrembisz07@gmail.com)\n"
@@ -157,12 +179,8 @@ pub fn main() {
 
     // Variables
 
-    let config_dir_builder =
-        expanduser("~").unwrap().to_str().unwrap().to_owned() + "/.config/brshtop";
-    CONFIG_DIR = Path::new(config_dir_builder.as_str());
-
     if !CONFIG_DIR.exists() {
-        match fs::create_dir(CONFIG_DIR) {
+        match fs::create_dir(CONFIG_DIR.to_path_buf()) {
             Err(_) => throw_error(
                 format!(
                     "ERROR!\nNo permission to write to \"{}\" directory!",
@@ -214,7 +232,6 @@ pub fn main() {
     let USER_THEME_DIR = CONFIG_DIR.join("themes");
 
     let CORES = psutil::cpu::cpu_count_physical();
-    THREADS = psutil::cpu::cpu_count();
 
     let THREAD_ERROR = 0;
 
@@ -315,29 +332,6 @@ pub fn main() {
             .map(|s| s.clone().to_owned())
             .collect::<Vec<String>>(),
     );
-    //Units for floating_humanizer function
-    UNITS = vec![
-        (
-            "bit".to_owned(),
-            [
-                "bit", "Kib", "Mib", "Gib", "Tib", "Pib", "Eib", "Zib", "Yib", "Bib", "GEb",
-            ]
-            .iter()
-            .map(|s| s.to_owned())
-            .collect::<Vec<String>>(),
-        ),
-        (
-            "byte".to_owned(),
-            [
-                "Byte", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "BiB", "GEB",
-            ]
-            .iter()
-            .map(|s| s.to_owned())
-            .collect::<Vec<String>>(),
-        ),
-    ]
-    .iter(|(s, v)| (s.clone(), v.iter().cloned().collect()))
-    .collect::<HashMap<String, Vec<String>>>();
 
     let CONFIG = match Config::new(CONFIG_FILE.clone()) {
         Ok(c) => c,
@@ -349,7 +343,7 @@ pub fn main() {
 
     errlog(format!(
         "New instance of brshtop version {} started with pid {}",
-        VERSION,
+        VERSION.to_owned(),
         std::process::id()
     ));
     errlog(format!(
@@ -418,15 +412,15 @@ pub fn create_box(
                 wt = b.name.clone();
             }
             Boxes::MemBox(b) => {
-                wx = b.x;
-                wy = b.y;
+                wx = b.x as u32;
+                wy = b.y as u32;
                 ww = b.parent.width;
                 wh = b.parent.height;
                 wt = b.name.clone();
             }
             Boxes::NetBox(b) => {
-                wx = b.x;
-                wy = b.y;
+                wx = b.x as u32;
+                wy = b.y as u32;
                 ww = b.parent.width;
                 wh = b.parent.height;
                 wt = b.name.clone();
@@ -447,18 +441,25 @@ pub fn create_box(
 
     // * Draw all horizontal lines
     for hpos in hlines {
-        out.push_str(format!("{}{}", mv::to(hpos, wx), symbol::h_line.repeat(ww - 1)).as_str());
+        out.push_str(
+            format!(
+                "{}{}",
+                mv::to(hpos, wx),
+                symbol::h_line.repeat((ww - 1) as usize)
+            )
+            .as_str(),
+        );
     }
 
     // * Draw all vertical lines and fill if enabled
     for hpos in hlines[0] + 1..hlines[1] {
         out.push_str(
             format!(
-                "{}{}{}",
+                "{}{}{}{}",
                 mv::to(hpos, wx),
                 symbol::v_line,
                 if fill {
-                    " ".repeat(ww - 2)
+                    " ".repeat((ww - 2) as usize)
                 } else {
                     mv::right(ww - 2)
                 },
@@ -474,7 +475,7 @@ pub fn create_box(
             "{}{}{}{}{}{}{}{}",
             mv::to(wy, wx),
             symbol::left_up,
-            mv::to(wt, wx + ww - 1),
+            mv::to(wy, wx + ww - 1),
             symbol::right_up,
             mv::to(wy + wh - 1, wx),
             symbol::left_down,
@@ -504,22 +505,27 @@ pub fn create_box(
     };
 
     match title2 {
-        Some(s) => out.push_str(
-            format!(
-                "{}{}{}{}{}{}{}{}",
-                mv::to(hlines[1], wx + 2),
-                symbol::title_left,
-                tc,
-                fx::b,
-                s,
-                fx::ub,
-                lc,
-                symbol::title_right,
-            )
-            .as_str(),
-        ),
+        Some(s) => {
+            out.push_str(
+                format!(
+                    "{}{}{}{}{}{}{}{}",
+                    mv::to(hlines[1], wx + 2),
+                    symbol::title_left,
+                    tc,
+                    fx::b,
+                    s,
+                    fx::ub,
+                    lc,
+                    symbol::title_right,
+                )
+                .as_str(),
+            );
+            ()
+        }
         None => (),
     }
+
+    out
 }
 
 pub fn readfile(file: File) -> Option<String> {
@@ -581,7 +587,6 @@ pub fn clean_quit(
     let now = SystemTime::now();
     match errcode {
         Some(0) => errlog(
-            CONFIG_DIR,
             format!(
                 "Exiting, Runtime {} \n",
                 now.duration_since(SELF_START.unwrap())
@@ -591,7 +596,6 @@ pub fn clean_quit(
         ),
         Some(n) => {
             errlog(
-                CONFIG_DIR,
                 format!(
                     "Exiting with errorcode {}, Runtime {} \n",
                     n,
@@ -631,14 +635,14 @@ pub fn floating_humanizer(
     let mut mult: f64 = if bit { 8.0 } else { 1.0 };
     let mut selector: usize = start;
     let mut unit: Vec<String> = if bit {
-        UNITS["bit".to_owned()]
+        UNITS[&"bit".to_owned()]
     } else {
-        UNITS["byte".to_owned()]
+        UNITS[&"byte".to_owned()]
     };
 
-    let mut working_val: f64 = f64::round(value * 100 * mult);
-    if working_val < 0.0 {
-        working_val = 0.0;
+    let mut working_val: i64 = f64::round(value * 100.0 * mult) as i64;
+    if working_val < 0 {
+        working_val = 0;
     }
 
     let mut broke: bool = false;
@@ -653,15 +657,15 @@ pub fn floating_humanizer(
     }
     if !broke {
         if working_val.to_string().len() == 4 && selector > 0 {
-            out = working_val.to_string()[..working_val.to_string().len() - 3]
+            out = working_val.to_string()[..working_val.to_string().len() - 3].to_owned()
                 + "."
-                + working_val.to_string()[working_val.to_string().len() - 3];
+                + (working_val.to_string().as_bytes()[working_val.to_string().len() - 3] as char).to_string().as_str();
         } else if working_val.to_string().len() == 3 && selector > 0 {
-            out = working_val.to_string()[..working_val.to_string().len() - 3]
+            out = working_val.to_string()[..working_val.to_string().len() - 3].to_string()
                 + "."
-                + working_val.to_string()[(working_val.to_string().len() - 3)..];
+                + working_val.to_string()[(working_val.to_string().len() - 3)..].to_string().as_str();
         } else if working_val.to_string().len() >= 2 {
-            out = working_val.to_string()[..working_val.to_string().len() - 3];
+            out = working_val.to_string()[..working_val.to_string().len() - 3].to_owned();
         } else {
             out = working_val.to_string();
         }
@@ -669,10 +673,10 @@ pub fn floating_humanizer(
 
     if short {
         if out.contains('.') {
-            out = f64::round(out.parse::<f64>()).to_string();
+            out = f64::round(out.parse::<f64>().unwrap()).to_string();
         }
         if out.len() > 3 {
-            out = (out[0] as i64 + 1).to_string();
+            out = ((out.as_bytes()[0] as char).to_string().parse::<i64>().unwrap() + 1).to_string();
             selector += 1;
         }
     }
@@ -681,7 +685,7 @@ pub fn floating_humanizer(
             "{}{}",
             if short { "" } else { " " },
             if short {
-                unit[selector][0]
+                (unit[selector].as_bytes()[0] as char).to_string()
             } else {
                 unit[selector]
             }
@@ -699,26 +703,26 @@ pub fn units_to_bytes(value: String) -> u64 {
     if value.len() == 0 {
         return 0;
     }
-    let mut out: u32 = 0;
+    let mut out: u64 = 0;
     let mut mult: u32 = 0;
     let mut bit: bool = false;
     let mut value_i: u64 = 0;
     let mut units: HashMap<String, u32> = HashMap::<String, u32>::new();
     if value.to_ascii_lowercase().ends_with('s') {
-        value = value[..value.len() - 2];
+        value = value[..value.len() - 2].to_owned();
     }
     if value.to_ascii_lowercase().ends_with("bit") {
         bit = true;
-        value = value[..value.len() - 4];
+        value = value[..value.len() - 4].to_owned();
     } else if value.to_ascii_lowercase().ends_with("byte") {
-        value = value[..value.len() - 5];
+        value = value[..value.len() - 5].to_owned();
     }
 
-    if units.contains_key(value[value.len() - 2].to_ascii_lowercase()) {
+    if units.contains_key(&(value.as_bytes()[value.len() - 2] as char).to_string().to_ascii_lowercase()) {
         mult = units
-            .get(value[value.len() - 2].to_ascii_lowercase())
-            .unwrap();
-        value = value[..value.len() - 2];
+            .get(&(value.as_bytes()[value.len() - 2] as char).to_string().to_ascii_lowercase())
+            .unwrap().to_owned();
+        value = value[..value.len() - 2].to_owned();
     }
 
     if value.contains('.')
@@ -728,15 +732,15 @@ pub fn units_to_bytes(value: String) -> u64 {
         }
     {
         if mult > 0 {
-            value_i = ((value.parse::<u64>() as f64) * 1024.0) as u64;
+            value_i = ((value.parse::<u64>().unwrap() as f64) * 1024.0) as u64;
             mult -= 1;
         } else {
-            value_i = value.parse::<u64>();
+            value_i = value.parse::<u64>().unwrap();
         }
     } else {
         match value.parse::<u64>() {
             Ok(u) => value_i = u,
-            Err(_) => false,
+            Err(_) => (),
         }
     }
 

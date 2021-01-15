@@ -163,6 +163,12 @@ impl From<String> for Color {
         Self::new(s).unwrap()
     }
 }
+impl From<&Color> for Color {
+
+    fn from(c : &Color) -> Self {
+        c.to_owned()
+    }
+}
 
 #[derive(FromMapDefault, FromMap, Debug, Gradient, Clone)]
 #[value_type = "Color"]

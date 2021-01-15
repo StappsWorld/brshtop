@@ -67,7 +67,7 @@ impl<'a> CpuCollector<'a> {
 
         CpuCollector_initialize
     }
-    pub fn collect<P: AsRef<Path>>(
+    pub fn collect(
         &mut self,
         CONFIG: &mut Config,
         THREADS: u64,
@@ -176,7 +176,7 @@ impl<'a> CpuCollector<'a> {
         }
     }
 
-    pub fn draw<P: AsRef<Path>>(
+    pub fn draw(
         &mut self,
         cpu_box: &mut CpuBox,
         CONFIG: &mut Config,
@@ -209,7 +209,7 @@ impl<'a> CpuCollector<'a> {
     pub fn get_sensors(&mut self, CONFIG: &mut Config) {
         self.sensor_method = String::from("");
 
-        if SYSTEM == "MacOS".to_owned() {
+        if SYSTEM.to_owned() == "MacOS".to_owned() {
             match which("coretemp") {
                 Ok(_) => {
                     let output = Exec::shell("coretemp -p")
@@ -265,7 +265,7 @@ impl<'a> CpuCollector<'a> {
             }
         }
 
-        if self.sensor_method == "" && SYSTEM == "Linux".to_owned() {
+        if self.sensor_method == "" && SYSTEM.to_owned() == "Linux".to_owned() {
             let output: Option<String> = match which("vcgencmd") {
                 Ok(s) => Some(
                     Exec::shell("vcgencmd measure_temp")

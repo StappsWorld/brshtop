@@ -15,6 +15,7 @@ use {
         mv,
         theme::{Color, Theme},
         timer::Timer,
+        THREADS,
     },
     std::{
         collections::HashMap,
@@ -77,7 +78,6 @@ impl Term {
         &mut self,
         args: Vec<String>,
         boxes: Vec<Boxes>,
-        THREADS: u64,
         collector: &mut Collector,
         init: &mut Init,
         cpu_box: &mut CpuBox,
@@ -135,7 +135,7 @@ impl Term {
                         Some(Color::White()),
                         true,
                         None,
-                        term,
+                        self,
                         theme,
                     ),
                     format!(
@@ -169,7 +169,7 @@ impl Term {
                             Some(Color::White()),
                             true,
                             None,
-                            term,
+                            self,
                             theme,
                         ),
                         format!(
@@ -282,7 +282,7 @@ impl Term {
         }
     }
 
-    pub fn title<P: AsRef<Path>>(text: String) -> String {
+    pub fn title(text: String) -> String {
         let out: String = match std::env::var("TERMINAL_TITLE") {
             Ok(o) => o,
             Err(e) => {

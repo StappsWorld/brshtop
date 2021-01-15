@@ -38,7 +38,7 @@ pub struct Menu {
     pub menu_length: HashMap<String, i32>,
     pub background: String,
 }
-impl Menu {
+impl<'a> Menu {
     pub fn new(
         MENUS: HashMap<String, HashMap<String, (String, String, String)>>,
         MENU_COLORS: HashMap<String, Vec<String>>,
@@ -97,8 +97,8 @@ impl Menu {
         THEME: &mut Theme,
         key_class: &mut Key,
         timer: &mut Timer,
-        collector: &mut Collector,
-        collectors: Vec<Collectors>,
+        collector: &mut Collector<'a>,
+        collectors: Vec<Collectors<'a>>,
         CONFIG: &mut Config,
         ARG_MODE: &mut ViewMode,
         THEME_DIR: &Path,
@@ -141,7 +141,7 @@ impl Menu {
             if self.resized {
                 banner_mut = format!(
                     "{}{}{}{}{}{} ← esc{}{}Version: {}{}{}{}{}",
-                    banner::draw_banner((term.height / 2) as u32 - 10, 0, true, false, term),
+                    banner::draw_banner((term.height / 2) as u32 - 10, 0, true, false, term, draw, key_class),
                     mv::down(1),
                     mv::left(46),
                     Color::BlackBg(),
@@ -220,7 +220,7 @@ impl Menu {
             skip = false;
             redraw = false;
 
-            if key_class.input_wait(timer.left(), true, draw, term) {
+            if key_class.input_wait(timer.left().as_secs_f64(), true, draw, term) {
                 if key_class.mouse_moved() {
                     let (mx_set, my_set) = key_class.get_mouse();
                     mx = mx_set;
@@ -272,8 +272,8 @@ impl Menu {
                 } else if vec!["up", "mouse_scroll_up", "shift_tab"]
                     .iter()
                     .map(|s| s.clone().to_owned())
-                    .collect()
-                    .contains(key)
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                 {
                     menu_index -= 1;
                     if menu_index < 0 {
@@ -284,8 +284,8 @@ impl Menu {
                 } else if vec!["down", "mouse_scroll_down", "tab"]
                     .iter()
                     .map(|s| s.clone().to_owned())
-                    .collect()
-                    .contains(key)
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                 {
                     menu_index += 1;
                     if menu_index > menu_names.len() - 1 {
@@ -312,7 +312,7 @@ impl Menu {
                             ARG_MODE,
                             THEME,
                             theme,
-                            THEME_DIRS,
+                            THEME_DIR,
                             USER_THEME_DIR,
                             draw,
                             term,
@@ -343,7 +343,7 @@ impl Menu {
                 }
             }
 
-            if timer.not_zero() && !self.resized {
+            if timer.not_zero(CONFIG) && !self.resized {
                 skip = true;
             } else {
                 collector.collect(
@@ -378,8 +378,8 @@ impl Menu {
         term: &mut Term,
         VERSION: String,
         key_class: &mut Key,
-        collector: &mut Collector,
-        collectors: Vec<Collectors>,
+        collector: &mut Collector<'a>,
+        collectors: Vec<Collectors<'a>>,
         CONFIG: &mut Config,
         timer: &mut Timer,
     ) {
@@ -465,7 +465,7 @@ impl Menu {
                 };
                 out_misc = format!(
                     "{}{}{}{}{}{}← esc{}{}Version: {}{}{}{}{}",
-                    banner::draw_banner(y - 7, 0, true, false, term),
+                    banner::draw_banner(y - 7, 0, true, false, term, draw, key_class),
                     mv::down(1),
                     mv::left(46),
                     Color::BlackBg(),
@@ -605,7 +605,7 @@ impl Menu {
                 skip = false;
                 redraw = false;
 
-                if key_class.input_wait(timer.left(), false, draw, term) {
+                if key_class.input_wait(timer.left().as_secs_f64(), false, draw, term) {
                     key = match key_class.get() {
                         Some(k) => k,
                         None => break,
@@ -672,7 +672,7 @@ impl Menu {
                     }
                 }
 
-                if timer.not_zero() && !self.resized {
+                if timer.not_zero(CONFIG) && !self.resized {
                     skip = true;
                 } else {
                     collector.collect(
@@ -720,14 +720,14 @@ impl Menu {
         brshtop_box: &mut BrshtopBox,
         boxes: Vec<Boxes>,
         THREADS: u64,
-        collector: &mut Collector,
+        collector: &mut Collector<'a>,
         init: &mut Init,
         cpubox: &mut CpuBox,
         cpucollector: &mut CpuCollector,
         netbox: &mut NetBox,
         DEFAULT_THEME: HashMap<String, String>,
         proc_collector: &mut ProcCollector,
-        collectors: Vec<Collectors>,
+        collectors: Vec<Collectors<'a>>,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -1129,7 +1129,7 @@ impl Menu {
             if self.resized {
                 out_misc = format!(
                     "{}{}{}{}{}{}← esc{}{}Version: {}{}{}{}{}",
-                    banner::draw_banner(y - 7, 0, true, false, term),
+                    banner::draw_banner(y - 7, 0, true, false, term, draw, key_class),
                     mv::down(1),
                     mv::left(46),
                     Color::BlackBg(),
@@ -1298,8 +1298,8 @@ impl Menu {
                             ]
                             .iter()
                             .map(|s| s.clone().to_owned())
-                            .collect()
-                            .contains(opt)
+                            .collect::<Vec<String>>()
+                            .contains(&opt)
                         {
                             out.push_str(
                                 format!(
@@ -1442,7 +1442,7 @@ impl Menu {
             skip = false;
             redraw = false;
 
-            if key_class.input_wait(timer.left(), false, draw, term) {
+            if key_class.input_wait(timer.left().as_secs_f64(), false, draw, term) {
                 key = match key_class.get() {
                     Some(k) => k,
                     None => "".to_owned(),
@@ -1492,9 +1492,9 @@ impl Menu {
                 if inputting {
                     if vec!["escape", "mouse_click"]
                         .iter()
-                        .map(|s| s.to_owned().clone())
-                        .collect()
-                        .contains(key)
+                        .map(|s| s.to_owned().to_owned())
+                        .collect::<Vec<String>>()
+                        .contains(&key)
                     {
                         inputting = false;
                     } else if key == "enter".to_owned() {
@@ -1543,18 +1543,18 @@ impl Menu {
                                             _ => (),
                                         }
                                         term.refresh(
-                                            [],
+                                            vec![],
                                             boxes,
-                                            THREADS,
                                             collector,
                                             init,
                                             cpubox,
                                             draw,
                                             true,
-                                            key,
+                                            key_class,
                                             self,
                                             brshtop_box,
                                             timer,
+                                            CONFIG,
                                             THEME,
                                         );
                                         self.resized = false;
@@ -1595,9 +1595,9 @@ impl Menu {
                     );
                 } else if ["escape", "o", "M", "f2"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                 {
                     self.close = true;
                     break;
@@ -1612,9 +1612,9 @@ impl Menu {
                         "tree_depth",
                     ]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(selected)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&selected)
                 {
                     inputting = true;
                     input_val = CONFIG.getattr(selected).to_string();
@@ -1637,12 +1637,12 @@ impl Menu {
                     && CONFIG.tree_depth > 0
                 {
                     CONFIG.tree_depth -= 1;
-                    proc_collector.collapsed = HashMap::<u64, bool>::new();
+                    proc_collector.collapsed = HashMap::<u32, bool>::new();
                 } else if ["left", "right"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                     && match CONFIG.getattr(selected) {
                         ConfigAttr::Bool(b) => true,
                         _ => false,
@@ -1665,9 +1665,9 @@ impl Menu {
                     }
                     if ["net_auto", "net_color_fixed", "net_sync"]
                         .iter()
-                        .map(|s| s.to_owned())
-                        .collect()
-                        .contains(selected)
+                        .map(|s| s.to_owned().to_owned())
+                        .collect::<Vec<String>>()
+                        .contains(&selected)
                     {
                         if selected == "net_auto".to_owned() {
                             netcollector.auto_min = CONFIG.net_auto;
@@ -1684,9 +1684,8 @@ impl Menu {
                         draw.clear(vec!["battery".to_owned()], true);
                     }
                     term.refresh(
-                        [],
+                        vec![],
                         boxes,
-                        THREADS,
                         collector,
                         init,
                         cpubox,
@@ -1702,9 +1701,9 @@ impl Menu {
                     self.resized = true;
                 } else if ["left", "right"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                     && selected == "color_theme".to_owned()
                     && theme.themes.len() > 1
                 {
@@ -1721,15 +1720,14 @@ impl Menu {
                     }
                     collector.collect_idle = Event::Wait;
                     collector.collect_idle.wait(-1.0);
-                    CONFIG.color_theme = theme.themes.keys().cloned().collect()[color_i];
+                    CONFIG.color_theme = theme.themes.keys().cloned().collect::<Vec<String>>()[color_i];
                     mem::replace(
                         THEME,
                         Theme::from_str(CONFIG.color_theme, DEFAULT_THEME).unwrap(),
                     );
                     term.refresh(
-                        [],
+                        vec![],
                         boxes,
-                        THREADS,
                         collector,
                         init,
                         cpubox,
@@ -1742,21 +1740,21 @@ impl Menu {
                         CONFIG,
                         THEME,
                     );
-                    timer.finished();
+                    timer.finish(key_class, CONFIG);
                 } else if ["left", "right"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                     && selected == "proc_sorting".to_owned()
                 {
                     // TODO : Need to figure out how to do this...
                     // proc_collector.sorting(key);
                 } else if ["left", "right"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                     && selected == "log_level".to_owned()
                 {
                     if key == "left".to_owned() {
@@ -1778,9 +1776,9 @@ impl Menu {
                     );
                 } else if ["left", "right"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                     && selected == "cpu_sensor".to_owned()
                     && CONFIG.cpu_sensors.len() > 1
                 {
@@ -1803,11 +1801,10 @@ impl Menu {
                         && (cpucollector.sensor_method != "psutil".to_owned()
                             || CONFIG.cpu_sensor == "Auto".to_owned())
                     {
-                        cpucollector.get_sensors(CONFIG, SYSTEM);
+                        cpucollector.get_sensors(CONFIG);
                         term.refresh(
-                            [],
+                            vec![],
                             boxes,
-                            THREADS,
                             collector,
                             init,
                             cpubox,
@@ -1824,9 +1821,9 @@ impl Menu {
                     }
                 } else if ["left", "right"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                     && selected == "view_mode".to_owned()
                 {
                     if key == "left".to_owned() {
@@ -1850,7 +1847,6 @@ impl Menu {
                     term.refresh(
                         vec![],
                         boxes,
-                        THREADS,
                         collector,
                         init,
                         cpubox,
@@ -1872,9 +1868,9 @@ impl Menu {
                     page = (selected_int as u32 * 2 / h) as u32 - 1;
                 } else if ["mouse_scroll_up", "page_up"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                     && pages > 0
                 {
                     page -= 1;
@@ -1884,9 +1880,9 @@ impl Menu {
                     selected_int = (page - 1) as usize * ceil((h as f64 / 2.0), 0) as usize;
                 } else if ["mouse_scroll_down", "page_down"]
                     .iter()
-                    .map(|s| s.to_owned())
-                    .collect()
-                    .contains(key)
+                    .map(|s| s.to_owned().to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&key)
                     && pages > 0
                 {
                     page += 1;
@@ -1901,7 +1897,7 @@ impl Menu {
                 }
             }
 
-            if timer.not_zero() && !self.resized {
+            if timer.not_zero(CONFIG) && !self.resized {
                 skip = true;
             } else {
                 collector.collect(

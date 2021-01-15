@@ -1,5 +1,5 @@
 use {
-    crate::{error::throw_error, VERSION},
+    crate::{error::{errlog, throw_error}, VERSION},
     lenient_bool::LenientBool,
     psutil::sensors::*,
     std::{
@@ -360,7 +360,7 @@ impl Config {
 
         match conf.get(&"version".to_owned()) {
             Some(ConfigItem::Str(s)) => {
-                if s.clone() != VERSION {
+                if s.clone() != VERSION.to_owned() {
                     initializing_config.recreate = true;
                     initializing_config.warnings.push("Config file version and brshtop version mismatch, will be recreated on exit!".to_owned())
                 }

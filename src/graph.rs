@@ -1,12 +1,12 @@
-use  {
-    crate::{mv, symbol, theme::Color, term::Term};
+use {
+    crate::{mv, symbol, term::Term, theme::Color},
     maplit::hashmap,
+    math::round::ceil,
     std::{
         collections::HashMap,
-        fmt::{self, Display, Formatter},
         default::Default,
+        fmt::{self, Display, Formatter},
     },
-    math::round::ceil,
 };
 
 pub struct Graphs {
@@ -17,6 +17,12 @@ pub struct Graphs {
     pub detailed_cpu: Graph,
     pub detailed_mem: Graph,
     pub pid_cpu: HashMap<u32, Graph>, // TODO: PID type
+}
+
+pub enum ColorSwitch {
+    Color(Color),
+    VecString(Vec<String>),
+    VecColor(Vec<Color>),
 }
 
 // FIXME
@@ -37,25 +43,21 @@ pub struct Graph {
     pub last: i32,
     pub symbol: HashMap<u32, &'static str>,
     pub _data: Vec<i32>, // TODO: Data type
-    pub NotImplemented : bool,
+    pub NotImplemented: bool,
 }
 impl Graph {
-
     /// Defaults invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None
-    pub fn new<C>(
+    pub fn new(
         width: i32,
         height: i32,
-        color: Option<C>,
+        color: Option<ColorSwitch>,
         data: Vec<i32>,
-        term : &mut Term,
-        invert : bool,
-        max_value : i32,
-        offset : i32,
-        color_max_value : Option<i32>,
-    ) -> Self
-    where
-        C: Into<Color>,
-    {
+        term: &mut Term,
+        invert: bool,
+        max_value: i32,
+        offset: i32,
+        color_max_value: Option<i32>,
+    ) -> Self {
         let graphs = hashmap! {
             true => Vec::new(),
             false => Vec::new(),
@@ -66,42 +68,48 @@ impl Graph {
             real_data = vec![0];
         }
 
-        let mut color_scale : i32 = 100;
+        let mut color_scale: i32 = 100;
         if max_value != 0 {
-            let mut to_set : Vec<i32> = Vec::<i32>::new();
+            let mut to_set: Vec<i32> = Vec::<i32>::new();
 
             for v in real_data {
-                to_set.push(if (v + offset) * (100 / (max_value + offset)) as i32 > 100 {100} else {(v + offset) * (100 / (max_value + offset)) as i32});
+                to_set.push(
+                    if (v + offset) * (100 / (max_value + offset)) as i32 > 100 {
+                        100
+                    } else {
+                        (v + offset) * (100 / (max_value + offset)) as i32
+                    },
+                );
             }
 
             real_data = to_set;
 
             if color_max_value != None {
-                color_scale = 100 * (max_value / match color_max_value {
-                    Some(val) => val,
-                    None => max_value,
-                } as i32);
+                color_scale = 100
+                    * (max_value
+                        / match color_max_value {
+                            Some(val) => val,
+                            None => max_value,
+                        } as i32);
             }
         }
 
-        
-
-        let colors = if let Some(color) = color.map(<_ as Into<Color>>::into) {
-            if height > 1 {
-                (0..height).map(|_| color).collect()
-            } else {
-                vec![]
-            }
-        } else {
-            vec![]
+        let colors: Vec<Color> = match color {
+            Some(v) => match v {
+                ColorSwitch::Color(c) => (0..height).map(|_| c).collect(),
+                ColorSwitch::VecString(v) => v
+                    .iter()
+                    .map(|s| Color::new(s.to_owned()).unwrap_or(Color::default()))
+                    .collect(),
+                ColorSwitch::VecColor(c) => c.clone(),
+            },
+            None => vec![],
         };
-
-        
 
         let mut graph = Self {
             out: String::new(),
-            width : width as u32,
-            height : height as u32,
+            width: width as u32,
+            height: height as u32,
             invert: false,
             offset: offset,
             colors,
@@ -127,13 +135,13 @@ impl Graph {
             graphs,
             current: false,
             last: 0,
-            NotImplemented : false,
+            NotImplemented: false,
         };
 
         graph._refresh_data(term);
 
-        let mut value_width : i32 = ceil(data.len() as f64 / 2.0, 0) as i32;
-        let mut filler : String = String::default();
+        let mut value_width: i32 = ceil(data.len() as f64 / 2.0, 0) as i32;
+        let mut filler: String = String::default();
 
         if value_width > width {
             real_data = data[(width as usize * 2)..].to_vec();
@@ -142,7 +150,7 @@ impl Graph {
         }
 
         if real_data.len() % 2 != 0 {
-            real_data.insert(0,0);
+            real_data.insert(0, 0);
         }
 
         for _ in 0..height {
@@ -157,19 +165,17 @@ impl Graph {
     }
 
     /// Defaults invert: bool = False, max_value: int = 0, offset: int = 0, color_max_value: Union[int, None] = None
-    pub fn new_with_vec<C : Into<Color>>(
+    pub fn new_with_vec<C: Into<Color>>(
         width: u32,
         height: u32,
         color: Vec<String>,
         data: Vec<i32>, // TODO: Data type
-        term : &mut Term,
-        invert : bool,
-        max_value : i32,
-        offset : i32,
-        color_max_value : Option<i32>,
-    ) -> Self
-    {
-
+        term: &mut Term,
+        invert: bool,
+        max_value: i32,
+        offset: i32,
+        color_max_value: Option<i32>,
+    ) -> Self {
         let graphs = hashmap! {
             true => Vec::new(),
             false => Vec::new(),
@@ -180,35 +186,50 @@ impl Graph {
             real_data = vec![0];
         }
 
-        let mut color_scale : u32 = 100;
+        let mut color_scale: u32 = 100;
         if max_value != 0 {
-            let mut to_set : Vec<i32> = Vec::<i32>::new();
+            let mut to_set: Vec<i32> = Vec::<i32>::new();
 
             for v in real_data {
-                to_set.push(if (v + offset) * (100 / (max_value + offset)) as i32 > 100 {100} else {(v + offset) * (100 / (max_value + offset)) as i32});
+                to_set.push(
+                    if (v + offset) * (100 / (max_value + offset)) as i32 > 100 {
+                        100
+                    } else {
+                        (v + offset) * (100 / (max_value + offset)) as i32
+                    },
+                );
             }
 
             real_data = to_set;
 
             if color_max_value != None {
-                color_scale = 100 * (max_value / match color_max_value {
-                    Some(val) => val,
-                    None => max_value,
-                }) as u32;
+                color_scale = 100
+                    * (max_value
+                        / match color_max_value {
+                            Some(val) => val,
+                            None => max_value,
+                        }) as u32;
             }
         }
 
-        
-
-        let colors : Vec<Color> = Vec::<Color>::new();
+        let colors: Vec<Color> = Vec::<Color>::new();
         if height > 1 {
             for i in 1..height + 1 {
-                colors.insert(0, Color::new(color.get(if i * (color_scale / height) < 100 {(i * (color_scale / height)) as usize} else {100 as usize}).unwrap()).unwrap());
-
+                colors.insert(
+                    0,
+                    Color::new(
+                        color
+                            .get(if i * (color_scale / height) < 100 {
+                                (i * (color_scale / height)) as usize
+                            } else {
+                                100 as usize
+                            })
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                );
             }
         }
-
-        
 
         let mut graph = Self {
             out: String::new(),
@@ -239,11 +260,10 @@ impl Graph {
             graphs,
             current: false,
             last: 0,
-            NotImplemented : false,
+            NotImplemented: false,
         };
 
         graph._refresh_data(term);
-
 
         graph
     }
@@ -258,7 +278,7 @@ impl Graph {
         };
         self
     }
-    pub fn max_value(mut self, max_value: i32, term : &mut Term) -> Self {
+    pub fn max_value(mut self, max_value: i32, term: &mut Term) -> Self {
         self.max_value = max_value;
         self._refresh_data(term);
         self
@@ -272,7 +292,7 @@ impl Graph {
         self
     }
 
-    fn _refresh_data(&mut self, term : &mut Term) {
+    fn _refresh_data(&mut self, term: &mut Term) {
         let value_width = (self._data.len() as f32 / 2.).ceil() as i32;
 
         self._data = if self._data.is_empty() {
@@ -306,7 +326,7 @@ impl Graph {
         self._create(true, term);
     }
 
-    fn _create(&mut self, new: bool, term : &mut Term) {
+    fn _create(&mut self, new: bool, term: &mut Term) {
         let mut value = hashmap! {
             "left" => 0,
             "right" => 0,
@@ -409,12 +429,16 @@ impl Graph {
                         if self.colors.is_empty() {
                             "".into()
                         } else {
-                            self.colors.get(h as usize).map(Color::to_string).unwrap_or_default()
+                            self.colors
+                                .get(h as usize)
+                                .map(Color::to_string)
+                                .unwrap_or_default()
                         },
                         self.graphs
                             .get(&self.current)
                             .map(|graph| {
-                                graph.get(if self.invert { self.height - 1 - h } else { h } as usize)
+                                graph
+                                    .get(if self.invert { self.height - 1 - h } else { h } as usize)
                             })
                             .flatten()
                             .cloned()
@@ -429,7 +453,7 @@ impl Graph {
         }
     }
 
-    pub fn call(&mut self, value: Option<i32>, term : &mut Term) -> String {
+    pub fn call(&mut self, value: Option<i32>, term: &mut Term) -> String {
         if let Some(value) = value {
             self.current = !self.current;
 
@@ -479,7 +503,7 @@ impl Graph {
         self.out.clone()
     }
 
-    pub fn add(&mut self, value: Option<i32>, term : &mut Term) -> String {
+    pub fn add(&mut self, value: Option<i32>, term: &mut Term) -> String {
         self.call(value, term)
     }
 }

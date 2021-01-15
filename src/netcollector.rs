@@ -14,11 +14,11 @@ use {
         units_to_bytes,
     },
     chrono::Duration,
-    heim_net::{io_counters, nic, IoCounters, Nic},
-    std::{collections::HashMap, time::SystemTime},
+    heim::net::{io_counters, nic, IoCounters, Nic},
+    std::{collections::HashMap, fmt, time::SystemTime},
 };
 
-#[derive(Clone, Debug, PartialEq, Display)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NetCollectorStat {
     U64(u64),
     Vec(Vec<u64>),
@@ -26,15 +26,33 @@ pub enum NetCollectorStat {
     I32(i32),
     String(String),
 }
+impl fmt::Display for NetCollectorStat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NetCollectorStat::U64(u) => write!(f, "{}", u.to_owned()),
+            NetCollectorStat::Vec(v) => write!(
+                f,
+                "{}",
+                v.iter()
+                    .map(|i| i.to_owned().to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            NetCollectorStat::Bool(b) => write!(f, "{}", b.to_owned()),
+            NetCollectorStat::I32(i) => write!(f, "{}", i.to_owned()),
+            NetCollectorStat::String(s) => write!(f, "{}", s.clone()),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct NetCollector<'a> {
     pub parent: Collector<'a>,
     pub buffer: String,
-    pub nics: Vec<String>,
+    pub nics: Vec<&'a Nic>,
     pub nic_i: i32,
-    pub nic: String,
-    pub new_nic: String,
+    pub nic: Nic,
+    pub new_nic: Nic,
     pub nic_error: bool,
     pub reset: bool,
     pub graph_raise: HashMap<String, i32>,
@@ -93,7 +111,10 @@ impl<'a> NetCollector<'a> {
                 Poll::Pending => (),
                 Poll::Ready(o) => match o {
                     Some(res) => match res {
-                        Ok(val) => io_all.insert(val.interface().to_owned(), val),
+                        Ok(val) => {
+                            io_all.insert(val.interface().to_owned(), val);
+                            ()
+                        },
                         Err(e) => {
                             if !self.nic_error {
                                 self.nic_error = true;
@@ -118,7 +139,10 @@ impl<'a> NetCollector<'a> {
                 Poll::Pending => (),
                 Poll::Ready(o) => match o {
                     Some(res) => match res {
-                        Ok(val) => up_stat.insert(val.name().to_owned(), val),
+                        Ok(val) => {
+                            up_stat.insert(val.name().to_owned(), val);
+                            ()
+                        },
                         Err(e) => {
                             if !self.nic_error {
                                 self.nic_error = true;
@@ -132,10 +156,10 @@ impl<'a> NetCollector<'a> {
         }
 
         for (nic, _) in io_all {
-            match up_stat.get(nic) {
+            match up_stat.get(&nic) {
                 Some(n) => {
                     if n.is_up() {
-                        self.nics.append(n.clone())
+                        self.nics.push(n.to_owned())
                     } else {
                         ()
                     }
@@ -149,12 +173,12 @@ impl<'a> NetCollector<'a> {
         self.nic = self.nics[self.nic_i as usize];
     }
 
-    pub fn switch(&mut self, key: String, collector: &mut Collector, CONFIG: &mut Config) {
+    pub fn switch(&mut self, key: String, collector: &'a mut Collector, CONFIG: &mut Config) {
         if self.nics.len() < 2 {
             return;
         }
         self.nic_i += if key == "n".to_owned() { 1 } else { -1 };
-        if self.nic_i >= self.nics.len() {
+        if self.nic_i >= self.nics.len() as i32 {
             self.nic_i = 0;
         } else if self.nic_i < 0 {
             self.nic_i = self.nics.len() as i32 - 1;
@@ -184,7 +208,10 @@ impl<'a> NetCollector<'a> {
                 Poll::Pending => (),
                 Poll::Ready(o) => match o {
                     Some(res) => match res {
-                        Ok(val) => up_stat.insert(val.name().to_owned(), val),
+                        Ok(val) => {
+                            up_stat.insert(val.name().to_owned(), val);
+                            ()
+                        },
                         Err(e) => {
                             if !self.nic_error {
                                 self.nic_error = true;
@@ -284,26 +311,32 @@ impl<'a> NetCollector<'a> {
                     .collect::<Vec<String>>()
                 {
                     match self.strings.get_mut(&self.nic) {
-                        Some(h) => h.insert(v, String::default()),
+                        Some(h) => {
+                            h.insert(v, HashMap::<String, String>::new());
+                            ()
+                        }
                         None => (),
                     }
                 }
             }
         }
 
-        match self.stats.get_mut(self.nic) {
+        match self.stats.get_mut(&self.nic) {
             Some(h) => {
                 match h.get_mut(&"download".to_owned()) {
-                    Some(hash) => hash.insert(
-                        "total".to_owned(),
-                        NetCollectorStat::U64(io_all.bytes_recv::<u64>()),
-                    ),
+                    Some(hash) => {
+                        hash.insert(
+                            "total".to_owned(),
+                            NetCollectorStat::U64(io_all.bytes_recv().value),
+                        );
+                        ()
+                    },
                     None => (),
                 }
                 match h.get_mut(&"upload".to_owned()) {
                     Some(hash) => hash.insert(
                         "total".to_owned(),
-                        NetCollectorStat::U64(io_all.bytes_sent::<u64>()),
+                        NetCollectorStat::U64(io_all.bytes_sent().value),
                     ),
                     None => (),
                 }

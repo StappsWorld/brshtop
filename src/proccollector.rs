@@ -15,14 +15,12 @@ use {
         procbox::ProcBox,
         SYSTEM,
         term::Term,
+        theme::Theme,
         THREADS,
     },
     core::time::Duration,
     math::round::ceil,
     psutil::{
-        disk::DiskIoCounters,
-        network::NetIoCounters,
-        process,
         process::{
             os::{linux::IoCounters, unix::ProcessExt},
             *,
@@ -32,15 +30,11 @@ use {
     std::{
         cmp::Ordering,
         collections::HashMap,
-        convert::TryInto,
         fmt::Display,
-        path::Path,
-        time::{Duration, Instant},
     },
-    users::get_user_by_uid,
 };
 
-#[derive(Clone, Display)]
+#[derive(Clone)]
 pub enum ProcCollectorDetails {
     Bool(bool),
     Status(Status),
@@ -175,7 +169,6 @@ impl<'a> ProcCollector<'a> {
         &mut self,
         brshtop_box: &mut BrshtopBox,
         CONFIG: &mut Config,
-        THREADS: u64,
         procbox: &mut ProcBox,
     ) {
         if brshtop_box.stat_mode {
@@ -1037,7 +1030,7 @@ impl<'a> ProcCollector<'a> {
                             }
                         },
                         ProcCollectorDetails::VecString(v) => {
-                            let ws : String = v.join(', ').trim().to_owned();
+                            let ws : String = v.join(", ").trim().to_owned();
                         },
                         _ => {
                             errlog("Malformed type in getinfo['cmdline']".to_owned());
@@ -1133,7 +1126,7 @@ impl<'a> ProcCollector<'a> {
                         ("mem_b", ProcCollectorDetails::U64(mem_b)),
                         ("cpu", ProcCollectorDetails::F32(cpu)),
                         ("depth", ProcCollectorDetails::U32(depth)),
-                    ].iter().map(|(s, p)| (s.to_owned().to_owned(), p.clone())).collect::<HashMap<String, ProcCollectorDetails>>();
+                    ].iter().map(|(s, p)| (s.to_owned().to_owned(), p.clone())).collect::<HashMap<String, ProcCollectorDetails>>()
                 );
             }
         }

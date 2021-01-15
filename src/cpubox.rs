@@ -320,7 +320,7 @@ impl CpuBox {
         return return_true || self.resized || self.redraw || menu.active;
     }
 
-    pub fn draw_fg<P: AsRef<Path>>(
+    pub fn draw_fg(
         &mut self,
         cpu: &mut CpuCollector,
         config: &mut Config,
@@ -430,7 +430,7 @@ impl CpuBox {
 
             if self.sub.column_size > 0 || ct_width > 0 {
                 for n in 0..THREADS as usize {
-                    graphs.cores[n] = Graph::new::<Color>(
+                    graphs.cores[n] = Graph::new(
                         5, 
                         1, 
                         None, 
@@ -444,7 +444,7 @@ impl CpuBox {
                 }
             }
             if cpu.got_sensors {
-                graphs.temps[0] = Graph::new::<Color>(
+                graphs.temps[0] = Graph::new(
                     5, 
                     1, 
                     None, 
@@ -460,7 +460,7 @@ impl CpuBox {
                         if cpu.cpu_temp[n].len() == 0 {
                             continue;
                         }
-                        graphs.temps[n] = Graph::new::<Color>(
+                        graphs.temps[n] = Graph::new(
                             5, 
                             1, 
                             None, 

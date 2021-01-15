@@ -4,6 +4,7 @@ use {
         config::{Config, ViewMode},
         create_box,
         draw::Draw,
+        error::errlog,
         fx,
         graph::{Graph, Graphs},
         key::Key,
@@ -142,7 +143,7 @@ impl NetBox {
             return;
         }
 
-        let mut net: NetCollector = NetCollector::new();
+        let mut net: NetCollector = NetCollector::new(self, CONFIG);
         if net.parent.redraw {
             self.redraw = true;
         }
@@ -162,12 +163,17 @@ impl NetBox {
         let bh = self.sub.box_height - 2;
         let reset: bool = match net.stats[&net.nic][&"download".to_owned()][&"offset".to_owned()] {
             NetCollectorStat::Bool(b) => b,
-            NetCollectorStat::Int(i) => i > 0,
+            NetCollectorStat::I32(i) => i > 0,
+            NetCollectorStat::U64(u) => u > 0,
             NetCollectorStat::Vec(v) => v.len() > 0,
+            NetCollectorStat::String(s) => {
+                errlog(format!("Malformed type in net.stats[{}]['download']['offset']", net.nic));
+                s.parse::<i64>().unwrap_or(0) > 0
+            }
         };
 
         if self.resized || self.redraw {
-            out_misc.push_str(self.draw_bg(theme).as_str());
+            out_misc.push_str(self.draw_bg(theme, term).as_str());
             if key.mouse.contains_key(&"b".to_owned()) {
                 let mut b_vec_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
@@ -367,8 +373,13 @@ impl NetBox {
             }
             if match stats["redraw"] {
                 NetCollectorStat::Bool(b) => b,
-                NetCollectorStat::Int(i) => i > 0,
+                NetCollectorStat::I32(i) => i > 0,
                 NetCollectorStat::Vec(v) => v.len() > 0,
+                NetCollectorStat::U64(u) => u > 0,
+                NetCollectorStat::String(s) => {
+                    errlog("Malformed type in stats['redraw']".to_owned());
+                    s.parse::<i32>().unwrap_or(0) > 0
+                },
             } || self.resized
             {
                 graphs.net[&direction] = Graph::new_with_vec::<Color>(
@@ -376,7 +387,7 @@ impl NetBox {
                     self.graph_height[&direction],
                     theme.gradient[&direction],
                     match stats[&"speed".to_owned()] {
-                        NetCollectorStat::Vec(v) => v,
+                        NetCollectorStat::Vec(v) => v.iter().map(|u| u.to_owned() as i32).collect(),
                         _ => vec![],
                     },
                     term,
@@ -385,9 +396,14 @@ impl NetBox {
                         net.sync_top
                     } else {
                         match stats[&"graph_top".to_owned()] {
-                            NetCollectorStat::Bool(b) => b as i32,
-                            NetCollectorStat::Int(i) => i,
+                            NetCollectorStat::Bool(b) => if b {1} else {0},
+                            NetCollectorStat::I32(i) => i,
                             NetCollectorStat::Vec(v) => 0,
+                            NetCollectorStat::U64(u) => u as i32,
+                            NetCollectorStat::String(s) => {
+                                errlog("Malformed type in stats['graph_top']".to_owned());
+                                s.parse::<i32>().unwrap_or(0)
+                            },
                         }
                     },
                     0,
@@ -413,13 +429,18 @@ impl NetBox {
                     graphs.net[&direction].call(
                         if match stats[&"redraw".to_owned()] {
                             NetCollectorStat::Bool(b) => b,
-                            NetCollectorStat::Int(i) => i > 0,
+                            NetCollectorStat::I32(i) => i > 0,
                             NetCollectorStat::Vec(v) => v.len() > 0,
+                            NetCollectorStat::U64(u) => u > 0,
+                            NetCollectorStat::String(s) => {
+                                errlog("Malformed type in stats['redraw']".to_owned());
+                                s.parse::<i32>().unwrap_or(0) > 0
+                            },
                         } {
                             None
                         } else {
                             Some(match stats[&"speed".to_owned()] {
-                                NetCollectorStat::Vec(v) => v[v.len() - 2],
+                                NetCollectorStat::Vec(v) => v[v.len() - 2] as i32,
                                 _ => 0,
                             })
                         },

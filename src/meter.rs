@@ -7,7 +7,7 @@ use {
     },
     std::{
         collections::HashMap,
-        string::ToString,
+        fmt,
     },
 };
 
@@ -122,8 +122,8 @@ pub struct Meter {
 
 
 
-} impl ToString for Meter {
-    fn to_string(&self) -> String {
-        self.out
+} impl fmt::Display for Meter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.out.clone())
     }
 }

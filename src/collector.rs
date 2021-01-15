@@ -1,4 +1,4 @@
-use crate::{cpucollector, netbox};
+use crate::{cpucollector, netbox, procbox};
 
 use {
     crate::{
@@ -15,6 +15,7 @@ use {
         netbox::NetBox,
         netcollector::NetCollector,
         proccollector::ProcCollector,
+        procbox::ProcBox,
         term::Term,
         theme::Theme,
         timeit::TimeIt,
@@ -37,8 +38,6 @@ pub struct Collector<'a> {
     pub draw_now: bool,
     pub redraw: bool,
     pub only_draw: bool,
-    pub tx: Sender<Event>,
-    pub rx: Receiver<Event>,
     pub thread: Option<thread::JoinHandle<()>>,
     pub flag: Flag,
     pub control: Control,
@@ -53,7 +52,6 @@ pub struct Collector<'a> {
 }
 impl<'a> Collector<'a> {
     pub fn new() -> Self {
-        let (tx_build, rx_build) = channel();
         let (flag_build, control_build) = make_pair();
         Collector {
             stopping: false,
@@ -61,16 +59,14 @@ impl<'a> Collector<'a> {
             draw_now: false,
             redraw: false,
             only_draw: false,
-            tx: tx_build,
-            rx: rx_build,
             flag: flag_build,
             control: control_build,
             thread: None,
             collect_run: Event::Flag(false),
             collect_done: Event::Flag(false),
             collect_idle: Event::Flag(true),
-            collect_queue: Vec::<Collectors>::new(),
-            default_collect_queue: Vec::<Collectors>::new(),
+            collect_queue: Vec::<Collectors<'a>>::new(),
+            default_collect_queue: Vec::<Collectors<'a>>::new(),
             collect_interrupt: false,
             proc_interrupt: false,
             use_draw_list: false,
@@ -80,7 +76,7 @@ impl<'a> Collector<'a> {
     /// Defaults draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False
     pub fn collect(
         &mut self,
-        collectors: Vec<Collectors>,
+        collectors: Vec<Collectors<'a>>,
         CONFIG: &mut Config,
         draw_now: bool,
         interrupt: bool,
@@ -113,7 +109,7 @@ impl<'a> Collector<'a> {
         &'static mut self,
         CONFIG: &'static mut Config,
         DEBUG: bool,
-        collectors: Vec<Collectors>,
+        collectors: Vec<Collectors<'static>>,
         brshtop_box: &'static mut BrshtopBox,
         timeit: &'static mut TimeIt,
         menu: &'static mut Menu,
@@ -129,29 +125,33 @@ impl<'a> Collector<'a> {
         graphs: &'static mut Graphs,
         meters: &'static mut Meters,
         netbox: &'static mut NetBox,
+        procbox : &'static mut ProcBox,
     ) {
         self.stopping = false;
-        self.thread = Some(thread::spawn(|| {
-            self.runner(
-                CONFIG,
-                DEBUG,
-                THREADS,
-                brshtop_box,
-                timeit,
-                menu,
-                draw,
-                term,
-                CORES,
-                CORE_MAP,
-                cpu_box,
-                key,
-                THEME,
-                ARG_MODE,
-                graphs,
-                meters,
-                netbox,
-            )
-        }));
+        unsafe {
+            self.thread = Some(thread::spawn(|| {
+                self.runner(
+                    CONFIG,
+                    DEBUG,
+                    THREADS,
+                    brshtop_box,
+                    timeit,
+                    menu,
+                    draw,
+                    term,
+                    CORES,
+                    CORE_MAP,
+                    cpu_box,
+                    key,
+                    THEME,
+                    ARG_MODE,
+                    graphs,
+                    meters,
+                    netbox,
+                    procbox
+                )
+            }));
+        }
         self.started = true;
         self.default_collect_queue = collectors.clone();
     }
@@ -193,6 +193,7 @@ impl<'a> Collector<'a> {
         graphs: &mut Graphs,
         meters: &mut Meters,
         netbox: &mut NetBox,
+        procbox : &mut ProcBox,
     ) {
         let mut draw_buffers = Vec::<String>::new();
 
@@ -224,8 +225,8 @@ impl<'a> Collector<'a> {
                         Collectors::CpuCollector(c) => {
                             c.collect(CONFIG, THREADS, term, CORES, CORE_MAP, cpu_box, brshtop_box)
                         }
-                        Collectors::NetCollector(n) => n.collect(),
-                        Collectors::ProcCollector(p) => p.collect(),
+                        Collectors::NetCollector(n) => n.collect(CONFIG, netbox),
+                        Collectors::ProcCollector(p) => p.collect(brshtop_box, CONFIG, procbox),
                     }
                 }
                 match collector {
@@ -236,7 +237,7 @@ impl<'a> Collector<'a> {
                     Collectors::NetCollector(_) => {
                         netbox.draw_fg(THEME, key, term, CONFIG, draw, graphs, menu)
                     }
-                    Collectors::ProcCollector(p) => p.draw_fg(),
+                    Collectors::ProcCollector(p) => p.draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu),
                 }
 
                 if self.use_draw_list {
@@ -274,9 +275,8 @@ impl<'a> Collector<'a> {
         }
     }
 }
-impl Clone for Collector {
+impl<'a> Clone for Collector<'a> {
     fn clone(&self) -> Self {
-        let (tx_build, rx_build) = channel();
         let (flag_build, control_build) = make_pair();
         Collector {
             stopping: self.stopping.clone(),
@@ -284,8 +284,6 @@ impl Clone for Collector {
             draw_now: self.draw_now.clone(),
             redraw: self.redraw.clone(),
             only_draw: self.only_draw.clone(),
-            tx: tx_build,
-            rx: rx_build,
             thread: None,
             flag: flag_build,
             control: control_build,
