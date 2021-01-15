@@ -15,15 +15,11 @@ use {
         mv,
         theme::{Color, Theme},
         timer::Timer,
-        THREADS,
     },
     std::{
         collections::HashMap,
         io,
-        os::unix::io::{AsRawFd, RawFd},
-        path::Path,
-        sync::mpsc::*,
-        thread,
+        os::unix::io::AsRawFd,
     },
     terminal_size::{terminal_size, Height, Width},
     termios::*,
@@ -125,8 +121,8 @@ impl Term {
             draw.now(
                 vec![
                     create_box(
-                        (self._w / 2) - 25,
-                        (self._h / 2) - 2,
+                        (self._w as u32 / 2) - 25,
+                        (self._h as u32 / 2) - 2,
                         50,
                         3,
                         Some(String::from("resizing")),
@@ -159,8 +155,8 @@ impl Term {
                 draw.now(
                     vec![
                         create_box(
-                            (self._w / 2) - 25,
-                            (self._h / 2) - 2,
+                            (self._w as u32 / 2) - 25,
+                            (self._h as u32 / 2) - 2,
                             50,
                             5,
                             Some(String::from("warning")),
@@ -237,7 +233,7 @@ impl Term {
         }
 
         key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
-        brshtop_box.calc_sizes(boxes, THREADS, self);
+        brshtop_box.calc_sizes(boxes, self, config);
         if init.running {
             self.resized = false;
             return;
@@ -249,7 +245,7 @@ impl Term {
 
         brshtop_box.draw_bg(false, draw, boxes, menu, config, cpu_box, key, theme, self);
         self.resized = false;
-        timer.finish();
+        timer.finish(key, config);
 
         return;
     }

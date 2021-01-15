@@ -64,7 +64,7 @@ lazy_static! {
     pub static ref CONFIG_DIR: &'static Path = {
         let config_dir_builder =
             expanduser("~").unwrap().to_str().unwrap().to_owned() + "/.config/brshtop";
-        Path::new(config_dir_builder.as_str());
+        Path::new(config_dir_builder.as_str())
     };
     pub static ref SYSTEM: String = match env::consts::OS {
         "linux" => String::from("Linux"),

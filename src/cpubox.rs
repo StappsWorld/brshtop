@@ -15,6 +15,7 @@ use {
         symbol,
         term::Term,
         theme::{Color, Theme},
+        THREADS,
     },
     battery::{
         units::{ratio::percent, time::second},
@@ -80,8 +81,8 @@ impl CpuBox {
         }
     }
 
-    pub fn calc_size(&mut self, THREADS: u64, term: &mut Term, brshtop_box: &mut BrshtopBox) {
-        let cpu: CpuCollector = CpuCollector::new(THREADS);
+    pub fn calc_size(&mut self, term: &mut Term, brshtop_box: &mut BrshtopBox) {
+        let cpu: CpuCollector = CpuCollector::new(THREADS.to_owned());
         let mut height_p: u32 = 0;
         height_p = if self.parent.proc_mode {
             20
@@ -99,7 +100,7 @@ impl CpuBox {
         brshtop_box._b_cpu_h = self.parent.height as i32;
 
         self.sub.box_columns =
-            ceil(((THREADS + 1) / (self.parent.height - 5) as u64) as f64, 0) as u32;
+            ceil(((THREADS.to_owned() + 1) / (self.parent.height - 5) as u64) as f64, 0) as u32;
 
         if self.sub.box_columns * (20 + if cpu.got_sensors { 13 } else { 21 })
             < self.parent.width - (self.parent.width / 3) as u32
@@ -125,7 +126,7 @@ impl CpuBox {
             self.sub.box_width = 8 + if cpu.got_sensors { 6 } else { 8 } * self.sub.box_columns + 1;
         }
 
-        self.sub.box_height = ceil((THREADS / self.sub.box_columns as u64) as f64, 0) as u32 + 4;
+        self.sub.box_height = ceil((THREADS.to_owned() / self.sub.box_columns as u64) as f64, 0) as u32 + 4;
 
         if self.sub.box_height > self.parent.height - 2 {
             self.sub.box_height = self.parent.height - 2;
@@ -331,7 +332,6 @@ impl CpuBox {
         ARG_MODE: ViewMode,
         graphs: &mut Graphs,
         meters : &mut Meters,
-        THREADS : u64,
         menu : &mut Menu,
         THEME : &mut Theme,
     ) {
@@ -429,7 +429,7 @@ impl CpuBox {
             );
 
             if self.sub.column_size > 0 || ct_width > 0 {
-                for n in 0..THREADS as usize {
+                for n in 0..THREADS.to_owned() as usize {
                     graphs.cores[n] = Graph::new(
                         5, 
                         1, 
@@ -456,7 +456,7 @@ impl CpuBox {
                     None
                 );
                 if self.sub.column_size > 1 {
-                    for n in 1..(THREADS + 1) as usize {
+                    for n in 1..(THREADS.to_owned() + 1) as usize {
                         if cpu.cpu_temp[n].len() == 0 {
                             continue;
                         }
@@ -642,11 +642,11 @@ impl CpuBox {
         }
 
         cy += 1;
-        for n in 1..(THREADS + 1) as usize {
+        for n in 1..(THREADS.to_owned() + 1) as usize {
             out.push_str(format!("{}{}{}{:<width$}",
                 theme.colors.main_fg,
                 mv::to(by + cy, bx + cx),
-                fx::b.to_owned() + "C" + if THREADS < 100 {
+                fx::b.to_owned() + "C" + if THREADS.to_owned() < 100 {
                     fx::ub
                 } else {
                     ""
@@ -718,7 +718,7 @@ impl CpuBox {
             out.push_str(theme.colors.div_line.call(symbol::v_line.to_owned(), term).to_string().as_str());
             cy += 1;
 
-            if cy > ceil((THREADS / self.sub.box_columns as u64) as f64, 0) as u32 && n != THREADS as usize {
+            if cy > ceil((THREADS.to_owned() / self.sub.box_columns as u64) as f64, 0) as u32 && n != THREADS.to_owned() as usize {
                 cc += 1;
                 cy = 1;
                 cx = ccw * cc;

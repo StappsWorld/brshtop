@@ -13,9 +13,12 @@ use {
         theme::Theme,
         units_to_bytes,
     },
-    chrono::Duration,
     heim::net::{io_counters, nic, IoCounters, Nic},
-    std::{collections::HashMap, fmt, time::SystemTime},
+    std::{
+        collections::HashMap,
+        fmt,
+        time::{Duration, SystemTime},
+    },
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,8 +54,8 @@ pub struct NetCollector<'a> {
     pub buffer: String,
     pub nics: Vec<&'a Nic>,
     pub nic_i: i32,
-    pub nic: Nic,
-    pub new_nic: Nic,
+    pub nic: Option<&'a Nic>,
+    pub new_nic: Option<&'a Nic>,
     pub nic_error: bool,
     pub reset: bool,
     pub graph_raise: HashMap<String, i32>,
@@ -71,10 +74,10 @@ impl<'a> NetCollector<'a> {
         NetCollector {
             parent: Collector::new(),
             buffer: netbox.buffer.clone(),
-            nics: Vec::<String>::new(),
+            nics: Vec::<&'a Nic>::new(),
             nic_i: 0,
-            nic: String::default(),
-            new_nic: String::default(),
+            nic: None,
+            new_nic: None,
             nic_error: false,
             reset: false,
             graph_raise: [("download", 5), ("upload", 5)]
@@ -102,7 +105,7 @@ impl<'a> NetCollector<'a> {
     /// Get a list of all network devices sorted by highest throughput
     pub fn get_nics(&mut self) {
         self.nic_i = 0;
-        self.nic = String::default();
+        self.nic = None;
         let io_all_stream = io_counters();
         let mut io_all: HashMap<String, IoCounters> = HashMap::<String, IoCounters>::new();
         let mut looping = true;
@@ -114,7 +117,7 @@ impl<'a> NetCollector<'a> {
                         Ok(val) => {
                             io_all.insert(val.interface().to_owned(), val);
                             ()
-                        },
+                        }
                         Err(e) => {
                             if !self.nic_error {
                                 self.nic_error = true;
@@ -142,7 +145,7 @@ impl<'a> NetCollector<'a> {
                         Ok(val) => {
                             up_stat.insert(val.name().to_owned(), val);
                             ()
-                        },
+                        }
                         Err(e) => {
                             if !self.nic_error {
                                 self.nic_error = true;
@@ -170,7 +173,7 @@ impl<'a> NetCollector<'a> {
         if self.nics.len() == 0 {
             self.nics = vec![];
         }
-        self.nic = self.nics[self.nic_i as usize];
+        self.nic = Some(self.nics[self.nic_i as usize]);
     }
 
     pub fn switch(&mut self, key: String, collector: &'a mut Collector, CONFIG: &mut Config) {
@@ -183,17 +186,20 @@ impl<'a> NetCollector<'a> {
         } else if self.nic_i < 0 {
             self.nic_i = self.nics.len() as i32 - 1;
         }
-        self.new_nic = self.nics[self.nic_i as usize];
+        self.new_nic = Some(self.nics[self.nic_i as usize]);
         self.switched = true;
-        collector.collect(
-            vec![Collectors::NetCollector(self)],
-            CONFIG,
-            true,
-            false,
-            false,
-            true,
-            false,
-        );
+
+        unsafe {
+            collector.collect(
+                vec![Collectors::<'a>::NetCollector(self)],
+                CONFIG,
+                true,
+                false,
+                false,
+                true,
+                false,
+            );
+        }
     }
 
     pub fn collect(&mut self, CONFIG: &mut Config, netbox: &mut NetBox) {
@@ -201,7 +207,7 @@ impl<'a> NetCollector<'a> {
         let mut stat: HashMap<String, NetCollectorStat> =
             HashMap::<String, NetCollectorStat>::new();
         let up_stat_stream = nic();
-        let mut up_stat: HashMap<String, Nic> = HashMap::<String, Nic>::new();
+        let mut up_stat: HashMap<String, &'a Nic> = HashMap::<String, &'a Nic>::new();
         let mut looping = true;
         while looping {
             match up_stat_stream.poll_next() {
@@ -211,7 +217,7 @@ impl<'a> NetCollector<'a> {
                         Ok(val) => {
                             up_stat.insert(val.name().to_owned(), val);
                             ()
-                        },
+                        }
                         Err(e) => {
                             if !self.nic_error {
                                 self.nic_error = true;
@@ -229,12 +235,15 @@ impl<'a> NetCollector<'a> {
             self.switched = false;
         }
 
-        if self.nic.len() == 0
-            || !up_stat.contains_key(&self.nic)
-            || !up_stat.get(&self.nic).unwrap().is_up()
+        if self.nic.is_none()
+            || !up_stat.contains_key(&self.nic.unwrap().name().to_owned())
+            || !up_stat
+                .get(&self.nic.unwrap().name().to_owned())
+                .unwrap()
+                .is_up()
         {
             self.get_nics();
-            if self.nic.len() == 0 {
+            if self.nic.is_none() {
                 return;
             }
         }
@@ -247,7 +256,10 @@ impl<'a> NetCollector<'a> {
                 Poll::Pending => (),
                 Poll::Ready(o) => match o {
                     Some(res) => match res {
-                        Ok(val) => io_all_hash.insert(val.interface().to_owned(), val),
+                        Ok(val) => {
+                            io_all_hash.insert(val.interface().to_owned(), val);
+                            ()
+                        }
                         Err(e) => {
                             if !self.nic_error {
                                 self.nic_error = true;
@@ -260,18 +272,21 @@ impl<'a> NetCollector<'a> {
             }
         }
 
-        let mut io_all: &IoCounters = match io_all_hash.get(self.nic) {
+        let mut io_all: &IoCounters = match io_all_hash.get(&self.nic.unwrap().name().to_owned()) {
             Some(i) => i,
             None => return,
         };
 
-        if !self.stats.contains_key(&self.nic) {
+        if !self
+            .stats
+            .contains_key(&self.nic.unwrap().name().to_owned())
+        {
             self.stats.insert(
-                self.nic,
+                self.nic.unwrap().name().to_owned(),
                 HashMap::<String, HashMap<String, NetCollectorStat>>::new(),
             );
             self.strings.insert(
-                self.nic,
+                self.nic.unwrap().name().to_owned(),
                 vec![
                     ("download", HashMap::<String, String>::new()),
                     ("upload", HashMap::<String, String>::new()),
@@ -281,36 +296,39 @@ impl<'a> NetCollector<'a> {
                 .collect::<HashMap<String, HashMap<String, String>>>(),
             );
             for (direction, value) in vec![
-                ("download", io_all.bytes_recv::<u64>()),
-                ("upload", io_all.bytes_sent::<u64>()),
+                ("download", io_all.bytes_recv().value),
+                ("upload", io_all.bytes_sent().value),
             ]
             .iter()
             .map(|(s, b)| (s.to_owned().to_owned(), b.clone()))
             .collect::<HashMap<String, u64>>()
             {
-                self.stats.get_mut(&self.nic).unwrap().insert(
-                    direction,
-                    vec![
-                        ("total", NetCollectorStat::U64(value)),
-                        ("last", NetCollectorStat::U64(value)),
-                        ("top", NetCollectorStat::U64(0)),
-                        ("graph_top", NetCollectorStat::U64(0)),
-                        ("offset", NetCollectorStat::U64(0)),
-                        ("speed", NetCollectorStat::Vec(Vec::<u64>::new())),
-                        ("redraw", NetCollectorStat::Bool(true)),
-                        ("graph_raise", NetCollectorStat::U64(0)),
-                        ("graph_lower", NetCollectorStat::U64(7)),
-                    ]
-                    .iter()
-                    .map(|(s, n)| (s.to_owned().to_owned(), n.clone()))
-                    .collect::<HashMap<String, NetCollectorStat>>(),
-                );
+                self.stats
+                    .get_mut(&self.nic.unwrap().name().to_owned())
+                    .unwrap()
+                    .insert(
+                        direction,
+                        vec![
+                            ("total", NetCollectorStat::U64(value)),
+                            ("last", NetCollectorStat::U64(value)),
+                            ("top", NetCollectorStat::U64(0)),
+                            ("graph_top", NetCollectorStat::U64(0)),
+                            ("offset", NetCollectorStat::U64(0)),
+                            ("speed", NetCollectorStat::Vec(Vec::<u64>::new())),
+                            ("redraw", NetCollectorStat::Bool(true)),
+                            ("graph_raise", NetCollectorStat::U64(0)),
+                            ("graph_lower", NetCollectorStat::U64(7)),
+                        ]
+                        .iter()
+                        .map(|(s, n)| (s.to_owned().to_owned(), n.clone()))
+                        .collect::<HashMap<String, NetCollectorStat>>(),
+                    );
                 for v in vec!["total", "byte_ps", "bit_ps", "top", "graph_top"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
                     .collect::<Vec<String>>()
                 {
-                    match self.strings.get_mut(&self.nic) {
+                    match self.strings.get_mut(&self.nic.unwrap().name().to_owned()) {
                         Some(h) => {
                             h.insert(v, HashMap::<String, String>::new());
                             ()
@@ -321,7 +339,7 @@ impl<'a> NetCollector<'a> {
             }
         }
 
-        match self.stats.get_mut(&self.nic) {
+        match self.stats.get_mut(&self.nic.unwrap().name().to_owned()) {
             Some(h) => {
                 match h.get_mut(&"download".to_owned()) {
                     Some(hash) => {
@@ -330,14 +348,17 @@ impl<'a> NetCollector<'a> {
                             NetCollectorStat::U64(io_all.bytes_recv().value),
                         );
                         ()
-                    },
+                    }
                     None => (),
                 }
                 match h.get_mut(&"upload".to_owned()) {
-                    Some(hash) => hash.insert(
-                        "total".to_owned(),
-                        NetCollectorStat::U64(io_all.bytes_sent().value),
-                    ),
+                    Some(hash) => {
+                        hash.insert(
+                            "total".to_owned(),
+                            NetCollectorStat::U64(io_all.bytes_sent().value),
+                        );
+                        ()
+                    }
                     None => (),
                 }
                 for direction in vec!["download", "upload"]
@@ -345,70 +366,75 @@ impl<'a> NetCollector<'a> {
                     .map(|s| s.to_owned().to_owned())
                     .collect::<Vec<String>>()
                 {
-                    stat = h.get(&direction).clone();
+                    stat = h.get(&direction).unwrap().clone();
                     let mut strings: HashMap<String, NetCollectorStat> = self
                         .strings
-                        .get(&self.nic)
+                        .get(&self.nic.unwrap().name().to_owned())
                         .unwrap()
                         .get(&direction)
                         .unwrap()
+                        .iter()
+                        .map(|(s1, s2)| (s1.clone(), NetCollectorStat::String(s2.clone())))
+                        .collect()
                         .clone();
                     // * Calculate current speed
-                    let speed_vec = match stat.get(&"speed".to_owned()) {
-                        NetCollectorStat::Vec(v) => v,
+                    let speed_vec = match stat.get(&"speed".to_owned()).unwrap() {
+                        NetCollectorStat::Vec(v) => v.clone(),
                         _ => {
                             errlog("Malformed type in stat['speed']".to_owned());
                             vec![]
                         }
                     };
-                    let total = match stat.get(&"total".to_owned()) {
-                        NetCollectorStat::U64(u) => u,
+                    let total = match stat.get(&"total".to_owned()).unwrap() {
+                        NetCollectorStat::U64(u) => u.to_owned(),
                         _ => {
                             errlog("Malformed type in stat['total']".to_owned());
-                            vec![]
+                            0
                         }
                     };
-                    let last = match stat.get(&"last".to_owned()) {
-                        NetCollectorStat::U64(u) => u,
+                    let last = match stat.get(&"last".to_owned()).unwrap() {
+                        NetCollectorStat::U64(u) => u.to_owned(),
                         _ => {
                             errlog("Malformed type in stat['last']".to_owned());
-                            vec![]
+                            0
                         }
                     };
                     speed_vec.push(
-                        (total - stat)
+                        (total - last)
                             / self
                                 .timestamp
                                 .elapsed()
-                                .unwrap_or(Duration::seconds(1))
+                                .unwrap_or(Duration::from_secs(1))
                                 .as_secs(),
                     );
                     last = total;
-                    speed = speed_vec[speed_vec.len() - 2];
+                    speed = speed_vec[speed_vec.len() - 2] as i32;
 
-                    if self.net_min.get(&direction).unwrap_or(0) == -1 {
+                    if self.net_min.get(&direction).unwrap_or(&0).to_owned() == -1 {
                         self.net_min.insert(
                             direction.clone(),
                             units_to_bytes(match direction.as_str() {
                                 "download" => CONFIG.net_download,
                                 "upload" => CONFIG.net_upload,
-                            }),
+                            }) as i32,
                         );
                         stat.insert(
                             "graph_top".to_owned(),
-                            NetCollectorStat::I32(self.net_min.get(&direction).unwrap()),
+                            NetCollectorStat::I32(self.net_min.get(&direction).unwrap().to_owned()),
                         );
                         stat.insert("graph_lower".to_owned(), NetCollectorStat::I32(7));
                         if !self.auto_min {
                             stat.insert("redraw".to_owned(), NetCollectorStat::Bool(true));
                             strings.insert(
-                                "graph_top",
+                                "graph_top".to_owned(),
                                 NetCollectorStat::String(floating_humanizer(
                                     match stat.get(&"graph_top".to_owned()).unwrap() {
                                         NetCollectorStat::I32(i) => i.to_owned() as f64,
                                         NetCollectorStat::U64(u) => u.to_owned() as f64,
                                         _ => {
-                                            errlog("Malformed type in strings['graph_top']");
+                                            errlog(
+                                                "Malformed type in strings['graph_top']".to_owned(),
+                                            );
                                             0.0
                                         }
                                     },
@@ -425,12 +451,12 @@ impl<'a> NetCollector<'a> {
                             NetCollectorStat::I32(i) => i.to_owned() as u64,
                             NetCollectorStat::U64(u) => u.to_owned(),
                             _ => {
-                                errlog("Malformed type in stat['offset']");
+                                errlog("Malformed type in stat['offset']".to_owned());
                                 0
                             }
                         },
                         None => {
-                            errlog("Error getting stat['offset']");
+                            errlog("Error getting stat['offset']".to_owned());
                             0
                         }
                     };
@@ -457,7 +483,7 @@ impl<'a> NetCollector<'a> {
                     strings.insert(
                         "total".to_owned(),
                         NetCollectorStat::String(floating_humanizer(
-                            (total - offset) as f64,
+                            (total - stat_offset) as f64,
                             false,
                             false,
                             0,
@@ -467,7 +493,7 @@ impl<'a> NetCollector<'a> {
                     strings.insert(
                         "byte_ps".to_owned(),
                         NetCollectorStat::String(floating_humanizer(
-                            speed_vec[speed_vec.len() - 2],
+                            speed_vec[speed_vec.len() - 2] as f64,
                             false,
                             true,
                             0,
@@ -477,7 +503,7 @@ impl<'a> NetCollector<'a> {
                     strings.insert(
                         "bit_ps".to_owned(),
                         NetCollectorStat::String(floating_humanizer(
-                            speed_vec[speed_vec.len() - 2],
+                            speed_vec[speed_vec.len() - 2] as f64,
                             true,
                             true,
                             0,
@@ -489,7 +515,7 @@ impl<'a> NetCollector<'a> {
                         NetCollectorStat::I32(i) => i.to_owned(),
                         NetCollectorStat::U64(u) => u.to_owned() as i32,
                         _ => {
-                            errlog("Malformed type in stat['top']");
+                            errlog("Malformed type in stat['top']".to_owned());
                             0
                         }
                     };
@@ -505,27 +531,27 @@ impl<'a> NetCollector<'a> {
                     }
 
                     if self.auto_min {
-                        let graph_lowergraph_top: i32 = match stat.get("graph_top".to_owned()) {
-                            NetCollectorStat::I32(i) => i,
-                            NetCollectorStat::U64(u) => u as i32,
+                        let graph_top: i32 = match stat.get(&"graph_top".to_owned()).unwrap() {
+                            NetCollectorStat::I32(i) => i.to_owned(),
+                            NetCollectorStat::U64(u) => u.to_owned() as i32,
                             _ => {
-                                errlog("Malformed type in stat['graph_top']");
+                                errlog("Malformed type in stat['graph_top']".to_owned());
                                 0
                             }
                         };
-                        let graph_raise: i32 = match stat.get("graph_raise".to_owned()) {
-                            NetCollectorStat::I32(i) => i,
-                            NetCollectorStat::U64(u) => u as i32,
+                        let graph_raise: i32 = match stat.get(&"graph_raise".to_owned()).unwrap() {
+                            NetCollectorStat::I32(i) => i.to_owned(),
+                            NetCollectorStat::U64(u) => u.to_owned() as i32,
                             _ => {
-                                errlog("Malformed type in stat['graph_raise']");
+                                errlog("Malformed type in stat['graph_raise']".to_owned());
                                 0
                             }
                         };
-                        let graph_lower: i32 = match stat.get("graph_lower".to_owned()) {
-                            NetCollectorStat::I32(i) => i,
-                            NetCollectorStat::U64(u) => u as i32,
+                        let graph_lower: i32 = match stat.get(&"graph_lower".to_owned()).unwrap() {
+                            NetCollectorStat::I32(i) => i.to_owned(),
+                            NetCollectorStat::U64(u) => u.to_owned() as i32,
                             _ => {
-                                errlog("Malformed type in stat['graph_lower']");
+                                errlog("Malformed type in stat['graph_lower']".to_owned());
                                 0
                             }
                         };
@@ -554,7 +580,7 @@ impl<'a> NetCollector<'a> {
                                 graph_top = if (10 << 10) > max * 3 {
                                     10 << 10
                                 } else {
-                                    max * 3
+                                    max as i32 * 3
                                 };
                             }
                             graph_raise = 0;
@@ -563,7 +589,11 @@ impl<'a> NetCollector<'a> {
                             strings.insert(
                                 "graph_top".to_owned(),
                                 NetCollectorStat::String(floating_humanizer(
-                                    graph_top, false, false, 0, true,
+                                    graph_top as f64,
+                                    false,
+                                    false,
+                                    0,
+                                    true,
                                 )),
                             );
                         }
@@ -579,9 +609,24 @@ impl<'a> NetCollector<'a> {
                     stat.insert("speed".to_owned(), NetCollectorStat::Vec(speed_vec));
 
                     self.strings
-                        .get_mut(&self.nic)
+                        .get_mut(&self.nic.unwrap().name().to_owned())
                         .unwrap()
-                        .insert(direction, string.clone());
+                        .insert(
+                            direction,
+                            strings
+                                .clone()
+                                .iter()
+                                .map(|(s1, s2)| {
+                                    (
+                                        s1.clone(),
+                                        match s2 {
+                                            NetCollectorStat::String(s) => s.clone(),
+                                            _ => "".to_owned(),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                        );
                     h.insert(direction, stat.clone());
                 }
 
@@ -590,7 +635,7 @@ impl<'a> NetCollector<'a> {
                 if CONFIG.net_sync {
                     let download_top = self
                         .stats
-                        .get(&self.nic)
+                        .get(&self.nic.unwrap().name().to_owned())
                         .unwrap()
                         .get(&"download".to_owned())
                         .unwrap()
@@ -598,17 +643,32 @@ impl<'a> NetCollector<'a> {
                         .unwrap();
                     let upload_top = self
                         .stats
-                        .get(&self.nic)
+                        .get(&self.nic.unwrap().name().to_owned())
                         .unwrap()
                         .get(&"upload".to_owned())
                         .unwrap()
                         .get(&"graph_top".to_owned())
                         .unwrap();
-                    let c_max: i32 = if download_top > upload_top {
-                        download_top
-                    } else {
-                        upload_top
+
+                    let dtu : i32 = match download_top {
+                        NetCollectorStat::I32(i) => i.to_owned(),
+                        NetCollectorStat::U64(u) => u.to_owned() as i32,
+                        NetCollectorStat::String(s) => s.to_owned().parse::<i32>().unwrap_or(0),
+                        _ => 0,
                     };
+                    let dut : i32 = match upload_top {
+                        NetCollectorStat::I32(i) => i.to_owned(),
+                        NetCollectorStat::U64(u) => u.to_owned() as i32,
+                        NetCollectorStat::String(s) => s.to_owned().parse::<i32>().unwrap_or(0),
+                        _ => 0,
+                    };
+
+                    let c_max: i32 = if dtu > dut {
+                        dtu
+                    } else {
+                        dut
+                    };
+
                     if c_max != self.sync_top {
                         self.sync_top = c_max;
                         self.sync_string =
@@ -619,7 +679,7 @@ impl<'a> NetCollector<'a> {
             }
             None => errlog(format!(
                 "Unable to access nic in self.stats (nic : {})",
-                self.nic
+                self.nic.unwrap().name()
             )),
         }
     }

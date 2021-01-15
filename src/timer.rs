@@ -33,15 +33,15 @@ pub struct Timer {
             return false;
         }
         match self.timestamp.checked_add(Duration::from_millis(CONFIG.update_ms as u64)).unwrap().duration_since(SystemTime::now()) {
-            Duration(_) => true,
-            _ => false,
+            Ok(_) => true,
+            Err(_) => false,
         }
     }
 
-    pub fn left(&mut self) -> Duration {
+    pub fn left(&mut self, CONFIG : &mut Config) -> Duration {
         match SystemTime::now().duration_since(self.timestamp.checked_add(Duration::from_millis(CONFIG.update_ms as u64)).unwrap()) {
-            Duration(d) => Duration::from_millis(0),
-            _ => self.timestamp.checked_add(Duration::from_millis(CONFIG.update_ms as u64)).unwrap().duration_since(SystemTime::now()).unwrap(),
+            Ok(_) => Duration::from_millis(0),
+            Err(_) => self.timestamp.checked_add(Duration::from_millis(CONFIG.update_ms as u64)).unwrap().duration_since(SystemTime::now()).unwrap(),
         }
     }
 

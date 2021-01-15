@@ -169,6 +169,12 @@ impl From<&Color> for Color {
         c.to_owned()
     }
 }
+impl From<Vec<String>> for Color {
+
+    fn from(v : Vec<String>) -> Self {
+        Self::new(v.join(" ")).unwrap()
+    }
+}
 
 #[derive(FromMapDefault, FromMap, Debug, Gradient, Clone)]
 #[value_type = "Color"]

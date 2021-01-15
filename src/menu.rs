@@ -220,7 +220,7 @@ impl<'a> Menu {
             skip = false;
             redraw = false;
 
-            if key_class.input_wait(timer.left().as_secs_f64(), true, draw, term) {
+            if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), true, draw, term) {
                 if key_class.mouse_moved() {
                     let (mx_set, my_set) = key_class.get_mouse();
                     mx = mx_set;
@@ -605,7 +605,7 @@ impl<'a> Menu {
                 skip = false;
                 redraw = false;
 
-                if key_class.input_wait(timer.left().as_secs_f64(), false, draw, term) {
+                if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
                     key = match key_class.get() {
                         Some(k) => k,
                         None => break,
@@ -1442,7 +1442,7 @@ impl<'a> Menu {
             skip = false;
             redraw = false;
 
-            if key_class.input_wait(timer.left().as_secs_f64(), false, draw, term) {
+            if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
                 key = match key_class.get() {
                     Some(k) => k,
                     None => "".to_owned(),

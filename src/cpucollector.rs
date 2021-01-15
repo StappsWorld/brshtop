@@ -200,7 +200,6 @@ impl<'a> CpuCollector<'a> {
             ARG_MODE,
             graphs,
             meters,
-            THREADS,
             menu,
             THEME
         );
@@ -562,7 +561,7 @@ impl<'a> CpuCollector<'a> {
                                 )
                             );
                             self.got_sensors = false;
-                            cpu_box.calc_size(THREADS, term, brshtop_box);
+                            cpu_box.calc_size(term, brshtop_box);
                             return;
                         }
                     };
@@ -585,7 +584,7 @@ impl<'a> CpuCollector<'a> {
                                 ),
                             );
                             self.got_sensors = false;
-                            cpu_box.calc_size(THREADS, term, brshtop_box);
+                            cpu_box.calc_size(term, brshtop_box);
                             return;
                         }
                     };
@@ -640,7 +639,7 @@ impl<'a> CpuCollector<'a> {
                                 ),
                             );
                             self.got_sensors = false;
-                            cpu_box.calc_size(THREADS, term, brshtop_box);
+                            cpu_box.calc_size(term, brshtop_box);
                             return;
                         }
                     };
@@ -668,7 +667,7 @@ impl<'a> CpuCollector<'a> {
                                 ),
                             );
                             self.got_sensors = false;
-                            cpu_box.calc_size(THREADS, term, brshtop_box);
+                            cpu_box.calc_size(term, brshtop_box);
                             return;
                         }
                     };

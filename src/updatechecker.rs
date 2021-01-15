@@ -1,7 +1,7 @@
 use {
     crate::{error::errlog, VERSION},
     reqwest::blocking::get,
-    std::{process::Command, str},
+    std::{process::Command, str, thread},
     which::which,
 };
 
@@ -9,7 +9,7 @@ pub struct UpdateChecker {
     pub version: String,
     pub thread: Option<thread::JoinHandle<()>>,
 }
-impl UpdateChecker {
+impl<'a> UpdateChecker {
     pub fn new() -> Self {
         UpdateChecker {
             version: VERSION.clone(),
@@ -17,7 +17,7 @@ impl UpdateChecker {
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&'static mut self) {
         self.thread = Some(thread::spawn(|| self.checker()));
     }
 
@@ -39,7 +39,7 @@ impl UpdateChecker {
             };
 
         for line in source.lines() {
-            line = match str::from_utf8(line) {
+            line = match str::from_utf8(line.as_bytes()) {
                 Ok(s) => s,
                 Err(e) => {
                     errlog(format!(
@@ -50,23 +50,23 @@ impl UpdateChecker {
                 }
             };
             if line.starts_with("VERSION: str = ") {
-                self.version = line[(line.find('=')) + 1..]
+                self.version = line[(line.find('=').unwrap()) + 1..]
                     .strip_prefix("\" \n")
-                    .unwrap_or(line[(line.find('=')) + 1..])
+                    .unwrap_or(&line[(line.find('=').unwrap()) + 1..])
                     .strip_suffix("\" \n")
-                    .unwrap_or(line[(line.find('=')) + 1..])
+                    .unwrap_or(&line[(line.find('=').unwrap()) + 1..])
                     .to_owned();
                 break;
             }
         }
 
-        if self.version != VERSION
+        if self.version != VERSION.to_owned()
             && match which::which("notify_send") {
                 Ok(p) => p.exists(),
                 Err(e) => false,
             }
         {
-            let command = Command::new("notify_send").args(&["-u", "normal", "BpyTop Update!", format!("New version of BpyTop available!\nCurrent version: {}\nNew version: {}\nDownload at github.com/aristocratos/bpytop", VERSION, self.version).as_str(), "-i", "update-notifier", "-t", "10000"]);
+            let command = Command::new("notify_send").args(&["-u", "normal", "BpyTop Update!", format!("New version of BpyTop available!\nCurrent version: {}\nNew version: {}\nDownload at github.com/aristocratos/bpytop", VERSION.to_owned(), self.version).as_str(), "-i", "update-notifier", "-t", "10000"]);
 
             match command.output() {
                 Ok(_) => (),

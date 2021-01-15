@@ -147,7 +147,7 @@ impl NetBox {
         if net.parent.redraw {
             self.redraw = true;
         }
-        if net.nic.len() == 0 {
+        if net.nic.is_none() {
             return;
         }
 
@@ -161,16 +161,18 @@ impl NetBox {
         let by = self.sub.box_y + 1;
         let bw = self.sub.box_width - 2;
         let bh = self.sub.box_height - 2;
-        let reset: bool = match net.stats[&net.nic][&"download".to_owned()][&"offset".to_owned()] {
+        let nic_name : String = net.nic.unwrap().name().to_owned();
+        let reset: bool = match net.stats[&nic_name][&"download".to_owned()][&"offset".to_owned()] {
             NetCollectorStat::Bool(b) => b,
             NetCollectorStat::I32(i) => i > 0,
             NetCollectorStat::U64(u) => u > 0,
             NetCollectorStat::Vec(v) => v.len() > 0,
             NetCollectorStat::String(s) => {
-                errlog(format!("Malformed type in net.stats[{}]['download']['offset']", net.nic));
+                errlog(format!("Malformed type in net.stats[{}]['download']['offset']", nic_name));
                 s.parse::<i64>().unwrap_or(0) > 0
             }
         };
+
 
         if self.resized || self.redraw {
             out_misc.push_str(self.draw_bg(theme, term).as_str());
@@ -179,7 +181,7 @@ impl NetBox {
 
                 for i in 0..4 {
                     let mut b_insert: Vec<i32> = Vec::<i32>::new();
-                    b_insert.push(x + w as i32 - net.nic[..10].len() as i32 - 9 + i);
+                    b_insert.push(x + w as i32 - nic_name[..10].len() as i32 - 9 + i);
                     b_insert.push(y - 1);
                     b_vec_top.push(b_insert);
                 }
@@ -201,7 +203,7 @@ impl NetBox {
 
                 for i in 0..4 {
                     let mut z_insert: Vec<i32> = Vec::<i32>::new();
-                    z_insert.push(x + w as i32 - net.nic[..10].len() as i32 - 14 + i);
+                    z_insert.push(x + w as i32 - nic_name[..10].len() as i32 - 14 + i);
                     z_insert.push(y - 1);
                     z_vec_top.push(z_insert);
                 }
@@ -213,7 +215,7 @@ impl NetBox {
                     "{}{}{}{}{}{}{}{}{}{}{}{}{}{} {} {}{}{}{}",
                     mv::to(y as u32 - 1, x as u32 + w - 25),
                     theme.colors.net_box,
-                    symbol::h_line.repeat(10 - net.nic[..10].len()),
+                    symbol::h_line.repeat(10 - nic_name[..10].len()),
                     symbol::title_left,
                     if reset { fx::bold } else { "" },
                     theme.colors.hi_fg.call("z".to_owned(), term),
@@ -228,7 +230,7 @@ impl NetBox {
                     symbol::title_left,
                     fx::b,
                     theme.colors.hi_fg.call("<b".to_owned(), term),
-                    theme.colors.title.call(net.nic[..10].to_owned(), term),
+                    theme.colors.title.call(nic_name[..10].to_owned(), term),
                     theme.colors.hi_fg.call("n>".to_owned(), term),
                     fx::ub,
                     theme
@@ -240,13 +242,13 @@ impl NetBox {
                 .as_str(),
             );
 
-            if (w as usize) - net.nic[..10].len() - 20 > 6 {
+            if (w as usize) - nic_name[..10].len() - 20 > 6 {
                 if !key.mouse.contains_key(&"a".to_owned()) {
                     let mut inserter_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
                     for i in 0..4 {
                         let mut inserter: Vec<i32> = Vec::<i32>::new();
 
-                        inserter.push(x + w as i32 - 20 - net.nic[..10].len() as i32 + i);
+                        inserter.push(x + w as i32 - 20 - nic_name[..10].len() as i32 + i);
                         inserter.push(y - 1);
                         inserter_top.push(inserter);
                     }
@@ -257,7 +259,7 @@ impl NetBox {
                         "{}{}{}{}{}{}{}{}",
                         mv::to(
                             (y as u32) - 1,
-                            (x as u32) + w - 21 - net.nic[..10].len() as u32
+                            (x as u32) + w - 21 - nic_name[..10].len() as u32
                         ),
                         theme
                             .colors
@@ -276,13 +278,13 @@ impl NetBox {
                     .as_str(),
                 );
             }
-            if w - net.nic[..10].len() as u32 - 20 > 6 {
+            if w - nic_name[..10].len() as u32 - 20 > 6 {
                 if !key.mouse.contains_key(&"a".to_owned()) {
                     let mut inserter_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..4 {
                         let mut inserter: Vec<i32> = Vec::<i32>::new();
-                        inserter.push(x + w as i32 - 20 - net.nic[..10].len() as i32 + i);
+                        inserter.push(x + w as i32 - 20 - nic_name[..10].len() as i32 + i);
                         inserter.push(y - 1);
                         inserter_top.push(inserter);
                     }
@@ -291,7 +293,7 @@ impl NetBox {
                 out_misc.push_str(
                     format!(
                         "{}{}{}{}{}{}{}{}",
-                        mv::to(y as u32 - 1, x as u32 + w - 21 - net.nic[..10].len() as u32),
+                        mv::to(y as u32 - 1, x as u32 + w - 21 - nic_name[..10].len() as u32),
                         theme
                             .colors
                             .net_box
@@ -310,13 +312,13 @@ impl NetBox {
                 );
             }
 
-            if w - net.nic[..10].len() as u32 - 20 > 13 {
+            if w - nic_name[..10].len() as u32 - 20 > 13 {
                 if !key.mouse.contains_key(&"y".to_owned()) {
                     let mut inserter_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..4 {
                         let mut inserter: Vec<i32> = Vec::<i32>::new();
-                        inserter.push(x + w as i32 - 26 - net.nic[..10].len() as i32 + i);
+                        inserter.push(x + w as i32 - 26 - nic_name[..10].len() as i32 + i);
                         inserter.push(y - 1);
                         inserter_top.push(inserter);
                     }
@@ -325,7 +327,7 @@ impl NetBox {
                 out_misc.push_str(
                     format!(
                         "{}{}{}{}{}{}{}{}{}",
-                        mv::to(y as u32 - 1, x as u32 + w - 27 - net.nic[..10].len() as u32),
+                        mv::to(y as u32 - 1, x as u32 + w - 27 - nic_name[..10].len() as u32),
                         theme
                             .colors
                             .net_box
@@ -365,8 +367,8 @@ impl NetBox {
             .map(|s| s.to_owned().to_owned())
             .collect::<Vec<String>>()
         {
-            let mut strings = net.strings[&net.nic][&direction].clone();
-            let mut stats = net.stats[&net.nic][&direction].clone();
+            let mut strings = net.strings[&nic_name][&direction].clone();
+            let mut stats = net.stats[&nic_name][&direction].clone();
 
             if self.redraw {
                 stats[&"redraw".to_owned()] = NetCollectorStat::Bool(true);
@@ -503,8 +505,8 @@ impl NetBox {
                 }
             }
             stats["redraw"] = NetCollectorStat::Bool(false);
-            net.strings[&net.nic][&direction] = strings;
-            net.stats[&net.nic][&direction] = stats;
+            net.strings[&nic_name][&direction] = strings;
+            net.stats[&nic_name][&direction] = stats;
         }
 
         out.push_str(
@@ -515,7 +517,7 @@ impl NetBox {
                     if CONFIG.net_sync {
                         net.sync_string
                     } else {
-                        net.strings[&net.nic][&"download".to_owned()][&"graph_top".to_owned()]
+                        net.strings[&nic_name][&"download".to_owned()][&"graph_top".to_owned()]
                     },
                     term
                 ),
@@ -524,7 +526,7 @@ impl NetBox {
                     if CONFIG.net_sync {
                         net.sync_string
                     } else {
-                        net.strings[&net.nic][&"upload".to_owned()][&"graph_top".to_owned()]
+                        net.strings[&nic_name][&"upload".to_owned()][&"graph_top".to_owned()]
                     },
                     term
                 ),

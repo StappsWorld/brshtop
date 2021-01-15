@@ -108,12 +108,12 @@ impl BrshtopBox {
         }
     }
 
-    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, THREADS: u64, term: &mut Term, CONFIG : &mut Config) {
+    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, term: &mut Term, CONFIG : &mut Config) {
         for sub in boxes {
             match sub {
                 Boxes::BrshtopBox(b) => (),
                 Boxes::CpuBox(b) => {
-                    b.calc_size(THREADS, term, self);
+                    b.calc_size(term, self);
                     b.resized = true;
                 },
                 Boxes::MemBox(b) => {
