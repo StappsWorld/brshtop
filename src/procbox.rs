@@ -141,7 +141,7 @@ impl<'a> ProcBox {
         mouse_pos: (i32, i32),
         proc_collector: &'a mut ProcCollector,
         key_class: &mut Key,
-        collector: &'a mut Collector,
+        collector: &'a mut Collector<'a>,
         CONFIG: &mut Config,
     ) {
         let old = (self.start, self.selected);

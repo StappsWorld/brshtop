@@ -23,8 +23,12 @@ use {
         symbol,
         term::Term,
         theme::{Color, Colors, Theme},
+        THEME_DIR,
         timer::Timer,
+        THREADS,
         updatechecker::UpdateChecker,
+        USER_DIR,
+        VERSION,
     },
     math::round::ceil,
     std::{collections::HashMap, iter::FromIterator, mem, path::Path},
@@ -92,7 +96,6 @@ impl<'a> Menu {
         theme: &mut Theme,
         draw: &mut Draw,
         term: &mut Term,
-        VERSION: String,
         update_checker: &mut UpdateChecker,
         THEME: &mut Theme,
         key_class: &mut Key,
@@ -101,18 +104,14 @@ impl<'a> Menu {
         collectors: Vec<Collectors<'a>>,
         CONFIG: &mut Config,
         ARG_MODE: &mut ViewMode,
-        THEME_DIR: &Path,
-        USER_THEME_DIR: &Path,
         netcollector: &mut NetCollector,
         brshtop_box: &mut BrshtopBox,
-        THREADS: u64,
         init: &mut Init,
         cpubox: &mut CpuBox,
         cpucollector: &mut CpuCollector,
         boxes: Vec<Boxes>,
         netbox: &mut NetBox,
         proccollector: &mut ProcCollector,
-        DEFAULT_THEME: HashMap<String, String>,
     ) {
         let mut out: String = String::default();
         let mut banner_mut: String = String::default();
@@ -149,14 +148,14 @@ impl<'a> Menu {
                     fx::b,
                     mv::right(30),
                     fx::i,
-                    VERSION,
+                    VERSION.to_owned(),
                     fx::ui,
                     fx::ub,
                     term.bg,
                     term.fg,
                 );
 
-                if update_checker.version != VERSION {
+                if update_checker.version != VERSION.to_owned() {
                     banner_mut.push_str(format!("{}{}{}New release {} availabel at https://github.com/aristocratos/bpytop{}{}",
                             mv::to(term.height as u32, 1),
                             fx::b,
@@ -312,31 +311,26 @@ impl<'a> Menu {
                             ARG_MODE,
                             THEME,
                             theme,
-                            THEME_DIR,
-                            USER_THEME_DIR,
                             draw,
                             term,
                             CONFIG,
-                            VERSION,
                             key_class,
                             timer,
                             netcollector,
                             brshtop_box,
                             boxes,
-                            THREADS,
                             collector,
                             init,
                             cpubox,
                             cpucollector,
                             netbox,
-                            DEFAULT_THEME,
                             proccollector,
                             collectors,
                         );
                         self.resized = true;
                     } else if menu_current == "help".to_owned() {
                         self.help(
-                            THEME, draw, term, VERSION, key_class, collector, collectors, CONFIG, timer
+                            THEME, draw, term, key_class, collector, collectors, CONFIG, timer
                         );
                         self.resized = true;
                     }
@@ -376,7 +370,6 @@ impl<'a> Menu {
         theme: &mut Theme,
         draw: &mut Draw,
         term: &mut Term,
-        VERSION: String,
         key_class: &mut Key,
         collector: &mut Collector<'a>,
         collectors: Vec<Collectors<'a>>,
@@ -473,7 +466,7 @@ impl<'a> Menu {
                     fx::b,
                     mv::right(30),
                     fx::i,
-                    VERSION,
+                    VERSION.to_owned(),
                     fx::ui,
                     fx::ub,
                     term.bg,
@@ -708,24 +701,19 @@ impl<'a> Menu {
         ARG_MODE: &mut ViewMode,
         THEME: &mut Theme,
         theme: &mut Theme,
-        THEME_DIR: &Path,
-        USER_THEME_DIR: &Path,
         draw: &mut Draw,
         term: &mut Term,
         CONFIG: &mut Config,
-        VERSION: String,
         key_class: &mut Key,
         timer: &mut Timer,
         netcollector: &mut NetCollector,
         brshtop_box: &mut BrshtopBox,
         boxes: Vec<Boxes>,
-        THREADS: u64,
         collector: &mut Collector<'a>,
         init: &mut Init,
         cpubox: &mut CpuBox,
         cpucollector: &mut CpuCollector,
         netbox: &mut NetBox,
-        DEFAULT_THEME: HashMap<String, String>,
         proc_collector: &mut ProcCollector,
         collectors: Vec<Collectors<'a>>,
     ) {
@@ -740,7 +728,7 @@ impl<'a> Menu {
         let mut d_quote: String = String::default();
         let mut inputting: bool = false;
         let mut input_val: String = String::default();
-        THEME.refresh(THEME_DIR, USER_THEME_DIR);
+        THEME.refresh();
         if self.background == String::default() {
             self.background = format!(
                 "{}{}{}",
@@ -1137,7 +1125,7 @@ impl<'a> Menu {
                     fx::b,
                     mv::right(30),
                     fx::i,
-                    VERSION,
+                    VERSION.to_owned(),
                     fx::ui,
                     fx::ub,
                     term.bg,
@@ -1723,7 +1711,7 @@ impl<'a> Menu {
                     CONFIG.color_theme = theme.themes.keys().cloned().collect::<Vec<String>>()[color_i];
                     mem::replace(
                         THEME,
-                        Theme::from_str(CONFIG.color_theme, DEFAULT_THEME).unwrap(),
+                        Theme::from_str(CONFIG.color_theme).unwrap(),
                     );
                     term.refresh(
                         vec![],

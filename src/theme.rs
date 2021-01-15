@@ -1,7 +1,10 @@
 use {
     crate::{
+        DEFAULT_THEME,
         term::Term,
         error::errlog,
+        THEME_DIR,
+        USER_THEME_DIR,
     },
     from_map::{FromMap, FromMapDefault},
     gradient::Gradient,
@@ -322,14 +325,14 @@ pub struct Theme {
     pub gradient : HashMap<String, Vec<String>>,
     pub colors : Colors,
 } impl Theme {
-    pub fn from_str<S: ToString>(s: S, DEFAULT_THEME : HashMap<String, String>) -> Result<Self, String> {
+    pub fn from_str<S: ToString>(s: S) -> Result<Self, String> {
         let colors_mut : Colors = match Colors::from_str(s) {
             Ok(c) => c,
             _ => return Err(String::from("Error in Color parsing")),
         };
 
         let mut cached_mut : HashMap<String, HashMap<String, String>> = HashMap::<String, HashMap<String, String>>::new();
-        cached_mut.insert("Default".to_owned(), DEFAULT_THEME);
+        cached_mut.insert("Default".to_owned(), DEFAULT_THEME.to_owned());
 
         let mut gradient_mut : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
         gradient_mut.insert("temp".to_owned(), Vec::<String>::new());
@@ -353,7 +356,7 @@ pub struct Theme {
         })
     }
 
-    pub fn new<R>(mut reader: R, DEFAULT_THEME : HashMap<String, String>) -> Result<Self, String>
+    pub fn new<R>(mut reader: R) -> Result<Self, String>
     where
         R: Read,
     {
@@ -363,7 +366,7 @@ pub struct Theme {
         };
 
         let mut cached_mut : HashMap<String, HashMap<String, String>> = HashMap::<String, HashMap<String, String>>::new();
-        cached_mut.insert("Default".to_owned(), DEFAULT_THEME);
+        cached_mut.insert("Default".to_owned(), DEFAULT_THEME.to_owned());
 
         let mut gradient_mut : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
         gradient_mut.insert("temp".to_owned(), Vec::<String>::new());
@@ -387,14 +390,14 @@ pub struct Theme {
         })
     }
 
-    pub fn from_file<P: AsRef<Path>>(path: P, DEFAULT_THEME : HashMap<String, String>) -> Result<Result<Self, String>, io::Error> {
-        Ok(Self::new(File::open(path)?, DEFAULT_THEME))
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Result<Self, String>, io::Error> {
+        Ok(Self::new(File::open(path)?))
     }
 
-    pub fn refresh(&mut self, THEME_DIR : &Path, USER_THEME_DIR : &Path) {
+    pub fn refresh(&mut self) {
         self.themes = vec![("Default", "Default")].iter().map(|(s1, s2)| (s1.clone().to_owned(), s2.clone().to_owned())).collect();
     
-        for d in vec![THEME_DIR, USER_THEME_DIR] {
+        for d in vec![THEME_DIR.to_owned(), USER_THEME_DIR.to_owned()].iter().map(|s| s.as_path()).collect::<Vec<&Path>>() {
             if !d.exists() {
                 continue;
             }
@@ -416,7 +419,7 @@ pub struct Theme {
                 match f_unwrap.path().file_name(){
                     Some(path) => match path.to_str() {
                         Some(path_str) => if path_str.ends_with(".theme") {
-                            let index = format!("{}{}", if d == THEME_DIR {"".to_owned()} else {"+".to_owned()}, path_str[..path_str.len() - 7].to_owned());
+                            let index = format!("{}{}", if d == THEME_DIR.to_owned() {"".to_owned()} else {"+".to_owned()}, path_str[..path_str.len() - 7].to_owned());
                             self.themes[&index] = format!("{}/{:?}", d.to_str().unwrap(), f_unwrap.file_name());
                         },
                         None => {

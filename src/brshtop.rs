@@ -9,11 +9,11 @@ impl Brshtop {
             theme_cache: HashMap::new(),
         }
     }
-    pub fn _init(&mut self, DEFAULT_THEME : HashMap<String, String>) -> Vec<crate::error::Error> {
-        self._load_themes(DEFAULT_THEME)
+    pub fn _init(&mut self) -> Vec<crate::error::Error> {
+        self._load_themes()
     }
 
-    fn _load_themes(&mut self, DEFAULT_THEME : HashMap<String, String>) -> Vec<crate::error::Error> {
+    fn _load_themes(&mut self) -> Vec<crate::error::Error> {
         let mut errors = vec![];
         let mut files = vec![];
         for path in crate::THEME_DIRS.iter() {
@@ -45,7 +45,7 @@ impl Brshtop {
         }
 
         for (path, file) in files {
-            match Theme::new(file, DEFAULT_THEME) {
+            match Theme::new(file) {
                 Ok(theme) => {
                     self.theme_cache
                         .insert(path.to_str().unwrap().to_string(), theme);

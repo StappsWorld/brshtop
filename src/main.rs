@@ -35,19 +35,33 @@ mod updatechecker;
 use {
     crate::{
         brshtop_box::{Boxes, BrshtopBox, SubBoxes},
-        collector::Collector,
+        collector::{Collector, Collectors},
+        config::{Config, SortingOption, ViewMode},
+        cpubox::CpuBox,
+        cpucollector::CpuCollector,
         draw::Draw,
+        event::Event,
+        graph::Graphs,
+        init::Init,
         key::Key,
+        memcollector::MemCollector,
+        menu::Menu,
+        netbox::NetBox,
+        netcollector::NetCollector,
+        procbox::ProcBox,
+        proccollector::{ProcCollector, ProcCollectorDetails},
         term::Term,
+        timer::Timer,
+        updatechecker::UpdateChecker,
     },
     clap::{App, Arg},
-    config::{Config, ViewMode},
     consts::*,
     cpuid,
     error::{errlog, throw_error},
     expanduser::expanduser,
     lazy_static::lazy_static,
     math::round,
+    psutil::process::Signal::{SIGINT, SIGKILL, SIGTERM},
     std::{
         collections::HashMap,
         env, fs,
@@ -100,6 +114,82 @@ lazy_static! {
     .collect::<HashMap<String, Vec<String>>>();
     pub static ref THREADS: u64 = psutil::cpu::cpu_count();
     pub static ref VERSION: String = clap::crate_version!().to_owned();
+    pub static ref DEFAULT_THEME: HashMap<String, String> = vec![
+        ("main_bg", ""),
+        ("main_fg", "#cc"),
+        ("title", "#ee"),
+        ("hi_fg", "#969696"),
+        ("selected_bg", "#7e2626"),
+        ("selected_fg", "#ee"),
+        ("inactive_fg", "#40"),
+        ("graph_text", "#60"),
+        ("meter_bg", "#40"),
+        ("proc_misc", "#0de756"),
+        ("cpu_box", "#3d7b46"),
+        ("mem_box", "#8a882e"),
+        ("net_box", "#423ba5"),
+        ("proc_box", "#923535"),
+        ("div_line", "#30"),
+        ("temp_start", "#4897d4"),
+        ("temp_mid", "#5474e8"),
+        ("temp_end", "#ff40b6"),
+        ("cpu_start", "#50f095"),
+        ("cpu_mid", "#f2e266"),
+        ("cpu_end", "#fa1e1e"),
+        ("free_start", "#223014"),
+        ("free_mid", "#b5e685"),
+        ("free_end", "#dcff85"),
+        ("cached_start", "#0b1a29"),
+        ("cached_mid", "#74e6fc"),
+        ("cached_end", "#26c5ff"),
+        ("available_start", "#292107"),
+        ("available_mid", "#ffd77a"),
+        ("available_end", "#ffb814"),
+        ("used_start", "#3b1f1c"),
+        ("used_mid", "#d9626d"),
+        ("used_end", "#ff4769"),
+        ("download_start", "#231a63"),
+        ("download_mid", "#4f43a3"),
+        ("download_end", "#b0a9de"),
+        ("upload_start", "#510554"),
+        ("upload_mid", "#7d4180"),
+        ("upload_end", "#dcafde"),
+        ("process_start", "#80d0a3"),
+        ("process_mid", "#dcd179"),
+        ("process_end", "#d45454"),
+    ]
+    .iter()
+    .cloned()
+    .map(|(a, b)| (a.to_owned(), b.to_owned()))
+    .collect();
+    pub static ref EXECUTE_PATH : &'static Path = match std::env::current_exe() {
+        Ok(p) => p.as_path(),
+        Err(_) => {
+            throw_error("ERROR!\n Could not read this applications directory!");
+            Path::new("") //NEVER REACHED
+        },
+    };
+    pub static ref THEME_DIR : &'static Path = {
+        let theme_dir_check = Path::new(format!("{}/bpytop-themes", EXECUTE_PATH.to_str().unwrap()).as_str());
+        let mut out : &'static Path;
+        if theme_dir_check.exists() {
+            out = theme_dir_check.clone();
+        } else {
+            let test_directories = vec!["/usr/local/", "/usr/", "/snap/bpytop/current/usr/"];
+
+            for directory in test_directories {
+                let test_directory_builder = directory.to_owned() + "share/bpytop/themes";
+                let test_directory = Path::new(test_directory_builder.as_str());
+
+                if test_directory.exists() {
+                    out = test_directory.clone();
+                    break;
+                }
+            }
+        }
+        out
+    };
+    pub static ref USER_THEME_DIR : &'static Path = CONFIG_DIR.to_owned().join("themes").as_path();
 }
 
 pub fn main() {
@@ -203,86 +293,10 @@ pub fn main() {
     }
 
     let CONFIG_FILE = CONFIG_DIR.join("bpytop.conf");
-    let mut EXECUTE_PATH = PathBuf::new();
-    match std::env::current_exe() {
-        Ok(p) => EXECUTE_PATH = p,
-        Err(_) => throw_error("ERROR!\n Could not read this applications directory!"),
-    }
-
-    let theme_dir_builder = format!("{}/bpytop-themes", EXECUTE_PATH.to_str().unwrap());
-    let theme_dir_check = Path::new(theme_dir_builder.as_str());
-    let mut THEME_DIR;
-
-    if theme_dir_check.exists() {
-        THEME_DIR = theme_dir_check.clone();
-    } else {
-        let test_directories = vec!["/usr/local/", "/usr/", "/snap/bpytop/current/usr/"];
-
-        for directory in test_directories {
-            let test_directory_builder = directory.to_owned() + "share/bpytop/themes";
-            let test_directory = Path::new(test_directory_builder.as_str());
-
-            if test_directory.exists() {
-                THEME_DIR = test_directory.clone();
-                break;
-            }
-        }
-    }
-
-    let USER_THEME_DIR = CONFIG_DIR.join("themes");
 
     let CORES = psutil::cpu::cpu_count_physical();
 
     let THREAD_ERROR = 0;
-
-    let mut DEFAULT_THEME: HashMap<String, String> = [
-        ("main_bg", ""),
-        ("main_fg", "#cc"),
-        ("title", "#ee"),
-        ("hi_fg", "#969696"),
-        ("selected_bg", "#7e2626"),
-        ("selected_fg", "#ee"),
-        ("inactive_fg", "#40"),
-        ("graph_text", "#60"),
-        ("meter_bg", "#40"),
-        ("proc_misc", "#0de756"),
-        ("cpu_box", "#3d7b46"),
-        ("mem_box", "#8a882e"),
-        ("net_box", "#423ba5"),
-        ("proc_box", "#923535"),
-        ("div_line", "#30"),
-        ("temp_start", "#4897d4"),
-        ("temp_mid", "#5474e8"),
-        ("temp_end", "#ff40b6"),
-        ("cpu_start", "#50f095"),
-        ("cpu_mid", "#f2e266"),
-        ("cpu_end", "#fa1e1e"),
-        ("free_start", "#223014"),
-        ("free_mid", "#b5e685"),
-        ("free_end", "#dcff85"),
-        ("cached_start", "#0b1a29"),
-        ("cached_mid", "#74e6fc"),
-        ("cached_end", "#26c5ff"),
-        ("available_start", "#292107"),
-        ("available_mid", "#ffd77a"),
-        ("available_end", "#ffb814"),
-        ("used_start", "#3b1f1c"),
-        ("used_mid", "#d9626d"),
-        ("used_end", "#ff4769"),
-        ("download_start", "#231a63"),
-        ("download_mid", "#4f43a3"),
-        ("download_end", "#b0a9de"),
-        ("upload_start", "#510554"),
-        ("upload_mid", "#7d4180"),
-        ("upload_end", "#dcafde"),
-        ("process_start", "#80d0a3"),
-        ("process_mid", "#dcd179"),
-        ("process_end", "#d45454"),
-    ]
-    .iter()
-    .cloned()
-    .map(|(a, b)| (a.to_owned(), b.to_owned()))
-    .collect();
 
     let mut MENUS = HashMap::new();
 
@@ -358,7 +372,7 @@ pub fn main() {
     // errlog(CONFIG_DIR, format!("CMD: {}", arg_output));
 
     let mut b = brshtop::Brshtop::new();
-    b._init(DEFAULT_THEME);
+    b._init();
 }
 
 /// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
@@ -586,24 +600,20 @@ pub fn clean_quit(
     Term::echo(true);
     let now = SystemTime::now();
     match errcode {
-        Some(0) => errlog(
-            format!(
-                "Exiting, Runtime {} \n",
+        Some(0) => errlog(format!(
+            "Exiting, Runtime {} \n",
+            now.duration_since(SELF_START.unwrap())
+                .unwrap()
+                .as_secs_f64()
+        )),
+        Some(n) => {
+            errlog(format!(
+                "Exiting with errorcode {}, Runtime {} \n",
+                n,
                 now.duration_since(SELF_START.unwrap())
                     .unwrap()
                     .as_secs_f64()
-            ),
-        ),
-        Some(n) => {
-            errlog(
-                format!(
-                    "Exiting with errorcode {}, Runtime {} \n",
-                    n,
-                    now.duration_since(SELF_START.unwrap())
-                        .unwrap()
-                        .as_secs_f64()
-                ),
-            );
+            ));
             print!(
                 "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
                 errcode.unwrap(),
@@ -659,11 +669,15 @@ pub fn floating_humanizer(
         if working_val.to_string().len() == 4 && selector > 0 {
             out = working_val.to_string()[..working_val.to_string().len() - 3].to_owned()
                 + "."
-                + (working_val.to_string().as_bytes()[working_val.to_string().len() - 3] as char).to_string().as_str();
+                + (working_val.to_string().as_bytes()[working_val.to_string().len() - 3] as char)
+                    .to_string()
+                    .as_str();
         } else if working_val.to_string().len() == 3 && selector > 0 {
             out = working_val.to_string()[..working_val.to_string().len() - 3].to_string()
                 + "."
-                + working_val.to_string()[(working_val.to_string().len() - 3)..].to_string().as_str();
+                + working_val.to_string()[(working_val.to_string().len() - 3)..]
+                    .to_string()
+                    .as_str();
         } else if working_val.to_string().len() >= 2 {
             out = working_val.to_string()[..working_val.to_string().len() - 3].to_owned();
         } else {
@@ -676,7 +690,12 @@ pub fn floating_humanizer(
             out = f64::round(out.parse::<f64>().unwrap()).to_string();
         }
         if out.len() > 3 {
-            out = ((out.as_bytes()[0] as char).to_string().parse::<i64>().unwrap() + 1).to_string();
+            out = ((out.as_bytes()[0] as char)
+                .to_string()
+                .parse::<i64>()
+                .unwrap()
+                + 1)
+            .to_string();
             selector += 1;
         }
     }
@@ -718,10 +737,19 @@ pub fn units_to_bytes(value: String) -> u64 {
         value = value[..value.len() - 5].to_owned();
     }
 
-    if units.contains_key(&(value.as_bytes()[value.len() - 2] as char).to_string().to_ascii_lowercase()) {
+    if units.contains_key(
+        &(value.as_bytes()[value.len() - 2] as char)
+            .to_string()
+            .to_ascii_lowercase(),
+    ) {
         mult = units
-            .get(&(value.as_bytes()[value.len() - 2] as char).to_string().to_ascii_lowercase())
-            .unwrap().to_owned();
+            .get(
+                &(value.as_bytes()[value.len() - 2] as char)
+                    .to_string()
+                    .to_ascii_lowercase(),
+            )
+            .unwrap()
+            .to_owned();
         value = value[..value.len() - 2].to_owned();
     }
 
@@ -750,4 +778,446 @@ pub fn units_to_bytes(value: String) -> u64 {
     out = value_i << (10 * mult);
 
     out
+}
+
+pub fn process_keys<'a>(
+    ARG_MODE: &mut ViewMode,
+    key_class: &mut Key,
+    procbox: &mut ProcBox,
+    collector: &'a mut Collector<'a>,
+    proccollector: &'a mut ProcCollector,
+    CONFIG: &mut Config,
+    draw: &mut Draw,
+    term: &mut Term,
+    brshtop_box: &mut BrshtopBox,
+    cpu_box: &mut CpuBox,
+    menu: &mut Menu,
+    THEME: &mut Theme,
+    netcollector: &'a mut NetCollector<'a>,
+    init: &mut Init,
+    cpucollector: &mut CpuCollector,
+    boxes: Vec<Boxes>,
+    netbox: &mut NetBox,
+    update_checker: &mut UpdateChecker,
+    collectors: Vec<Collectors<'a>>,
+    timer: &mut Timer,
+    memcollector: &'a mut MemCollector,
+    graphs: &mut Graphs,
+) {
+    let mut mouse_pos: (i32, i32) = (0, 0);
+    let mut filtered: bool = false;
+    while key_class.has_key() {
+        let key = match key_class.get() {
+            Some(k) => k,
+            None => return,
+        };
+        if vec!["mouse_scroll_up", "mouse_scroll_down", "mouse_click"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            mouse_pos = key_class.get_mouse();
+            if mouse_pos.0 >= procbox.parent.x as i32
+                && procbox.current_y as i32 + 1 <= mouse_pos.1
+                && mouse_pos.1 < (procbox.current_y + procbox.current_h - 1) as i32
+            {
+                ()
+            } else if key == "mouse_click".to_owned() {
+                key = "mouse_unselect".to_owned()
+            } else {
+                key = "_null".to_owned()
+            }
+        }
+        if procbox.filtering {
+            if vec!["enter", "mouse_click", "mouse_unselect"]
+                .iter()
+                .map(|s| s.to_owned().to_owned())
+                .collect::<Vec<String>>()
+                .contains(&key)
+            {
+                procbox.filtering = false;
+                collector.collect(
+                    vec![Collectors::<'a>::ProcCollector(proccollector)],
+                    CONFIG,
+                    true,
+                    false,
+                    false,
+                    true,
+                    true,
+                );
+                continue;
+            } else if vec!["escape", "delete"]
+                .iter()
+                .map(|s| s.to_owned().to_owned())
+                .collect::<Vec<String>>()
+                .contains(&key)
+            {
+                proccollector.search_filter = String::default();
+                procbox.filtering = false;
+            } else if key.len() == 1 {
+                proccollector.search_filter.push_str(key.as_str());
+            } else if key == "backspace".to_owned() && proccollector.search_filter.len() > 0 {
+                proccollector.search_filter =
+                    proccollector.search_filter[..proccollector.search_filter.len() - 2].to_owned();
+            } else {
+                continue;
+            }
+            collector.collect(
+                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                CONFIG,
+                true,
+                false,
+                true,
+                true,
+                false,
+            );
+            if filtered {
+                collector.collect_done = Event::Wait;
+                collector.collect_done.wait(0.1);
+                collector.collect_done = Event::Flag(false);
+            }
+            filtered = true;
+            continue;
+        }
+
+        if key == "_null".to_owned() {
+            continue;
+        } else if key == "q".to_owned() {
+            clean_quit(None, None, key_class, collector, draw, term, CONFIG, None);
+        } else if key == "+" && CONFIG.update_ms + 100 <= 86399900 {
+            CONFIG.update_ms += 100;
+            brshtop_box.draw_update_ms(false, CONFIG, cpu_box, key_class, draw, menu, THEME, term);
+        } else if key == "-".to_owned() && CONFIG.update_ms - 100 >= 100 {
+            CONFIG.update_ms -= 100;
+            brshtop_box.draw_update_ms(false, CONFIG, cpu_box, key_class, draw, menu, THEME, term);
+        } else if vec!["b", "n"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            netcollector.switch(key, collector, CONFIG);
+        } else if vec!["M", "escape"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            menu.main(
+                THEME,
+                draw,
+                term,
+                update_checker,
+                THEME,
+                key_class,
+                timer,
+                collector,
+                collectors,
+                CONFIG,
+                ARG_MODE,
+                netcollector,
+                brshtop_box,
+                init,
+                cpu_box,
+                cpucollector,
+                boxes,
+                netbox,
+                proccollector,
+            );
+        } else if vec!["o", "f2"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            menu.options(
+                ARG_MODE,
+                THEME,
+                THEME,
+                draw,
+                term,
+                CONFIG,
+                key_class,
+                timer,
+                netcollector,
+                brshtop_box,
+                boxes,
+                collector,
+                init,
+                cpu_box,
+                cpucollector,
+                netbox,
+                proccollector,
+                collectors,
+            );
+        } else if vec!["h", "f1"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            menu.help(
+                THEME, draw, term, key_class, collector, collectors, CONFIG, timer,
+            );
+        } else if key == "z".to_owned() {
+            netcollector.reset = !netcollector.reset;
+            collector.collect(
+                vec![Collectors::<'a>::NetCollector(netcollector)],
+                CONFIG,
+                true,
+                false,
+                false,
+                true,
+                false,
+            );
+        } else if key == "y".to_owned() {
+            CONFIG.net_sync = !CONFIG.net_sync;
+            collector.collect(
+                vec![Collectors::<'a>::NetCollector(netcollector)],
+                CONFIG,
+                true,
+                false,
+                false,
+                true,
+                false,
+            );
+        } else if key == "a".to_owned() {
+            netcollector.auto_min = !netcollector.auto_min;
+            netcollector.net_min = vec![("download", -1), ("upload", -1)]
+                .iter()
+                .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
+                .collect::<HashMap<String, i32>>();
+            collector.collect(
+                vec![Collectors::<'a>::NetCollector(netcollector)],
+                CONFIG,
+                true,
+                false,
+                false,
+                true,
+                false,
+            );
+        } else if vec!["left", "right"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            // TODO : Fix this...
+            //proccollector.sorting(key);
+        } else if key == " ".to_owned() && CONFIG.proc_tree && procbox.selected > 0 {
+            if proccollector.collapsed.contains_key(&procbox.selected_pid) {
+                proccollector.collapsed[&procbox.selected_pid] =
+                    !proccollector.collapsed[&procbox.selected_pid];
+            }
+            collector.collect(
+                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                CONFIG,
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "e".to_owned() {
+            CONFIG.proc_tree = !CONFIG.proc_tree;
+            collector.collect(
+                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                CONFIG,
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "r".to_owned() {
+            CONFIG.proc_reversed = !CONFIG.proc_reversed;
+            collector.collect(
+                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                CONFIG,
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "c".to_owned() {
+            CONFIG.proc_per_core = !CONFIG.proc_per_core;
+            collector.collect(
+                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                CONFIG,
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "g".to_owned() {
+            CONFIG.mem_graphs = !CONFIG.mem_graphs;
+            collector.collect(
+                vec![Collectors::<'a>::MemCollector(memcollector)],
+                CONFIG,
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "s".to_owned() {
+            collector.collect_idle = Event::Wait;
+            collector.collect_idle.wait(-1.0);
+            CONFIG.swap_disk = !CONFIG.swap_disk;
+            collector.collect(
+                vec![Collectors::<'a>::MemCollector(memcollector)],
+                CONFIG,
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "f".to_owned() {
+            procbox.filtering = true;
+            if proccollector.search_filter.len() == 0 {
+                procbox.start = 0;
+            }
+            collector.collect(
+                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                CONFIG,
+                true,
+                false,
+                false,
+                true,
+                true,
+            );
+        } else if key == "m".to_owned() {
+            if *ARG_MODE != ViewMode::None {
+                ARG_MODE = &mut ViewMode::None;
+            } else if CONFIG
+                .view_modes
+                .iter()
+                .position(|v| *v == CONFIG.view_mode)
+                .unwrap()
+                + 1
+                > CONFIG.view_modes.len() - 1
+            {
+                CONFIG.view_mode = CONFIG.view_modes[0];
+            } else {
+                CONFIG.view_mode = CONFIG.view_modes[CONFIG
+                    .view_modes
+                    .iter()
+                    .position(|v| *v == CONFIG.view_mode)
+                    .unwrap()
+                    + 1];
+            }
+            brshtop_box.proc_mode = CONFIG.view_mode == ViewMode::Proc;
+            brshtop_box.stat_mode = CONFIG.view_mode == ViewMode::Stat;
+            draw.clear(vec![], true);
+            term.refresh(
+                vec![],
+                vec![],
+                collector,
+                init,
+                cpu_box,
+                draw,
+                true,
+                key_class,
+                menu,
+                brshtop_box,
+                timer,
+                CONFIG,
+                THEME,
+            );
+        } else if vec!["t", "k", "i"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key.to_ascii_lowercase())
+        {
+            let pid: u32 = if procbox.selected > 0 {
+                procbox.selected_pid
+            } else {
+                proccollector.detailed_pid.unwrap()
+            };
+            let lower = key.to_ascii_lowercase();
+            if psutil::process::pid_exists(pid) {
+                let sig = if lower == "t".to_owned() {
+                    SIGTERM
+                } else if lower == "k".to_owned() {
+                    SIGKILL
+                } else {
+                    SIGINT
+                };
+                match psutil::process::Process::new(pid).unwrap().send_signal(sig) {
+                    Ok(_) => (),
+                    Err(e) => errlog(format!(
+                        "Execption when sending signal {} to pid {}",
+                        sig, pid
+                    )),
+                };
+            }
+        } else if key == "delete".to_owned() && proccollector.search_filter.len() > 0 {
+            proccollector.search_filter = String::default();
+            collector.collect(
+                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                CONFIG,
+                true,
+                false,
+                true,
+                true,
+                false,
+            );
+        } else if key == "enter".to_owned() {
+            if procbox.selected > 0
+                && proccollector.detailed_pid.unwrap_or(0) != procbox.selected_pid
+                && psutil::process::pid_exists(procbox.selected_pid)
+            {
+                proccollector.detailed = true;
+                procbox.last_selection = procbox.selected;
+                procbox.selected = 0;
+                proccollector.detailed_pid = Some(procbox.selected_pid);
+                procbox.parent.resized = true;
+            } else if proccollector.detailed {
+                procbox.selected = procbox.last_selection;
+                procbox.last_selection = 0;
+                proccollector.detailed = false;
+                proccollector.detailed_pid = None;
+                procbox.parent.resized = true;
+            } else {
+                continue;
+            }
+            proccollector.details = HashMap::<String, ProcCollectorDetails>::new();
+            proccollector.details_cpu = vec![];
+            proccollector.details_mem = vec![];
+            graphs.detailed_cpu.NotImplemented = true;
+            graphs.detailed_mem.NotImplemented = true;
+            collector.collect(
+                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                CONFIG,
+                true,
+                false,
+                true,
+                true,
+                false,
+            );
+        } else if vec![
+            "up",
+            "down",
+            "mouse_scroll_up",
+            "mouse_scroll_down",
+            "page_up",
+            "page_down",
+            "home",
+            "end",
+            "mouse_click",
+            "mouse_unselect",
+        ]
+        .iter()
+        .map(|s| s.to_owned().to_owned())
+        .collect::<Vec<String>>()
+        .contains(&key)
+        {
+            procbox.selector(key, mouse_pos, proccollector, key_class, collector, CONFIG);
+        }
+    }
 }

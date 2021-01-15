@@ -10,6 +10,8 @@ use {
         event::Event,
         graph::Graphs,
         key::Key,
+        memcollector::MemCollector,
+        membox::MemBox,
         menu::Menu,
         meter::Meters,
         netbox::NetBox,
@@ -30,6 +32,7 @@ pub enum Collectors<'a> {
     CpuCollector(&'a CpuCollector<'a>),
     NetCollector(&'a NetCollector<'a>),
     ProcCollector(&'a ProcCollector<'a>),
+    MemCollector(&'a MemCollector<'a>),
 }
 
 pub struct Collector<'a> {
@@ -126,6 +129,7 @@ impl<'a> Collector<'a> {
         meters: &'static mut Meters,
         netbox: &'static mut NetBox,
         procbox : &'static mut ProcBox,
+        membox : &'static mut MemBox
     ) {
         self.stopping = false;
         unsafe {
@@ -148,7 +152,8 @@ impl<'a> Collector<'a> {
                     graphs,
                     meters,
                     netbox,
-                    procbox
+                    procbox,
+                    membox,
                 )
             }));
         }
@@ -194,6 +199,7 @@ impl<'a> Collector<'a> {
         meters: &mut Meters,
         netbox: &mut NetBox,
         procbox : &mut ProcBox,
+        membox : &mut MemBox,
     ) {
         let mut draw_buffers = Vec::<String>::new();
 
@@ -227,6 +233,7 @@ impl<'a> Collector<'a> {
                         }
                         Collectors::NetCollector(n) => n.collect(CONFIG, netbox),
                         Collectors::ProcCollector(p) => p.collect(brshtop_box, CONFIG, procbox),
+                        Collectors::MemCollector(m) => m.collect(CONFIG, membox),
                     }
                 }
                 match collector {
@@ -238,13 +245,15 @@ impl<'a> Collector<'a> {
                         netbox.draw_fg(THEME, key, term, CONFIG, draw, graphs, menu)
                     }
                     Collectors::ProcCollector(p) => p.draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu),
+                    Collectors::MemCollector(m) => m.draw(membox, term, brshtop_box, CONFIG, meters, THEME, key, self, draw, menu),
                 }
 
                 if self.use_draw_list {
                     draw_buffers.push(match collector {
-                        Collectors::CpuCollector(c) => c.buffer,
-                        Collectors::NetCollector(n) => n.buffer,
-                        Collectors::ProcCollector(p) => p.buffer,
+                        Collectors::CpuCollector(c) => c.buffer.clone(),
+                        Collectors::NetCollector(n) => n.buffer.clone(),
+                        Collectors::ProcCollector(p) => p.buffer.clone(),
+                        Collectors::MemCollector(m) => m.buffer.clone(),
                     });
                 }
 

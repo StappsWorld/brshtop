@@ -176,7 +176,7 @@ impl<'a> NetCollector<'a> {
         self.nic = Some(self.nics[self.nic_i as usize]);
     }
 
-    pub fn switch(&mut self, key: String, collector: &'a mut Collector, CONFIG: &mut Config) {
+    pub fn switch(&'a mut self, key: String, collector: &'a mut Collector<'a>, CONFIG: &mut Config) {
         if self.nics.len() < 2 {
             return;
         }
