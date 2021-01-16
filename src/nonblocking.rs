@@ -1,20 +1,19 @@
 use crate::error;
 use std::io::Stdin;
 use std::path::Path;
-use std::os::unix::io::{RawFd, AsRawFd};
 use nix::{fcntl, libc::O_NONBLOCK};
 
 pub struct Nonblocking<'a> {
     pub stream : &'a mut Stdin,
-    pub fd : RawFd,
-    pub orig_fl : Option<RawFd>,
+    pub fd : i32,
+    pub orig_fl : Option<i32>,
 }
 impl<'a> Nonblocking<'a> {
 
     pub fn new(s : &'a mut Stdin) -> Self {
         Nonblocking {
             stream : s,
-            fd : s.as_raw_fd().clone(),
+            fd : libc::STDIN_FILENO.clone(),
             orig_fl : None,
         }
     }

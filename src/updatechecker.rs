@@ -1,9 +1,17 @@
 use {
     crate::{error::errlog, VERSION},
-    reqwest::blocking::get,
+    error_chain::error_chain,
+    reqwest,
     std::{process::Command, str, thread},
     which::which,
 };
+
+error_chain! {
+    foreign_links {
+        Io(std::io::Error);
+        HttpRequest(reqwest::Error);
+    }
+}
 
 pub struct UpdateChecker {
     pub version: String,
@@ -24,7 +32,7 @@ impl<'a> UpdateChecker {
     // TODO : Implement for Brshtop github
     pub fn checker(&mut self) {
         let source: String =
-            match get("https://github.com/aristocratos/bpytop/raw/master/bpytop.py") {
+            match reqwest::blocking::get("https://github.com/aristocratos/bpytop/raw/master/bpytop.py") {
                 Ok(s) => match s.text() {
                     Ok(text) => text,
                     Err(e) => {

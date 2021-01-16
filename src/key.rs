@@ -20,7 +20,6 @@ use {
         },
         thread,
         time::Duration,
-        os::unix::io::AsRawFd,
         path::Path,
     },
     nix::sys::{
@@ -202,7 +201,7 @@ impl Key {
             raw.enter();
 
             
-            match select(current_stdin.as_raw_fd(), None, None, None, &mut TimeVal::milliseconds(100)) {
+            match select(libc::STDIN_FILENO, None, None, None, &mut TimeVal::milliseconds(100)) {
                 Ok(s) => if s > 0 {
                     let mut buffer = [0; 1];
                     match current_stdin.read_to_string(&mut input_key) {

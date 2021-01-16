@@ -13,6 +13,7 @@ use {
         theme::Theme,
         units_to_bytes,
     },
+    futures::{future, stream::StreamExt},
     heim::net::{io_counters, nic, IoCounters, Nic},
     std::{
         collections::HashMap,
@@ -108,27 +109,20 @@ impl<'a> NetCollector<'a> {
         self.nic = None;
         let io_all_stream = io_counters();
         let mut io_all: HashMap<String, IoCounters> = HashMap::<String, IoCounters>::new();
-        let mut looping = true;
-        while looping {
-            match io_all_stream.poll_next() {
-                Poll::Pending => (),
-                Poll::Ready(o) => match o {
-                    Some(res) => match res {
-                        Ok(val) => {
-                            io_all.insert(val.interface().to_owned(), val);
-                            ()
-                        }
-                        Err(e) => {
-                            if !self.nic_error {
-                                self.nic_error = true;
-                                errlog(format!("Nic error : {:?}", e));
-                            }
-                        }
-                    },
-                    None => looping = false,
-                },
+
+        io_all_stream.for_each(|o| match o {
+            Ok(val) => {
+                io_all.insert(val.interface().to_owned(), val);
+                future::ready(())
             }
-        }
+            Err(e) => {
+                if !self.nic_error {
+                    self.nic_error = true;
+                    errlog(format!("Nic error : {:?}", e));
+                }
+                future::ready(())
+            }
+        });
 
         if io_all.len() == 0 {
             return;
@@ -136,27 +130,19 @@ impl<'a> NetCollector<'a> {
 
         let up_stat_stream = nic();
         let mut up_stat: HashMap<String, Nic> = HashMap::<String, Nic>::new();
-        looping = true;
-        while looping {
-            match up_stat_stream.poll_next() {
-                Poll::Pending => (),
-                Poll::Ready(o) => match o {
-                    Some(res) => match res {
-                        Ok(val) => {
-                            up_stat.insert(val.name().to_owned(), val);
-                            ()
-                        }
-                        Err(e) => {
-                            if !self.nic_error {
-                                self.nic_error = true;
-                                errlog(format!("Nic error : {:?}", e));
-                            }
-                        }
-                    },
-                    None => looping = false,
-                },
+        up_stat_stream.for_each(|o| match o {
+            Ok(val) => {
+                up_stat.insert(val.name().to_owned(), val);
+                future::ready(())
             }
-        }
+            Err(e) => {
+                if !self.nic_error {
+                    self.nic_error = true;
+                    errlog(format!("Nic error : {:?}", e));
+                }
+                future::ready(())
+            }
+        });
 
         for (nic, _) in io_all {
             match up_stat.get(&nic) {
@@ -176,7 +162,12 @@ impl<'a> NetCollector<'a> {
         self.nic = Some(self.nics[self.nic_i as usize]);
     }
 
-    pub fn switch(&'a mut self, key: String, collector: &'a mut Collector<'a>, CONFIG: &mut Config) {
+    pub fn switch(
+        &'a mut self,
+        key: String,
+        collector: &'a mut Collector<'a>,
+        CONFIG: &mut Config,
+    ) {
         if self.nics.len() < 2 {
             return;
         }
@@ -208,27 +199,19 @@ impl<'a> NetCollector<'a> {
             HashMap::<String, NetCollectorStat>::new();
         let up_stat_stream = nic();
         let mut up_stat: HashMap<String, &'a Nic> = HashMap::<String, &'a Nic>::new();
-        let mut looping = true;
-        while looping {
-            match up_stat_stream.poll_next() {
-                Poll::Pending => (),
-                Poll::Ready(o) => match o {
-                    Some(res) => match res {
-                        Ok(val) => {
-                            up_stat.insert(val.name().to_owned(), val);
-                            ()
-                        }
-                        Err(e) => {
-                            if !self.nic_error {
-                                self.nic_error = true;
-                                errlog(format!("Nic error : {:?}", e));
-                            }
-                        }
-                    },
-                    None => looping = false,
-                },
+        up_stat_stream.for_each(|o| match o {
+            Ok(val) => {
+                up_stat.insert(val.name().to_owned(), &val);
+                future::ready(())
             }
-        }
+            Err(e) => {
+                if !self.nic_error {
+                    self.nic_error = true;
+                    errlog(format!("Nic error : {:?}", e));
+                }
+                future::ready(())
+            }
+        });
 
         if self.switched {
             self.nic = self.new_nic;
@@ -250,27 +233,19 @@ impl<'a> NetCollector<'a> {
 
         let io_all_stream = io_counters();
         let mut io_all_hash: HashMap<String, IoCounters> = HashMap::<String, IoCounters>::new();
-        let mut looping = true;
-        while looping {
-            match io_all_stream.poll_next() {
-                Poll::Pending => (),
-                Poll::Ready(o) => match o {
-                    Some(res) => match res {
-                        Ok(val) => {
-                            io_all_hash.insert(val.interface().to_owned(), val);
-                            ()
-                        }
-                        Err(e) => {
-                            if !self.nic_error {
-                                self.nic_error = true;
-                                errlog(format!("Nic error : {:?}", e));
-                            }
-                        }
-                    },
-                    None => looping = false,
-                },
+        io_all_stream.for_each(|o| match o {
+            Ok(val) => {
+                io_all_hash.insert(val.interface().to_owned(), val);
+                future::ready(())
             }
-        }
+            Err(e) => {
+                if !self.nic_error {
+                    self.nic_error = true;
+                    errlog(format!("Nic error : {:?}", e));
+                }
+                future::ready(())
+            }
+        });
 
         let mut io_all: &IoCounters = match io_all_hash.get(&self.nic.unwrap().name().to_owned()) {
             Some(i) => i,
@@ -375,7 +350,7 @@ impl<'a> NetCollector<'a> {
                         .unwrap()
                         .iter()
                         .map(|(s1, s2)| (s1.clone(), NetCollectorStat::String(s2.clone())))
-                        .collect()
+                        .collect::<HashMap<String, NetCollectorStat>>()
                         .clone();
                     // * Calculate current speed
                     let speed_vec = match stat.get(&"speed".to_owned()).unwrap() {
@@ -650,24 +625,20 @@ impl<'a> NetCollector<'a> {
                         .get(&"graph_top".to_owned())
                         .unwrap();
 
-                    let dtu : i32 = match download_top {
+                    let dtu: i32 = match download_top {
                         NetCollectorStat::I32(i) => i.to_owned(),
                         NetCollectorStat::U64(u) => u.to_owned() as i32,
                         NetCollectorStat::String(s) => s.to_owned().parse::<i32>().unwrap_or(0),
                         _ => 0,
                     };
-                    let dut : i32 = match upload_top {
+                    let dut: i32 = match upload_top {
                         NetCollectorStat::I32(i) => i.to_owned(),
                         NetCollectorStat::U64(u) => u.to_owned() as i32,
                         NetCollectorStat::String(s) => s.to_owned().parse::<i32>().unwrap_or(0),
                         _ => 0,
                     };
 
-                    let c_max: i32 = if dtu > dut {
-                        dtu
-                    } else {
-                        dut
-                    };
+                    let c_max: i32 = if dtu > dut { dtu } else { dut };
 
                     if c_max != self.sync_top {
                         self.sync_top = c_max;

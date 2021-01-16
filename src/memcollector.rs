@@ -14,10 +14,9 @@ use {
         term::Term,
         theme::Theme
     },
-    futures::{Stream, task::Poll},
+    futures::{future, stream::StreamExt},
     heim::{
         disk::{io_counters, IoCounters},
-        units::information::Conversion,
     },
     psutil::{
         disk::{DiskUsage, FileSystem},
@@ -251,18 +250,13 @@ impl<'a> MemCollector<'a> {
 
         let io_stream = io_counters();
         let io_counters: HashMap<String, IoCounters> = HashMap::<String, IoCounters>::new();
-        let mut looping = true;
-        while looping {
-            match io_stream.poll_next() {
-                Poll::Pending => (),
-                Poll::Ready(o) => match o {
-                    Some(counter) => {
-                        io_counters.insert(counter.device_name.to_str().to_owned(), counter)
-                    }
-                    None => looping = false,
-                },
-            };
-        }
+        io_stream.for_each(|o| match o {
+            Ok(counter) => {
+                io_counters.insert(counter.device_name().to_str().unwrap().to_owned(), counter);
+                future::ready(())
+            },
+            Err(e) => future::ready(()),
+        });
 
         match psutil::disk::partitions() {
             Ok(disks) => {
@@ -466,7 +460,7 @@ impl<'a> MemCollector<'a> {
                                 let new: HashMap<String, HashMap<String, DiskInfo>> = vec![(
                                     self.disks.keys().cloned().collect::<Vec<String>>()[0].clone(),
                                     self.disks
-                                        .get(self.disks.keys().cloned().collect()[0].clone())
+                                        .get(&self.disks.keys().map(|k| k.to_string()).collect::<Vec<String>>()[0].clone())
                                         .unwrap()
                                         .clone()
                                 )]

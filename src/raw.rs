@@ -2,18 +2,17 @@ use crate::error::*;
 use std::io::Stdin;
 use nix::fcntl;
 use termios::*;
-use std::os::unix::io::{RawFd, AsRawFd};
 use pancurses;
 
 
 pub struct Raw<'a> {
     pub stream : &'a mut Stdin,
-    pub fd : RawFd,
+    pub fd : i32,
     pub original_stty : Termios,
 }
 impl<'a> Raw<'a> {
     pub fn new(s : &'a mut Stdin) -> Self {
-        let usable_fd = s.as_raw_fd().clone();
+        let usable_fd = libc::STDIN_FILENO.clone();
         let tty = match Termios::from_fd(usable_fd) {
             Ok(t) => t,
             Err(e) => {
@@ -23,7 +22,7 @@ impl<'a> Raw<'a> {
         };
         Raw {
             stream : s,
-            fd : s.as_raw_fd().clone(),
+            fd : libc::STDIN_FILENO.clone(),
             original_stty : tty,
         }
     }

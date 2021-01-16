@@ -27,7 +27,6 @@ use {
         timer::Timer,
         THREADS,
         updatechecker::UpdateChecker,
-        USER_DIR,
         VERSION,
     },
     math::round::ceil,
