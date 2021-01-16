@@ -121,7 +121,7 @@ impl<'a> Collector<'a> {
         cpu_box: &'static mut CpuBox,
         key: &'static mut Key,
         THEME: &'static mut Theme,
-        ARG_MODE: &mut ViewMode,
+        ARG_MODE: &'static mut ViewMode,
         graphs: &'static mut Graphs,
         meters: &'static mut Meters,
         netbox: &'static mut NetBox,
@@ -185,7 +185,7 @@ impl<'a> Collector<'a> {
         cpu_box: &mut CpuBox,
         key: &mut Key,
         THEME: &mut Theme,
-        ARG_MODE: ViewMode,
+        ARG_MODE: &mut ViewMode,
         graphs: &mut Graphs,
         meters: &mut Meters,
         netbox: &mut NetBox,
@@ -229,7 +229,7 @@ impl<'a> Collector<'a> {
                 }
                 match collector {
                     Collectors::CpuCollector(c) => c.draw(
-                        cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters,menu,
+                        cpu_box, CONFIG, key, THEME, term, draw, *ARG_MODE, graphs, meters,menu,
                     ),
                     Collectors::NetCollector(_) => {
                         netbox.draw_fg(THEME, key, term, CONFIG, draw, graphs, menu)

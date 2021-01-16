@@ -260,7 +260,7 @@ pub fn main() {
         )
         .get_matches();
 
-    let mut ARG_MODE = ViewMode::None;
+    let mut ARG_MODE: &mut ViewMode = &mut ViewMode::None;
     let arg_full = matches.value_of("Full Mode");
     let arg_proc = matches.value_of("Minimal Mode (proc)");
     let arg_stat = matches.value_of("Minimal Mode (stat)");
@@ -268,11 +268,11 @@ pub fn main() {
     let arg_debug = matches.value_of("Debug");
 
     if arg_full.is_some() {
-        ARG_MODE = ViewMode::Full;
+        ARG_MODE = &mut ViewMode::Full;
     } else if arg_proc.is_some() {
-        ARG_MODE = ViewMode::Proc
+        ARG_MODE = &mut ViewMode::Proc
     } else if arg_stat.is_some() {
-        ARG_MODE = ViewMode::Stat;
+        ARG_MODE = &mut ViewMode::Stat;
     }
 
     let DEBUG = arg_debug.is_some();
@@ -436,15 +436,15 @@ pub fn main() {
 
     let mut draw: &mut Draw = &mut Draw::new();
 
-    let mut brshtop_box: &mut BrshtopBox = &mut BrshtopBox::new(&mut CONFIG, ARG_MODE);
+    let mut brshtop_box: &mut BrshtopBox = &mut BrshtopBox::new(&mut CONFIG, *ARG_MODE);
 
-    let mut cpu_box: &mut CpuBox = &mut CpuBox::new(&mut brshtop_box, &mut CONFIG, ARG_MODE);
+    let mut cpu_box: &mut CpuBox = &mut CpuBox::new(&mut brshtop_box, &mut CONFIG, *ARG_MODE);
 
-    let mut mem_box: &mut MemBox = &mut MemBox::new(&mut brshtop_box, &mut CONFIG, ARG_MODE);
+    let mut mem_box: &mut MemBox = &mut MemBox::new(&mut brshtop_box, &mut CONFIG, *ARG_MODE);
 
-    let mut net_box: &mut NetBox = &mut NetBox::new(&mut CONFIG, ARG_MODE, &mut brshtop_box);
+    let mut net_box: &mut NetBox = &mut NetBox::new(&mut CONFIG, *ARG_MODE, &mut brshtop_box);
 
-    let mut proc_box: &mut ProcBox = &mut ProcBox::new(&mut brshtop_box, &mut CONFIG, ARG_MODE);
+    let mut proc_box: &mut ProcBox = &mut ProcBox::new(&mut brshtop_box, &mut CONFIG, *ARG_MODE);
 
     let mut collector: &mut Collector = &mut Collector::new();
 
@@ -628,8 +628,42 @@ pub fn main() {
     thread::spawn(move || {
         for sig in signals.forever() {
             match sig {
-                SIGTSTP => now_sleeping(),
-                SIGCONT => now_awake(),
+                SIGTSTP => match now_sleeping(key, collector, draw, term) {
+                    Some(_) => (),
+                    None => clean_quit(
+                        None,
+                        Some("Failed to pause program".to_owned()),
+                        key,
+                        collector,
+                        draw,
+                        term,
+                        CONFIG,
+                        None,
+                    ),
+                },
+                SIGCONT => now_awake(
+                    draw,
+                    term,
+                    key,
+                    brshtop_box,
+                    collector,
+                    boxes,
+                    init,
+                    cpu_box,
+                    menu,
+                    timer,
+                    CONFIG,
+                    THEME,
+                    DEBUG,
+                    collectors,
+                    timeit,
+                    ARG_MODE,
+                    graphs,
+                    meters,
+                    net_box,
+                    proc_box,
+                    mem_box,
+                ),
                 SIGINT => clean_quit(None, None, key, collector, draw, term, CONFIG, None),
                 SIGWINCH => term.refresh(
                     vec![],
@@ -1838,7 +1872,7 @@ pub fn now_awake<'a>(
     DEBUG: bool,
     collectors: Vec<Collectors<'static>>,
     timeit: &'static mut TimeIt,
-    ARG_MODE: &mut ViewMode,
+    ARG_MODE: &'static mut ViewMode,
     graphs: &'static mut Graphs,
     meters: &'static mut Meters,
     netbox: &'static mut NetBox,
