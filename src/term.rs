@@ -69,7 +69,7 @@ impl Term {
         }
     }
 
-    ///Updates width and height and sets resized flag if terminal has been resized
+    ///Updates width and height and sets resized flag if terminal has been resized, defaults : force = false
     pub fn refresh(
         &mut self,
         args: Vec<String>,

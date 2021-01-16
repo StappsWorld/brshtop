@@ -9,6 +9,7 @@ use {
     },
 };
 
+#[derive(Default)]
 pub struct Graphs {
     pub cpu: HashMap<String, Graph>,
     pub cores: Vec<Graph>,

@@ -118,13 +118,10 @@ impl<'a> Collector<'a> {
         menu: &'static mut Menu,
         draw: &'static mut Draw,
         term: &'static mut Term,
-        THREADS: u64,
-        CORES: u64,
-        CORE_MAP: Vec<i32>,
         cpu_box: &'static mut CpuBox,
         key: &'static mut Key,
         THEME: &'static mut Theme,
-        ARG_MODE: ViewMode,
+        ARG_MODE: &mut ViewMode,
         graphs: &'static mut Graphs,
         meters: &'static mut Meters,
         netbox: &'static mut NetBox,
@@ -137,14 +134,11 @@ impl<'a> Collector<'a> {
                 self.runner(
                     CONFIG,
                     DEBUG,
-                    THREADS,
                     brshtop_box,
                     timeit,
                     menu,
                     draw,
                     term,
-                    CORES,
-                    CORE_MAP,
                     cpu_box,
                     key,
                     THEME,
@@ -183,14 +177,11 @@ impl<'a> Collector<'a> {
         &mut self,
         CONFIG: &mut Config,
         DEBUG: bool,
-        THREADS: u64,
         brshtop_box: &mut BrshtopBox,
         timeit: &mut TimeIt,
         menu: &mut Menu,
         draw: &mut Draw,
         term: &mut Term,
-        CORES: u64,
-        CORE_MAP: Vec<i32>,
         cpu_box: &mut CpuBox,
         key: &mut Key,
         THEME: &mut Theme,
@@ -229,7 +220,7 @@ impl<'a> Collector<'a> {
                 if !self.only_draw {
                     match collector {
                         Collectors::CpuCollector(c) => {
-                            c.collect(CONFIG, THREADS, term, CORES, CORE_MAP, cpu_box, brshtop_box)
+                            c.collect(CONFIG, term, cpu_box, brshtop_box)
                         }
                         Collectors::NetCollector(n) => n.collect(CONFIG, netbox),
                         Collectors::ProcCollector(p) => p.collect(brshtop_box, CONFIG, procbox),
@@ -238,8 +229,7 @@ impl<'a> Collector<'a> {
                 }
                 match collector {
                     Collectors::CpuCollector(c) => c.draw(
-                        cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, THREADS,
-                        menu,
+                        cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters,menu,
                     ),
                     Collectors::NetCollector(_) => {
                         netbox.draw_fg(THEME, key, term, CONFIG, draw, graphs, menu)

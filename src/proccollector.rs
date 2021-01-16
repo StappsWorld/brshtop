@@ -130,10 +130,10 @@ pub struct ProcCollector<'a> {
     pub p_values: Vec<String>,
 }
 impl<'a> ProcCollector<'a> {
-    pub fn new(buffer: String) -> Self {
+    pub fn new(procbox : &mut ProcBox) -> Self {
         let mut proc = ProcCollector {
             parent: Collector::new(),
-            buffer: buffer.clone(),
+            buffer: procbox.buffer.clone(),
             search_filter: String::default(),
             processes: HashMap::<Pid, HashMap<String, ProcessInfo>>::new(),
             num_procs: 0,

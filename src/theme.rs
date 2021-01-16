@@ -317,7 +317,7 @@ impl Colors {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Theme {
     pub themes : HashMap<String, String>,
     pub cached : HashMap<String, HashMap<String, String>>,

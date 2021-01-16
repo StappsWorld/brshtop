@@ -1,26 +1,28 @@
-use crate::{
-    CONFIG_DIR,
-    brshtop_box::BrshtopBox,
-    collector::{Collector, Collectors},
-    config::{Config, ViewMode},
-    cpubox::CpuBox,
-    draw::Draw,
-    error,
-    graph::Graphs,
-    key::Key,
-    menu::Menu,
-    meter::Meters,
-    SYSTEM,
-    term::Term,
-    theme::Theme,
+use {
+    crate::{
+        brshtop_box::BrshtopBox,
+        collector::{Collector, Collectors},
+        config::{Config, ViewMode},
+        cpubox::CpuBox,
+        draw::Draw,
+        error,
+        graph::Graphs,
+        key::Key,
+        menu::Menu,
+        meter::Meters,
+        term::Term,
+        theme::Theme,
+        CONFIG_DIR, CORES, CORE_MAP, SYSTEM,
+        THREADS,
+    },
+    hhmmss::Hhmmss,
+    psutil::sensors::*,
+    std::time::SystemTime,
+    std::{collections::HashMap, iter::Enumerate, path::*},
+    subprocess::Exec,
+    sys_info::*,
+    which::which,
 };
-use hhmmss::Hhmmss;
-use psutil::sensors::*;
-use std::time::SystemTime;
-use std::{collections::HashMap, iter::Enumerate, path::*};
-use subprocess::Exec;
-use sys_info::*;
-use which::which;
 
 #[derive(Clone)]
 pub struct CpuCollector<'a> {
@@ -40,10 +42,10 @@ pub struct CpuCollector<'a> {
     pub cpu_temp_only: bool,
 }
 impl<'a> CpuCollector<'a> {
-    pub fn new(THREADS: u64) -> Self {
+    pub fn new() -> Self {
         let mut cpu_usage_mut = Vec::<Vec<u32>>::new();
         let mut cpu_temp_mut = Vec::<Vec<u32>>::new();
-        for _ in 0..THREADS + 1 {
+        for _ in 0..THREADS.to_owned() + 1 {
             cpu_usage_mut.push(Vec::new());
             cpu_temp_mut.push(Vec::new());
         }
@@ -70,10 +72,7 @@ impl<'a> CpuCollector<'a> {
     pub fn collect(
         &mut self,
         CONFIG: &mut Config,
-        THREADS: u64,
         term: &mut Term,
-        CORES: u64,
-        CORE_MAP: Vec<i32>,
         cpu_box: &mut CpuBox,
         brshtop_box: &mut BrshtopBox,
     ) {
@@ -93,17 +92,13 @@ impl<'a> CpuCollector<'a> {
             Ok(p) => match p.cpu_percent_percpu() {
                 Ok(p) => p,
                 Err(e) => {
-                    error::errlog(
-                        format!("Unable to collect CPU percentages! (error {})", e),
-                    );
+                    error::errlog(format!("Unable to collect CPU percentages! (error {})", e));
                     self.got_sensors = false;
                     return;
                 }
             },
             Err(e) => {
-                error::errlog(
-                    format!("Unable to collect CPU percentages! (error {})", e),
-                );
+                error::errlog(format!("Unable to collect CPU percentages! (error {})", e));
                 vec![-1.0]
             }
         };
@@ -118,9 +113,7 @@ impl<'a> CpuCollector<'a> {
         let cpu_frequency = match psutil::cpu::cpu_freq() {
             Ok(f) => f.current(),
             Err(e) => {
-                error::errlog(
-                    format!("Unable to collect CPU frequency! (error {})", e),
-                );
+                error::errlog(format!("Unable to collect CPU frequency! (error {})", e));
                 -1.0
             }
         };
@@ -134,9 +127,7 @@ impl<'a> CpuCollector<'a> {
                 format!("{:.2}", l.fifteen).parse::<f64>().unwrap(),
             ],
             Err(e) => {
-                error::errlog(
-                    format!("Unable to collect load average! (error {})", e),
-                );
+                error::errlog(format!("Unable to collect load average! (error {})", e));
                 vec![-1.0, -1.0, -1.0]
             }
         };
@@ -153,26 +144,16 @@ impl<'a> CpuCollector<'a> {
                 ela
             }
             Err(e) => {
-                error::errlog(
-                    format!(
-                        "Error finding the boot time of this system... (error {})",
-                        e
-                    ),
-                );
+                error::errlog(format!(
+                    "Error finding the boot time of this system... (error {})",
+                    e
+                ));
                 String::from("99:99:99")
             }
         };
 
         if CONFIG.check_temp && self.got_sensors {
-            self.collect_temps(
-                CONFIG,
-                THREADS,
-                CORES,
-                CORE_MAP,
-                cpu_box,
-                brshtop_box,
-                term,
-            );
+            self.collect_temps(CONFIG, cpu_box, brshtop_box, term);
         }
     }
 
@@ -187,21 +168,10 @@ impl<'a> CpuCollector<'a> {
         ARG_MODE: ViewMode,
         graphs: &mut Graphs,
         meters: &mut Meters,
-        THREADS: u64,
         menu: &mut Menu,
     ) {
         cpu_box.draw_fg(
-            self,
-            CONFIG,
-            key,
-            THEME,
-            term,
-            draw,
-            ARG_MODE,
-            graphs,
-            meters,
-            menu,
-            THEME
+            self, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu, THEME,
         );
     }
 
@@ -292,9 +262,6 @@ impl<'a> CpuCollector<'a> {
     pub fn collect_temps(
         &mut self,
         CONFIG: &mut Config,
-        THREADS: u64,
-        CORES: u64,
-        CORE_MAP: Vec<i32>,
         cpu_box: &mut CpuBox,
         brshtop_box: &mut BrshtopBox,
         term: &mut Term,
@@ -417,7 +384,7 @@ impl<'a> CpuCollector<'a> {
                                         }
                                         c_max = largest + 1;
                                     }
-                                    if c_max < (THREADS / 2) as i32
+                                    if c_max < (THREADS.to_owned() / 2) as i32
                                         && !core_dict.contains_key(&(entry_int + c_max))
                                     {
                                         core_dict.insert(
@@ -500,28 +467,28 @@ impl<'a> CpuCollector<'a> {
                 self.cpu_temp.get(0).unwrap().push(temp as u32);
                 if cpu_type == String::from("ryzen") {
                     let ccds: i32 = core_dict.len() as i32;
-                    let cores_per_ccd: i32 = (CORES / ccds as u64) as i32;
+                    let cores_per_ccd: i32 = (CORES.to_owned() / ccds as u64) as i32;
                     let mut z: i32 = 1;
 
-                    for x in 0..THREADS as usize {
-                        if x == CORES as usize {
+                    for x in 0..THREADS.to_owned() as usize {
+                        if x == CORES.to_owned() as usize {
                             z = 1;
                         }
-                        if CORE_MAP[x] + 1 > cores_per_ccd * z {
+                        if CORE_MAP.to_owned()[x] + 1 > cores_per_ccd * z {
                             z += 1;
                         }
                         if core_dict.contains_key(&z) {
-                            self.cpu_temp[x + 1].push(core_dict[&CORE_MAP[x]] as u32);
+                            self.cpu_temp[x + 1].push(core_dict[&CORE_MAP.to_owned()[x]] as u32);
                         }
                     }
                 } else {
-                    for x in 0..THREADS as usize {
-                        if core_dict.contains_key(&CORE_MAP[x]) {
-                            self.cpu_temp[x + 1].push(core_dict[&CORE_MAP[x]] as u32);
+                    for x in 0..THREADS.to_owned() as usize {
+                        if core_dict.contains_key(&CORE_MAP.to_owned()[x]) {
+                            self.cpu_temp[x + 1].push(core_dict[&CORE_MAP.to_owned()[x]] as u32);
                         }
                     }
                 }
-            } else if cores.len() == (THREADS / 2) as usize {
+            } else if cores.len() == (THREADS.to_owned() / 2) as usize {
                 self.cpu_temp[0].push(temp as u32);
                 let mut n = 1;
                 for t in cores {
@@ -529,7 +496,7 @@ impl<'a> CpuCollector<'a> {
                         Some(u) => u.push(t.parse::<u32>().unwrap()),
                         None => break,
                     }
-                    match self.cpu_temp.get((THREADS / 2) as usize + n) {
+                    match self.cpu_temp.get((THREADS.to_owned() / 2) as usize + n) {
                         Some(u) => u.push(t.parse::<u32>().unwrap()),
                         None => break,
                     }
@@ -556,10 +523,9 @@ impl<'a> CpuCollector<'a> {
                         Ok(o) => o.stdout_str().to_owned().trim().parse::<u32>().unwrap(),
                         Err(e) => {
                             error::errlog(format!(
-                                    "Error getting temperature data for this system... (error {})",
-                                    e
-                                )
-                            );
+                                "Error getting temperature data for this system... (error {})",
+                                e
+                            ));
                             self.got_sensors = false;
                             cpu_box.calc_size(term, brshtop_box);
                             return;
@@ -577,12 +543,10 @@ impl<'a> CpuCollector<'a> {
                             .map(|s: &str| s.parse::<u32>().unwrap_or(0))
                             .collect::<Vec<u32>>(),
                         Err(e) => {
-                            error::errlog(
-                                format!(
-                                    "Error getting temperature data for this system... (error {})",
-                                    e
-                                ),
-                            );
+                            error::errlog(format!(
+                                "Error getting temperature data for this system... (error {})",
+                                e
+                            ));
                             self.got_sensors = false;
                             cpu_box.calc_size(term, brshtop_box);
                             return;
@@ -591,7 +555,7 @@ impl<'a> CpuCollector<'a> {
 
                     cores = coretemp.iter().map(|u| u.to_string()).collect();
 
-                    if cores.len() == (THREADS as usize / 2) {
+                    if cores.len() == (THREADS.to_owned() as usize / 2) {
                         self.cpu_temp[0].push(temp as u32);
 
                         let mut n = 1;
@@ -600,7 +564,7 @@ impl<'a> CpuCollector<'a> {
                                 Some(u) => u.push(t.parse::<u32>().unwrap()),
                                 None => break,
                             }
-                            match self.cpu_temp.get((THREADS / 2) as usize + n) {
+                            match self.cpu_temp.get((THREADS.to_owned() / 2) as usize + n) {
                                 Some(u) => u.push(t.parse::<u32>().unwrap()),
                                 None => break,
                             }
@@ -632,12 +596,10 @@ impl<'a> CpuCollector<'a> {
                             setter.parse::<f64>().unwrap().round() as u32
                         }
                         Err(e) => {
-                            error::errlog(
-                                format!(
-                                    "Error getting temperature data for this system... (error {})",
-                                    e
-                                ),
-                            );
+                            error::errlog(format!(
+                                "Error getting temperature data for this system... (error {})",
+                                e
+                            ));
                             self.got_sensors = false;
                             cpu_box.calc_size(term, brshtop_box);
                             return;
@@ -660,12 +622,10 @@ impl<'a> CpuCollector<'a> {
                             setter.parse::<f64>().unwrap().round() as u32
                         }
                         Err(e) => {
-                            error::errlog(
-                                format!(
-                                    "Error getting temperature data for this system... (error {})",
-                                    e
-                                ),
-                            );
+                            error::errlog(format!(
+                                "Error getting temperature data for this system... (error {})",
+                                e
+                            ));
                             self.got_sensors = false;
                             cpu_box.calc_size(term, brshtop_box);
                             return;

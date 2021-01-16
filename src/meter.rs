@@ -16,6 +16,7 @@ pub enum MeterUnion {
     Graph(Graph),
 }
 
+#[derive(Default)]
 pub struct Meters {
     pub cpu : Meter,
     pub battery : Meter,
@@ -25,6 +26,7 @@ pub struct Meters {
     pub disks_free : HashMap<String, Meter>,
 }
 
+#[derive(Default)]
 pub struct Meter {
     pub out : String,
     pub color_gradient : Vec<String>,

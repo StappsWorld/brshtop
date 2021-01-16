@@ -41,16 +41,20 @@ use {
         cpucollector::CpuCollector,
         draw::Draw,
         event::Event,
+        fx::Fx,
         graph::Graphs,
         init::Init,
         key::Key,
+        membox::MemBox,
         memcollector::MemCollector,
         menu::Menu,
+        meter::Meters,
         netbox::NetBox,
         netcollector::NetCollector,
         procbox::ProcBox,
         proccollector::{ProcCollector, ProcCollectorDetails},
         term::Term,
+        timeit::TimeIt,
         timer::Timer,
         updatechecker::UpdateChecker,
     },
@@ -61,15 +65,19 @@ use {
     expanduser::expanduser,
     lazy_static::lazy_static,
     math::round,
-    psutil::process::Signal::{SIGINT, SIGKILL, SIGTERM},
+    psutil::process::Signal,
+    signal_hook::{consts::signal::*, iterator::Signals},
     std::{
         collections::HashMap,
         env, fs,
         fs::{metadata, File},
+        io,
         io::{prelude::*, BufReader},
         path::{Path, PathBuf},
+        process, thread,
         time::{Duration, SystemTime, UNIX_EPOCH},
     },
+    terminal_size::{terminal_size, Height, Width},
     theme::{Color, Theme},
 };
 
@@ -190,6 +198,8 @@ lazy_static! {
         out
     };
     pub static ref USER_THEME_DIR : &'static Path = CONFIG_DIR.to_owned().join("themes").as_path();
+    pub static ref CORES : u64 = psutil::cpu::cpu_count_physical();
+    pub static ref CORE_MAP : Vec<i32> = get_cpu_core_mapping();
 }
 
 pub fn main() {
@@ -294,64 +304,87 @@ pub fn main() {
 
     let CONFIG_FILE = CONFIG_DIR.join("bpytop.conf");
 
-    let CORES = psutil::cpu::cpu_count_physical();
-
     let THREAD_ERROR = 0;
 
     let mut MENUS = HashMap::new();
 
     let mut options_hash = HashMap::new();
     options_hash.insert(
-        "normal",
+        "normal".to_owned(),
         (
-            "┌─┐┌─┐┌┬┐┬┌─┐┌┐┌┌─┐",
-            "│ │├─┘ │ ││ ││││└─┐",
-            "└─┘┴   ┴ ┴└─┘┘└┘└─┘",
+            "┌─┐┌─┐┌┬┐┬┌─┐┌┐┌┌─┐".to_owned(),
+            "│ │├─┘ │ ││ ││││└─┐".to_owned(),
+            "└─┘┴   ┴ ┴└─┘┘└┘└─┘".to_owned(),
         ),
     );
     options_hash.insert(
-        "selected",
+        "selected".to_owned(),
         (
-            "╔═╗╔═╗╔╦╗╦╔═╗╔╗╔╔═╗",
-            "║ ║╠═╝ ║ ║║ ║║║║╚═╗",
-            "╚═╝╩   ╩ ╩╚═╝╝╚╝╚═╝",
+            "╔═╗╔═╗╔╦╗╦╔═╗╔╗╔╔═╗".to_owned(),
+            "║ ║╠═╝ ║ ║║ ║║║║╚═╗".to_owned(),
+            "╚═╝╩   ╩ ╩╚═╝╝╚╝╚═╝".to_owned(),
         ),
     );
-    MENUS.insert("options", options_hash);
+    MENUS.insert("options".to_owned(), options_hash);
     let mut help_hash = HashMap::new();
-    help_hash.insert("normal", ("┬ ┬┌─┐┬  ┌─┐", "├─┤├┤ │  ├─┘", "┴ ┴└─┘┴─┘┴  "));
-    help_hash.insert("selected", ("╦ ╦╔═╗╦  ╔═╗", "╠═╣║╣ ║  ╠═╝", "╩ ╩╚═╝╩═╝╩  "));
-    MENUS.insert("help", help_hash);
+    help_hash.insert(
+        "normal".to_owned(),
+        (
+            "┬ ┬┌─┐┬  ┌─┐".to_owned(),
+            "├─┤├┤ │  ├─┘".to_owned(),
+            "┴ ┴└─┘┴─┘┴  ".to_owned(),
+        ),
+    );
+    help_hash.insert(
+        "selected".to_owned(),
+        (
+            "╦ ╦╔═╗╦  ╔═╗".to_owned(),
+            "╠═╣║╣ ║  ╠═╝".to_owned(),
+            "╩ ╩╚═╝╩═╝╩  ".to_owned(),
+        ),
+    );
+    MENUS.insert("help".to_owned(), help_hash);
 
     let mut quit_hash = HashMap::new();
-    quit_hash.insert("normal", ("┌─┐ ┬ ┬ ┬┌┬┐", "│─┼┐│ │ │ │ ", "└─┘└└─┘ ┴ ┴ "));
     quit_hash.insert(
-        "selected",
-        ("╔═╗ ╦ ╦ ╦╔╦╗ ", "║═╬╗║ ║ ║ ║  ", "╚═╝╚╚═╝ ╩ ╩  "),
+        "normal".to_owned(),
+        (
+            "┌─┐ ┬ ┬ ┬┌┬┐".to_owned(),
+            "│─┼┐│ │ │ │ ".to_owned(),
+            "└─┘└└─┘ ┴ ┴ ".to_owned(),
+        ),
+    );
+    quit_hash.insert(
+        "selected".to_owned(),
+        (
+            "╔═╗ ╦ ╦ ╦╔╦╗ ".to_owned(),
+            "║═╬╗║ ║ ║ ║  ".to_owned(),
+            "╚═╝╚╚═╝ ╩ ╩  ".to_owned(),
+        ),
     );
 
-    MENUS.insert("quit", quit_hash);
+    MENUS.insert("quit".to_owned(), quit_hash);
     let mut MENU_COLORS: HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
     MENU_COLORS.insert(
         "normal".to_owned(),
         vec!["#0fd7ff", "#00bfe6", "#00a6c7", "#008ca8"]
             .iter()
-            .map(|s| s.clone().to_owned())
+            .map(|s| s.to_owned().to_owned())
             .collect::<Vec<String>>(),
     );
     MENU_COLORS.insert(
         "selected".to_owned(),
         vec!["#ffa50a", "#f09800", "#db8b00", "#c27b00"]
             .iter()
-            .map(|s| s.clone().to_owned())
+            .map(|s| s.to_owned().to_owned())
             .collect::<Vec<String>>(),
     );
 
-    let CONFIG = match Config::new(CONFIG_FILE.clone()) {
-        Ok(c) => c,
+    let CONFIG: &mut Config = match Config::new(CONFIG_FILE.clone()) {
+        Ok(c) => &mut c,
         Err(e) => {
             throw_error(e);
-            Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
+            &mut Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
         }
     };
 
@@ -373,6 +406,483 @@ pub fn main() {
 
     let mut b = brshtop::Brshtop::new();
     b._init();
+
+    let mut THEME: &mut Theme = match Theme::from_file(THEME_DIR.to_owned().as_path()) {
+        Ok(r) => match r {
+            Ok(t) => &mut t,
+            Err(e) => {
+                errlog(format!(
+                    "Unable to read Theme in directory '{}' (error {}), falling back to default",
+                    THEME_DIR.to_owned().to_str().unwrap(),
+                    e
+                ));
+                &mut Theme::default()
+            }
+        },
+        Err(e) => {
+            errlog(format!(
+                "Unable to read Theme in directory '{}' (error {}), falling back to default",
+                THEME_DIR.to_owned().to_str().unwrap(),
+                e
+            ));
+            &mut Theme::default()
+        }
+    };
+
+    // Pre main ---------------------------------------------------------------------------------------------
+    let mut term: &mut Term = &mut Term::new();
+
+    let mut key: &mut Key = &mut Key::new();
+
+    let mut draw: &mut Draw = &mut Draw::new();
+
+    let mut brshtop_box: &mut BrshtopBox = &mut BrshtopBox::new(&mut CONFIG, ARG_MODE);
+
+    let mut cpu_box: &mut CpuBox = &mut CpuBox::new(&mut brshtop_box, &mut CONFIG, ARG_MODE);
+
+    let mut mem_box: &mut MemBox = &mut MemBox::new(&mut brshtop_box, &mut CONFIG, ARG_MODE);
+
+    let mut net_box: &mut NetBox = &mut NetBox::new(&mut CONFIG, ARG_MODE, &mut brshtop_box);
+
+    let mut proc_box: &mut ProcBox = &mut ProcBox::new(&mut brshtop_box, &mut CONFIG, ARG_MODE);
+
+    let mut collector: &mut Collector = &mut Collector::new();
+
+    let mut cpu_collector: &mut CpuCollector = &mut CpuCollector::new();
+
+    let mut mem_collector: &mut MemCollector = &mut MemCollector::new(&mut mem_box);
+
+    let mut net_collector: &mut NetCollector = &mut NetCollector::new(&mut net_box, &mut CONFIG);
+
+    let mut proc_collector: &mut ProcCollector = &mut ProcCollector::new(&mut proc_box);
+
+    let mut menu: &mut Menu = &mut Menu::new(MENUS, MENU_COLORS);
+
+    let mut timer: &mut Timer = &mut Timer::new();
+
+    let mut timeit: &mut TimeIt = &mut TimeIt::new();
+
+    let mut init: &mut Init = &mut Init::new();
+
+    let mut updatechecker: &mut UpdateChecker = &mut UpdateChecker::new();
+
+    let mut collectors: Vec<Collectors> = vec![
+        Collectors::MemCollector(mem_collector),
+        Collectors::NetCollector(net_collector),
+        Collectors::ProcCollector(proc_collector),
+        Collectors::CpuCollector(cpu_collector),
+    ];
+
+    let mut boxes: Vec<Boxes> = vec![
+        Boxes::CpuBox(&mut cpu_box),
+        Boxes::MemBox(&mut mem_box),
+        Boxes::NetBox(&mut net_box),
+        Boxes::ProcBox(&mut proc_box),
+    ];
+
+    let mut graphs: &mut Graphs = &mut Graphs::default();
+
+    let mut meters: &mut Meters = &mut Meters::default();
+
+    // Main -----------------------------------------------------------------------------------------------
+
+    let term_size = terminal_size();
+    match term_size {
+        Some((Width(w), Height(h))) => {
+            term.width = w;
+            term.height = h;
+        }
+        None => error::throw_error("Unable to get size of terminal!"),
+    };
+
+    // Init ----------------------------------------------------------------------------------
+    if DEBUG {
+        timeit.start("Init".to_owned());
+    }
+
+    // Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
+
+    draw.now(
+        vec![
+            term.alt_screen,
+            term.clear,
+            term.hide_cursor,
+            term.mouse_on,
+            Term::title("BRShtop".to_owned()),
+        ],
+        key,
+    );
+    Term::echo(false);
+    term.refresh(
+        vec![],
+        boxes,
+        collector,
+        init,
+        cpu_box,
+        draw,
+        true,
+        key,
+        menu,
+        brshtop_box,
+        timer,
+        CONFIG,
+        THEME,
+    );
+
+    // Start a thread checking for updates while running init
+    if CONFIG.update_check {
+        updatechecker.run();
+    }
+
+    // Draw banner and init status
+    if CONFIG.show_init && !init.resized {
+        init.start(draw, key, term);
+    }
+
+    // Load theme
+    if CONFIG.show_init {
+        draw.buffer(
+            "+init!".to_owned(),
+            vec![format!(
+                "{}{}{}",
+                mv::restore,
+                Fx::trans("Loading theme and creating colors... ".to_owned()),
+                mv::save
+            )],
+            false,
+            false,
+            100,
+            false,
+            false,
+            false,
+            key,
+        );
+    }
+    THEME = &mut match Theme::from_str(CONFIG.color_theme) {
+        Ok(t) => {
+            init.success(CONFIG, draw, term, key);
+            t
+        }
+        Err(e) => {
+            errlog(format!("Unable to read theme from config (error {})...", e));
+            Init::fail(e, CONFIG, draw, collector, key, term);
+            Theme::default()
+        }
+    };
+
+    // Setup boxes
+    if CONFIG.show_init {
+        draw.buffer(
+            "+init!".to_owned(),
+            vec![format!(
+                "{}{}{}",
+                mv::restore,
+                Fx::trans("Doing some maths and drawing... ".to_owned()),
+                mv::save
+            )],
+            false,
+            false,
+            100,
+            false,
+            false,
+            false,
+            key,
+        );
+        if CONFIG.check_temp {
+            cpu_collector.get_sensors(CONFIG);
+        }
+        brshtop_box.calc_sizes(boxes, term, CONFIG);
+        brshtop_box.draw_bg(false, draw, boxes, menu, CONFIG, cpu_box, key, THEME, term);
+        init.success(CONFIG, draw, term, key);
+    }
+
+    // Setup signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH
+
+    if CONFIG.show_init {
+        draw.buffer(
+            "+init!".to_owned(),
+            vec![format!(
+                "{}{}{}",
+                mv::restore,
+                Fx::trans("Setting up signal handlers... ".to_owned()),
+                mv::save
+            )],
+            false,
+            false,
+            100,
+            false,
+            false,
+            false,
+            key,
+        );
+    }
+
+    let signals = match Signals::new(&[SIGTSTP, SIGCONT, SIGINT, SIGWINCH]) {
+        //Handling ctrl-z, resume, ctrl-c, terminal resized
+        Ok(s) => s,
+        Err(e) => {
+            Init::fail(e.to_string(), CONFIG, draw, collector, key, term);
+            return;
+        }
+    };
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            match sig {
+                SIGTSTP => now_sleeping(),
+                SIGCONT => now_awake(),
+                SIGINT => clean_quit(None, None, key, collector, draw, term, CONFIG, None),
+                SIGWINCH => term.refresh(
+                    vec![],
+                    boxes,
+                    collector,
+                    init,
+                    cpu_box,
+                    draw,
+                    true,
+                    key,
+                    menu,
+                    brshtop_box,
+                    timer,
+                    CONFIG,
+                    THEME,
+                ),
+                _ => unreachable!(),
+            }
+        }
+    });
+    init.success(CONFIG, draw, term, key);
+
+    // Start a separate thread for reading keyboard input
+    if CONFIG.show_init {
+        draw.buffer(
+            "+init!".to_owned(),
+            vec![format!(
+                "{}{}{}",
+                mv::restore,
+                Fx::trans("Starting input reader thread... ".to_owned()),
+                mv::save
+            )],
+            false,
+            false,
+            100,
+            false,
+            false,
+            false,
+            key,
+        );
+    }
+    key.start(draw, menu);
+    init.success(CONFIG, draw, term, key);
+
+    // Start a separate thread for data collection and drawing
+    if CONFIG.show_init {
+        draw.buffer(
+            "+init!".to_owned(),
+            vec![format!(
+                "{}{}{}",
+                mv::restore,
+                Fx::trans("Starting data collection and drawer thread... ".to_owned()),
+                mv::save
+            )],
+            false,
+            false,
+            100,
+            false,
+            false,
+            false,
+            key,
+        );
+    }
+    collector.start(
+        CONFIG,
+        DEBUG,
+        collectors,
+        brshtop_box,
+        timeit,
+        menu,
+        draw,
+        term,
+        cpu_box,
+        key,
+        THEME,
+        ARG_MODE,
+        graphs,
+        meters,
+        net_box,
+        proc_box,
+        mem_box,
+    );
+    init.success(CONFIG, draw, term, key);
+
+    // Collect data and draw to buffer
+    if CONFIG.show_init {
+        draw.buffer(
+            "+init!".to_owned(),
+            vec![format!(
+                "{}{}{}",
+                mv::restore,
+                Fx::trans("Collecting data and drawing... ".to_owned()),
+                mv::save
+            )],
+            false,
+            false,
+            100,
+            false,
+            false,
+            false,
+            key,
+        );
+    }
+    collector.collect(collectors, CONFIG, false, false, false, false, false);
+    init.success(CONFIG, draw, term, key);
+
+    // Draw to screen
+    if CONFIG.show_init {
+        draw.buffer(
+            "+init!".to_owned(),
+            vec![format!(
+                "{}{}{}",
+                mv::restore,
+                Fx::trans("Finishing up... ".to_owned()),
+                mv::save
+            )],
+            false,
+            false,
+            100,
+            false,
+            false,
+            false,
+            key,
+        );
+    }
+    collector.collect_done = Event::Wait;
+    collector.collect_done.wait(-1.0);
+    init.success(CONFIG, draw, term, key);
+
+    init.done(CONFIG, draw, term, key);
+    term.refresh(
+        vec![],
+        boxes,
+        collector,
+        init,
+        cpu_box,
+        draw,
+        false,
+        key,
+        menu,
+        brshtop_box,
+        timer,
+        CONFIG,
+        THEME,
+    );
+    draw.out(vec![], true, key);
+    if CONFIG.draw_clock.len() > 0 {
+        brshtop_box.clock_on = true;
+    }
+    if DEBUG {
+        timeit.stop("Init".to_owned());
+    }
+
+    // Main loop ------------------------------------------------------------------------------------->
+    run(
+        term,
+        key,
+        timer,
+        collector,
+        boxes,
+        init,
+        cpu_box,
+        draw,
+        menu,
+        brshtop_box,
+        CONFIG,
+        THEME,
+        &mut ARG_MODE,
+        proc_box,
+        proc_collector,
+        net_collector,
+        cpu_collector,
+        net_box,
+        updatechecker,
+        collectors,
+        mem_collector,
+        graphs,
+    );
+}
+
+pub fn run<'a>(
+    term: &mut Term,
+    key: &mut Key,
+    timer: &mut Timer,
+    collector: &'a mut Collector<'a>,
+    boxes: Vec<Boxes>,
+    init: &mut Init,
+    cpu_box: &mut CpuBox,
+    draw: &mut Draw,
+    menu: &mut Menu,
+    brshtop_box: &mut BrshtopBox,
+    CONFIG: &mut Config,
+    THEME: &mut Theme,
+    ARG_MODE: &mut ViewMode,
+    procbox: &mut ProcBox,
+    proccollector: &'a mut ProcCollector<'a>,
+    netcollector: &'a mut NetCollector<'a>,
+    cpucollector: &mut CpuCollector,
+    netbox: &mut NetBox,
+    update_checker: &mut UpdateChecker,
+    collectors: Vec<Collectors<'a>>,
+    memcollector: &'a mut MemCollector<'a>,
+    graphs: &mut Graphs,
+) {
+    loop {
+        term.refresh(
+            vec![],
+            boxes,
+            collector,
+            init,
+            cpu_box,
+            draw,
+            false,
+            key,
+            menu,
+            brshtop_box,
+            timer,
+            CONFIG,
+            THEME,
+        );
+        timer.stamp();
+
+        while timer.not_zero(CONFIG) {
+            if key.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
+                process_keys(
+                    ARG_MODE,
+                    key,
+                    procbox,
+                    collector,
+                    proccollector,
+                    CONFIG,
+                    draw,
+                    term,
+                    brshtop_box,
+                    cpu_box,
+                    menu,
+                    THEME,
+                    netcollector,
+                    init,
+                    cpucollector,
+                    boxes,
+                    netbox,
+                    update_checker,
+                    collectors,
+                    timer,
+                    memcollector,
+                    graphs,
+                )
+            }
+        }
+
+        collector.collect(collectors, CONFIG, true, false, false, false, false);
+    }
 }
 
 /// Defaults x: int = 0, y: int = 0, width: int = 0, height: int = 0, title: str = "", title2: str = "", line_color: Color = None, title_color: Color = None, fill: bool = True, box=None
@@ -1142,11 +1652,11 @@ pub fn process_keys<'a>(
             let lower = key.to_ascii_lowercase();
             if psutil::process::pid_exists(pid) {
                 let sig = if lower == "t".to_owned() {
-                    SIGTERM
+                    Signal::SIGTERM
                 } else if lower == "k".to_owned() {
-                    SIGKILL
+                    Signal::SIGKILL
                 } else {
-                    SIGINT
+                    Signal::SIGINT
                 };
                 match psutil::process::Process::new(pid).unwrap().send_signal(sig) {
                     Ok(_) => (),
@@ -1220,4 +1730,167 @@ pub fn process_keys<'a>(
             procbox.selector(key, mouse_pos, proccollector, key_class, collector, CONFIG);
         }
     }
+}
+
+pub fn get_cpu_core_mapping() -> Vec<i32> {
+    let mut mapping: Vec<i32> = vec![];
+    let map_file = Path::new("/proc/cpuinfo");
+    if SYSTEM.to_owned() == "Linux".to_owned() && map_file.exists() {
+        for _ in 0..THREADS.to_owned() {
+            mapping.push(0);
+        }
+        let mut num: i32 = 0;
+        for l in read_lines(map_file).unwrap() {
+            if let Ok(line) = l {
+                if line.starts_with("processor") {
+                    num = line.trim()[line.find(": ").unwrap() + 2..]
+                        .to_owned()
+                        .parse::<i32>()
+                        .unwrap_or(0);
+                    if num > THREADS.to_owned() as i32 - 1 || num < 0 {
+                        break;
+                    }
+                } else if line.starts_with("core id") {
+                    mapping[num as usize] = line.trim()[line.find(": ").unwrap() + 2..]
+                        .to_owned()
+                        .parse::<i32>()
+                        .unwrap_or(0);
+                }
+            }
+        }
+        if num < THREADS.to_owned() as i32 - 1 {
+            throw_error("Error getting cpu core mapping!!!");
+        }
+    }
+
+    if mapping.len() == 0 {
+        mapping = vec![];
+        for _ in 0..THREADS.to_owned() / CORES.to_owned() {
+            let mut appender: Vec<i32> = vec![];
+            for x in 0..CORES.to_owned() as i32 {
+                appender.push(x);
+            }
+            mapping.append(&mut appender);
+        }
+    }
+
+    mapping
+}
+
+fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>> {
+    let file = File::open(filename)?;
+    Ok(io::BufReader::new(file).lines())
+}
+
+/// Reset terminal settings and stop background input read before putting to sleep
+pub fn now_sleeping(
+    key: &mut Key,
+    collector: &mut Collector,
+    draw: &mut Draw,
+    term: &mut Term,
+) -> Option<()> {
+    match key.stop() {
+        Some(b) => {
+            if b {
+                ()
+            } else {
+                return None;
+            }
+        }
+        None => return None,
+    };
+
+    collector.stop();
+    draw.now(
+        vec![
+            term.clear,
+            term.normal_screen,
+            term.show_cursor,
+            term.mouse_off,
+            Term::title("".to_owned()),
+        ],
+        key,
+    );
+    Term::echo(true);
+    match psutil::process::Process::new(process::id())
+        .unwrap()
+        .send_signal(Signal::SIGTSTP)
+    {
+        Ok(_) => Some(()),
+        Err(e) => None,
+    }
+}
+
+/// Set terminal settings and restart background input read
+pub fn now_awake<'a>(
+    draw: &'static mut Draw,
+    term: &'static mut Term,
+    key: &'static mut Key,
+    brshtop_box: &'static mut BrshtopBox,
+    collector: &'static mut Collector,
+    boxes: Vec<Boxes>,
+    init: &mut Init,
+    cpu_box: &'static mut CpuBox,
+    menu: &'static mut Menu,
+    timer: &mut Timer,
+    CONFIG: &'static mut Config,
+    THEME: &'static mut Theme,
+    DEBUG: bool,
+    collectors: Vec<Collectors<'static>>,
+    timeit: &'static mut TimeIt,
+    ARG_MODE: &mut ViewMode,
+    graphs: &'static mut Graphs,
+    meters: &'static mut Meters,
+    netbox: &'static mut NetBox,
+    procbox: &'static mut ProcBox,
+    membox: &'static mut MemBox,
+) {
+    draw.now(
+        vec![
+            term.alt_screen,
+            term.clear,
+            term.hide_cursor,
+            term.mouse_on,
+            Term::title("BRShtop".to_owned()),
+        ],
+        key,
+    );
+    Term::echo(false);
+    key.start(draw, menu);
+    term.refresh(
+        vec![],
+        boxes,
+        collector,
+        init,
+        cpu_box,
+        draw,
+        false,
+        key,
+        menu,
+        brshtop_box,
+        timer,
+        CONFIG,
+        THEME,
+    );
+    brshtop_box.calc_sizes(boxes, term, CONFIG);
+    brshtop_box.draw_bg(true, draw, boxes, menu, CONFIG, cpu_box, key, THEME, term);
+    collector.start(
+        CONFIG,
+        DEBUG,
+        collectors,
+        brshtop_box,
+        timeit,
+        menu,
+        draw,
+        term,
+        cpu_box,
+        key,
+        THEME,
+        ARG_MODE,
+        graphs,
+        meters,
+        netbox,
+        procbox,
+        membox,
+    )
 }

@@ -82,7 +82,7 @@ impl CpuBox {
     }
 
     pub fn calc_size(&mut self, term: &mut Term, brshtop_box: &mut BrshtopBox) {
-        let cpu: CpuCollector = CpuCollector::new(THREADS.to_owned());
+        let cpu: CpuCollector = CpuCollector::new();
         let mut height_p: u32 = 0;
         height_p = if self.parent.proc_mode {
             20
@@ -192,7 +192,7 @@ impl CpuBox {
                 self.sub.box_width,
                 self.sub.box_height,
                 Some(if config.custom_cpu_name != String::default() {
-                    CPU_NAME[..self.sub.box_width as usize - 14].to_owned()
+                    CPU_NAME.to_owned()[..self.sub.box_width as usize - 14].to_owned()
                 } else {
                     config.custom_cpu_name[..self.sub.box_width as usize - 14].to_owned()
                 }),

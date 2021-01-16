@@ -41,3 +41,4 @@ heim = { version = "*", features = ["net", "disk", "memory"]}
 reqwest = "0.11.0"
 rand = "0.8.2"
 futures = "0.3.11"
+signal-hook = "0.3.3"
