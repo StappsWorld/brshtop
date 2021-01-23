@@ -34,27 +34,28 @@ pub enum SubBoxes<'a> {
     CpuBox(&'a mut CpuBox),
 }
 
+#[derive(Clone)]
 pub struct BrshtopBox {
-    pub name: String,
-    pub height_p: u32,
-    pub width_p: u32,
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-    pub proc_mode: bool,
-    pub stat_mode: bool,
-    pub out: String,
-    pub bg: String,
-    pub _b_cpu_h: i32,
-    pub _b_mem_h: i32,
-    pub redraw_all: bool,
-    pub buffers: Vec<String>,
-    pub clock_on: bool,
-    pub clock: String,
-    pub clock_len: u32,
-    pub resized: bool,
-    pub clock_custom_format: HashMap<String, String>,
+    name: String,
+    height_p: u32,
+    width_p: u32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    proc_mode: bool,
+    stat_mode: bool,
+    out: String,
+    bg: String,
+    _b_cpu_h: i32,
+    _b_mem_h: i32,
+    redraw_all: bool,
+    buffers: Vec<String>,
+    clock_on: bool,
+    clock: String,
+    clock_len: u32,
+    resized: bool,
+    clock_custom_format: HashMap<String, String>,
 }
 impl BrshtopBox {
     pub fn new(config: &mut Config, ARG_MODE: ViewMode) -> Self {
@@ -361,4 +362,183 @@ impl BrshtopBox {
             self.draw_clock(true, term, config, theme, menu, cpu_box, draw, key);
         }
     }
+
+    pub fn get_name(self) -> String {
+        self.name.clone()
+    }
+
+    pub fn set_name(&mut self, name : String) {
+        self.name = name.clone()
+    }
+
+    pub fn get_height_p(&self) -> u32 {
+        self.height_p.clone()
+    }
+
+    pub fn set_height_p(&mut self, height_p : u32) {
+        self.height_p = height_p.clone()
+    }
+
+    pub fn get_width_p(&self) -> u32 {
+        self.width_p.clone()
+    }
+
+    pub fn set_width_p(&mut self, width_p : u32) {
+        self.width_p = width_p
+    }
+
+    pub fn get_x(&self) -> u32 {
+        self.x.clone()
+    }
+
+    pub fn set_x(&mut self, x : u32) {
+        self.x = x.clone()
+    }
+
+    pub fn get_y(&self) -> u32 {
+        self.y.clone()
+    }
+
+    pub fn set_y(&mut self, y : u32) {
+        self.y = y.clone()
+    }
+
+    pub fn get_width(&self) -> u32 {
+        self.width.clone()
+    }
+
+    pub fn set_width(&mut self, width : u32) {
+        self.width = width.clone()
+    }
+
+    pub fn get_height(&self) -> u32 {
+        self.height.clone()
+    }
+
+    pub fn set_height(&mut self, height : u32) {
+        self.height = height.clone()
+    }
+
+    pub fn get_proc_mode(&self) -> bool {
+        self.proc_mode.clone()
+    }
+
+    pub fn set_proc_mode(&mut self, proc_mode : bool) {
+        self.proc_mode = proc_mode.clone()
+    }
+
+    pub fn get_stat_mode(&self) -> bool {
+        self.stat_mode.clone()
+    }
+
+    pub fn set_stat_mode(&mut self, stat_mode : bool) {
+        self.stat_mode = stat_mode.clone()
+    }
+
+    pub fn get_out(&self) -> String {
+        self.out.clone()
+    }
+
+    pub fn set_out(&mut self, out : String) {
+        self.out = out.clone()
+    }
+
+    pub fn get_bg(&self) -> String {
+        self.bg.clone()
+    }
+
+    pub fn set_bg(&mut self, bg : String) {
+        self.bg = bg.clone()
+    }
+
+    pub fn get_b_cpu_h(&self) -> i32 {
+        self._b_cpu_h.clone()
+    }
+
+    pub fn set_b_cpu_h(&mut self, _b_cpu_h : i32) {
+        self._b_cpu_h = _b_cpu_h.clone()
+    }
+
+    pub fn get_redraw_all(&self) -> bool {
+        self.redraw_all.clone()
+    }
+
+    pub fn set_redraw_all(&mut self, redraw_all : bool) {
+        self.redraw_all = redraw_all.clone()
+    }
+
+    pub fn get_buffers(&self) -> Vec<String> {
+        self.buffers.clone()
+    }
+
+    pub fn set_buffers(&mut self, buffers : Vec<String>) {
+        self.buffers = buffers.clone()
+    }
+
+    pub fn push_buffers(&mut self, element : String) {
+        self.buffers.push(element.clone())
+    }
+
+    pub fn get_buffers_index(&self, index : usize) -> Option<String> {
+        match self.buffers.get(index) {
+            Some(s) => Some(s.to_owned().clone()),
+            None => None
+        }
+    }
+
+    pub fn set_buffers_index(&mut self, index : usize, element : String) {
+        self.buffers.insert(index, element.clone())
+    }
+
+    pub fn get_clock_on(&self) -> bool {
+        self.clock_on.clone()
+    }
+
+    pub fn set_clock_on(&mut self, clock_on : bool) {
+        self.clock_on = clock_on.clone()
+    }
+
+    pub fn get_clock(&self) -> String {
+        self.clock.clone()
+    }
+
+    pub fn set_clock(&mut self, clock : String) {
+        self.clock = clock.clone()
+    }
+
+    pub fn get_clock_len(&self) -> u32 {
+        self.clock_len.clone()
+    }
+
+    pub fn set_clock_len(&mut self, clock_len : u32) {
+        self.clock_len = clock_len.clone()
+    }
+
+    pub fn get_resized(&self) -> bool {
+        self.resized.clone()
+    }
+
+    pub fn set_resized(&mut self, resized : bool) {
+        self.resized = resized.clone()
+    }
+
+    pub fn get_clock_custom_format(&self) -> HashMap<String, String> {
+        self.clock_custom_format.clone()
+    }
+
+    pub fn set_clock_custom_format(&mut self, clock_custom_format : HashMap<String, String>) {
+        self.clock_custom_format = clock_custom_format.clone()
+    }
+
+    pub fn get_clock_custom_format_index(&self, index : String) -> Option<String> {
+        match self.clock_custom_format.get(&index) {
+            Some(s) => Some(s.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_clock_custom_format_index(&mut self, index : String, element : String) {
+        self.clock_custom_format.insert(index.clone(), element.clone());
+    }
+
 }

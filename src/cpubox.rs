@@ -22,29 +22,23 @@ use {
         *,
     },
     math::round::ceil,
-    std::{collections::HashMap, fs::File, path::Path},
+    std::{collections::HashMap, fs::File, path::Path, convert::TryFrom},
 };
 
 pub struct CpuBox {
-    pub parent: BrshtopBox,
-    pub sub: SubBox,
-    pub name: String,
-    pub x: u32,
-    pub y: u32,
-    pub height_p: u32,
-    pub width_p: u32,
-    pub resized: bool,
-    pub redraw: bool,
-    pub buffer: String,
-    pub battery_percent: f32,
-    pub battery_secs: f32,
-    pub battery_status: String,
-    pub old_battery_pos: u32,
-    pub old_battery_len: usize,
-    pub battery_path: Option<String>,
-    pub battery_clear: bool,
-    pub battery_symbols: HashMap<String, String>,
-    pub clock_block: bool,
+    parent: BrshtopBox,
+    sub: SubBox,
+    redraw: bool,
+    buffer: String,
+    battery_percent: f32,
+    battery_secs: f32,
+    battery_status: String,
+    old_battery_pos: u32,
+    old_battery_len: usize,
+    battery_path: Option<String>,
+    battery_clear: bool,
+    battery_symbols: HashMap<String, String>,
+    clock_block: bool,
 }
 impl CpuBox {
     pub fn new(brshtop_box: &mut BrshtopBox, config: &mut Config, ARG_MODE: ViewMode) -> Self {
@@ -56,17 +50,11 @@ impl CpuBox {
 
         let buffer_mut: String = "cpu".to_owned();
 
-        brshtop_box.buffers.push(buffer_mut.clone());
+        brshtop_box.push_buffers(buffer_mut.clone());
 
-        CpuBox {
+        let cpu_box = CpuBox {
             parent: BrshtopBox::new(config, ARG_MODE),
             sub: SubBox::new(),
-            name: "cpu".to_owned(),
-            x: 1,
-            y: 1,
-            height_p: 32,
-            width_p: 100,
-            resized: true,
             redraw: false,
             buffer: buffer_mut.clone(),
             battery_percent: 1000.0,
@@ -78,65 +66,69 @@ impl CpuBox {
             battery_clear: false,
             battery_symbols: bsm.clone(),
             clock_block: true,
-        }
+        };
+        cpu_box.set_parent_name("cpu".to_owned());
+        cpu_box.set_parent_y(1);
+        cpu_box.set_parent_x(1);
+        cpu_box.set_parent_height_p(32);
+        cpu_box.set_parent_width_p(100);
+        cpu_box.set_parent_resized(true);
+        cpu_box
     }
 
-    pub fn calc_size(&mut self, term: &mut Term, brshtop_box: &mut BrshtopBox) {
-        let cpu: CpuCollector = CpuCollector::new();
-        let mut height_p: u32 = 0;
-        height_p = if self.parent.proc_mode {
+    pub fn calc_size(&mut self, term: &mut Term, brshtop_box: &mut BrshtopBox, cpu : &mut CpuCollector) {
+        let mut height_p: u32 = if self.get_parent().get_proc_mode() {
             20
         } else {
-            self.height_p
+            self.get_height_p()
         };
 
-        self.parent.width = (term.width as u32 * self.width_p / 100) as u32;
-        self.parent.height = (term.height as u32 * self.height_p / 100) as u32;
+        self.set_parent_width((term.width as u32 * self.get_width_p() / 100) as u32);
+        self.set_parent_height((term.height as u32 * self.get_height_p() / 100) as u32);
 
-        if self.parent.height < 8 {
-            self.parent.height = 8;
+        if self.get_parent().get_height() < 8 {
+            self.set_parent_height(8);
         }
 
-        brshtop_box._b_cpu_h = self.parent.height as i32;
+        brshtop_box.set_b_cpu_h(self.get_parent().get_height() as i32);
 
-        self.sub.box_columns =
-            ceil(((THREADS.to_owned() + 1) / (self.parent.height - 5) as u64) as f64, 0) as u32;
+        self.set_sub_box_columns(ceil(((THREADS.to_owned() + 1) / (self.parent.height - 5) as u64) as f64, 0) as u32);
 
-        if self.sub.box_columns * (20 + if cpu.got_sensors { 13 } else { 21 })
-            < self.parent.width - (self.parent.width / 3) as u32
+        if self.get_sub().get_box_columns() * (20 + if cpu.got_sensors { 13 } else { 21 })
+            < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
-            self.sub.column_size = 2;
-            self.sub.box_width = 20 + if cpu.got_sensors { 13 } else { 21 };
-        } else if self.sub.box_columns * (15 + if cpu.got_sensors { 6 } else { 15 })
-            < self.parent.width - (self.parent.width / 3) as u32
+            self.set_sub_column_size(2);
+            self.set_sub_box_width(20 + if cpu.got_sensors { 13 } else { 21 });
+        } else if self.get_sub().get_box_columns() * (15 + if cpu.got_sensors { 6 } else { 15 })
+            < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
-            self.sub.column_size = 1;
-            self.sub.box_width = 15 + if cpu.got_sensors { 6 } else { 15 };
-        } else if self.sub.box_columns * (8 + if cpu.got_sensors { 6 } else { 8 })
-            < self.parent.width - (self.parent.width / 3) as u32
+            self.set_sub_column_size(1);
+            self.set_sub_box_width(15 + if cpu.got_sensors { 6 } else { 15 });
+        } else if self.get_sub().get_box_columns() * (8 + if cpu.got_sensors { 6 } else { 8 })
+            < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
-            self.sub.column_size = 0;
+            self.set_sub_column_size(0);
         } else {
-            self.sub.box_columns = (self.parent.width - (self.parent.width / 3) as u32)
-                / (8 + if cpu.got_sensors { 6 } else { 8 });
-            self.sub.column_size = 0;
+            self.set_sub_box_columns((self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32)
+                / (8 + if cpu.got_sensors { 6 } else { 8 }));
+            self.set_sub_column_size(0);
         }
 
-        if self.sub.column_size == 0 {
-            self.sub.box_width = 8 + if cpu.got_sensors { 6 } else { 8 } * self.sub.box_columns + 1;
+        if self.get_sub().get_column_size() == 0 {
+            self.set_sub_box_width(8 + if cpu.got_sensors { 6 } else { 8 } * self.get_sub().get_box_columns() + 1);
         }
 
-        self.sub.box_height = ceil((THREADS.to_owned() / self.sub.box_columns as u64) as f64, 0) as u32 + 4;
+        self.set_sub_box_height(ceil((THREADS.to_owned() / self.get_sub().get_box_columns() as u64) as f64, 0) as u32 + 4);
 
-        if self.sub.box_height > self.parent.height - 2 {
-            self.sub.box_height = self.parent.height - 2;
+        if self.get_sub().get_box_height() > self.get_parent().get_height() - 2 {
+            self.set_sub_box_height(u32::try_from(self.get_parent().get_height() as i32 - 2).unwrap_or(0));
         }
 
-        self.sub.box_x = (self.parent.width - 1) - self.sub.box_width;
-        self.sub.box_y = self.y
-            + (ceil(((self.parent.height - 2) / 2) as f64, 0)
-                - ceil((self.sub.box_height / 2) as f64, 0)
-                + 1.0) as u32;
+        self.set_sub_box_x = u32::try_from((self.get_parent().get_width() as i32 - 1) - self.get_sub().get_box_width() as i32).unwrap_or(0);
+        self.set_sub_box_y(self.get_y()
+            + u32::try_from(ceil((u32::try_from(self.get_parent().get_height() as i32 - 2).unwrap_or(0) / 2) as f64, 0)
+                - ceil(u32::try_from(self.get_sub().get_box_height() as i32 / 2).unwrap_or(0) as f64, 0)
+                + 1.0).unwrap_or(0));
     }
 
     pub fn draw_bg(
@@ -187,14 +179,14 @@ impl CpuBox {
                 .cpu_box
                 .call(symbol::title_right.to_owned(), term),
             create_box(
-                self.sub.box_x,
-                self.sub.box_y,
-                self.sub.box_width,
-                self.sub.box_height,
+                self.get_sub().get_box_x(),
+                self.get_sub().get_box_y(),
+                self.get_sub().get_box_width(),
+                self.get_sub().get_box_height(),
                 Some(if config.custom_cpu_name != String::default() {
-                    CPU_NAME.to_owned()[..self.sub.box_width as usize - 14].to_owned()
+                    CPU_NAME.to_owned()[..usize::try_from(self.get_sub().get_box_width() as i32 - 14).unwrap_or(0)].to_owned()
                 } else {
-                    config.custom_cpu_name[..self.sub.box_width as usize - 14].to_owned()
+                    config.custom_cpu_name[..usize::try_from(self.get_sub().get_box_width() as i32 - 14).unwrap_or(0)].to_owned()
                 }),
                 None,
                 Some(theme.colors.div_line),
@@ -211,8 +203,8 @@ impl CpuBox {
         let battery_manager = match Manager::new() {
             Ok(m) => m,
             Err(_) => {
-                if self.battery_percent != 1000.0 {
-                    self.battery_clear = true;
+                if self.get_battery_percent() != 1000.0 {
+                    self.set_battery_clear(true);
                 }
                 return false;
             }
@@ -221,26 +213,34 @@ impl CpuBox {
         let batteries = match battery_manager.batteries() {
             Ok(b) => b,
             Err(_) => {
-                if self.battery_percent != 1000.0 {
-                    self.battery_clear = true;
+                if self.get_battery_percent() != 1000.0 {
+                    self.set_battery_clear(true);
                 }
                 return false;
             }
         };
 
-        let currentBattery = match batteries.next() {
+        let currentBattery : Battery = match batteries.next() {
             None => {
-                if self.battery_percent != 1000.0 {
-                    self.battery_clear = true;
+                if self.get_battery_percent() != 1000.0 {
+                    self.set_battery_clear(true);
                 }
                 return false;
             }
-            Some(r) => r.unwrap(),
+            Some(r) => match r {
+                Ok(b) => b,
+                Err(_) => {
+                    if self.get_battery_percent() != 1000.0 {
+                        self.set_battery_clear(true);
+                    }
+                    return false;
+                }
+            },
         };
 
-        match self.battery_path {
+        match self.get_battery_path() {
             Some(_) => {
-                self.battery_path = None;
+                self.set_battery_path(None);
                 let checker = Path::new("/sys/class/power_supply");
                 if checker.exists() {
                     match checker.read_dir() {
@@ -258,10 +258,10 @@ impl CpuBox {
                                         if filename.starts_with("BAT")
                                             || filename.to_lowercase().contains("battery")
                                         {
-                                            self.battery_path = Some(format!(
+                                            self.set_battery_path(Some(format!(
                                                 "/sys/class/power_supply/{}",
                                                 filename
-                                            ));
+                                            )));
                                             break;
                                         }
                                     }
@@ -280,22 +280,22 @@ impl CpuBox {
         let percentage: f32 =
             ceil(currentBattery.state_of_charge().get::<percent>() as f64, 0) as f32;
 
-        if percentage != self.battery_percent {
-            self.battery_percent = percentage;
+        if percentage != self.get_battery_percent() {
+            self.set_battery_percent(percentage);
             return_true = true;
         }
 
         let seconds: f32 = currentBattery.time_to_empty().unwrap().get::<second>();
 
-        if seconds != self.battery_secs as f32 {
-            self.battery_secs = seconds;
+        if seconds != self.get_battery_secs() {
+            self.set_battery_secs(seconds);
             return_true = true;
         }
 
         let status: String = "not_set".to_owned();
 
-        if self.battery_path != None {
-            status = match File::open(self.battery_path.unwrap() + "status") {
+        if self.get_battery_path().is_some() {
+            status = match File::open(self.get_battery_path().unwrap() + "status") {
                 Ok(f) => match readfile(f) {
                     Some(s) => s,
                     None => "not_set".to_owned(),
@@ -313,12 +313,12 @@ impl CpuBox {
                 State::__Nonexhaustive => "Nonexhaustive".to_owned(),
             };
         }
-        if status != self.battery_status {
-            self.battery_status = status;
+        if status != self.get_battery_status() {
+            self.set_battery_status(status.clone());
             return_true = true;
         }
 
-        return return_true || self.resized || self.redraw || menu.active;
+        return return_true || self.get_resized() || self.get_redraw() || menu.active;
     }
 
     pub fn draw_fg(
@@ -343,19 +343,22 @@ impl CpuBox {
         let mut out_misc: String = String::default();
         let mut lavg: String = String::default();
 
-        let mut x = self.x + 1;
-        let mut y = self.y + 1;
-        let mut w = self.parent.width - 2;
-        let mut h = self.parent.height - 2;
-        let mut bx = self.sub.box_x + 1;
-        let mut by = self.sub.box_y + 1;
-        let mut bw = self.sub.box_width - 2;
-        let mut bh = self.sub.box_height - 2;
-        let mut hh = ceil((h / 2) as f64, 0) as i32;
+        let parent : BrshtopBox = self.get_parent();
+        let mut x : u32 = parent.get_x() + 1;
+        let mut y : u32 = parent.get_y() + 1;
+        let mut w : u32 = parent.get_width() - 2;
+        let mut h : u32 = parent.get_height() - 2;
+
+        let sub : SubBox = self.get_sub();
+        let mut bx : u32 = sub.get_box_x() + 1;
+        let mut by : u32 = sub.get_box_y() + 1;
+        let mut bw : u32 = sub.get_box_width() - 2;
+        let mut bh : u32 = sub.get_box_height() - 2;
+        let mut hh : u32 = ceil((h / 2) as f64, 0) as i32;
         let mut hide_cores: bool = (cpu.cpu_temp_only || !config.show_coretemp) && cpu.got_sensors;
         let mut ct_width: u32 = if hide_cores {
-            if 6 * self.sub.column_size > 6 {
-                6 * self.sub.column_size
+            if 6 * sub.get_column_size() > 6 {
+                6 * sub.get_column_size()
             } else {
                 6
             }
@@ -363,7 +366,7 @@ impl CpuBox {
             0
         };
 
-        if self.resized || self.redraw {
+        if parent.get_resized() || self.get_redraw() {
             if !key.mouse.contains_key(&"m".to_owned()) {
                 let mut parent = Vec::<Vec<i32>>::new();
                 for i in 0..12 {
@@ -498,10 +501,10 @@ impl CpuBox {
             
             let mut battery_symbol : String = self.battery_symbols.get(&self.battery_status).unwrap().clone();
             let battery_len : u32 = (format!("{}", config.update_ms).len() + 
-                if self.parent.width >= 100 {11} else {0} + 
+                if self.get_parent().get_width() >= 100 {11} else {0} + 
                 battery_time.len() + 
                 format!("{}", self.battery_percent).len()) as u32;
-            let battery_pos : u32 = self.parent.width - battery_len - 17;
+            let battery_pos : u32 = self.get_parent().get_width() - battery_len - 17;
 
             if (battery_pos != self.old_battery_pos || battery_len != self.old_battery_len as u32) && self.old_battery_pos > 0 && !self.resized {
                 bat_out.push_str(format!("{}{}", mv::to(y-1, self.old_battery_pos), theme.colors.cpu_box.call(symbol::h_line.repeat(self.old_battery_len + 4), term)).as_str());
@@ -517,7 +520,7 @@ impl CpuBox {
                     theme.colors.title,
                     battery_symbol,
                     self.battery_percent,
-                    if self.parent.width < 100 {
+                    if self.get_parent().get_width() < 100 {
                         String::default()
                     } else {
                         format!(" {}{}{}",
@@ -789,5 +792,166 @@ impl CpuBox {
         self.clock_block = false;
     }
 
+    pub fn get_parent(&self) -> BrshtopBox {
+        self.parent.clone()
+    }
+
+    pub fn set_parent(&mut self, parent : BrshtopBox) {
+        self.parent = parent.clone()
+    }
+
+    pub fn set_parent_name(&mut self, name : String) {
+        self.parent.set_name(name.clone())
+    }
+
+    pub fn set_parent_x(&mut self, x : u32) {
+        self.parent.set_x(x.clone())
+    }
+
+    pub fn set_parent_y(&mut self, y : u32) {
+        self.parent.set_y(y.clone())
+    }
+
+    pub fn set_parent_height_p(&mut self, height_p : u32) {
+        self.parent.set_height_p(height_p.clone())
+    }
+
+    pub fn set_parent_width_p(&mut self, width_p : u32) {
+        self.parent.set_width_p(width_p.clone())
+    }
+
+    pub fn set_parent_resized(&mut self, resized : u32) {
+        self.parent.set_resized(resized.clone())
+    }
+
+    pub fn set_parent_width(&mut self, width : u32) {
+        self.parent.set_width(width.clone())
+    }
+
+    pub fn set_parent_height(&mut self, height : u32) {
+        self.parent.set_height(height.clone())
+    }
+
+    pub fn get_sub(&self) -> SubBox {
+        self.sub.clone()
+    }
+
+    pub fn set_sub(&mut self, sub : SubBox) {
+        self.sub = sub.clone()
+    }
+
+    pub fn set_sub_box_columns(&mut self, box_columns : u32) {
+        self.sub.set_box_columns(box_columns.clone())
+    }
+
+    pub fn set_sub_column_size(&mut self, column_size : u32) {
+        self.sub.set_column_size(column_size.clone())
+    }
+
+    pub fn set_sub_box_width(&mut self, box_width : u32) {
+        self.sub.set_box_width(box_width.clone())
+    }
+
+    pub fn set_sub_box_height(&mut self, box_height : u32) {
+        self.sub.set_box_height(box_height.clone())
+    }
+
+    pub fn set_sub_box_x(&mut self, box_x : u32) {
+        self.sub.set_box_x(box_x.clone())
+    }
+
+    pub fn get_redraw(&self) -> bool {
+        self.redraw.clone()
+    }
+
+    pub fn set_redraw(&mut self, redraw : bool) {
+        self.redraw = redraw.clone()
+    }
+
+    pub fn get_buffer(&self) -> String {
+        self.buffer.clone()
+    }
+
+    pub fn set_buffer(&mut self, buffer : String) {
+        self.buffer = buffer.clone()
+    }
+
+    pub fn get_battery_percent(&self) -> f32 {
+        self.battery_percent.clone()
+    }
+
+    pub fn set_battery_percent(&mut self, battery_percent : f32) {
+        self.battery_percent = battery_percent.clone()
+    }
+
+    pub fn get_battery_secs(&self) -> f32 {
+        self.battery_secs.clone()
+    }
+
+    pub fn set_battery_sec(&mut self, battery_secs : f32) {
+        self.battery_secs = battery_secs.clone()
+    }
+
+    pub fn get_battery_status(&self) -> String {
+        self.battery_status.clone()
+    }
+
+    pub fn set_battery_status(&mut self, battery_status : String) {
+        self.battery_status = battery_status.clone()
+    }
+
+    pub fn get_old_battery_pos(&self) -> u32 {
+        self.old_battery_pos.clone()
+    }
+
+    pub fn set_old_battery_pos(&mut self, old_battery_pos : u32) {
+        self.old_battery_pos = old_battery_pos.clone()
+    }
+
+    pub fn get_old_battery_len(&self) -> usize {
+        self.old_battery_len.clone()
+    }
+
+    pub fn set_old_battery_len(&mut self, old_battery_len : u32) {
+        self.old_battery_len = old_battery_len.clone()
+    }
+
+    pub fn get_battery_path(&self) -> Option<String> {
+        match self.battery_path {
+            Some(s) => Some(s.clone()),
+            None => None
+        }
+    }
+
+    pub fn set_battery_path(&mut self, battery_path : Option<String>) {
+        self.battery_path = match battery_path {
+            Some(s) => Some(s.clone()),
+            None => None
+        }
+    }
+    
+    pub fn get_battery_clear(&self) -> bool {
+        self.battery_clear.clone()
+    }
+
+    pub fn set_battery_clear(&mut self, battery_clear : bool) {
+        self.battery_clear = battery_clear.clone()
+    }
+
+    pub fn get_battery_symbols(&self) -> HashMap<String, String> {
+        self.battery_symbols.clone()
+    }
+
+    pub fn set_battery_symbols(&mut self, battery_symbols : HashMap<String, String>) {
+        self.battery_symbols = battery_symbols.clone()
+    }
+
+    pub fn get_clock_block(&self) -> bool {
+        self.clock_block.clone()
+    }
+
+    pub fn set_clock_block(&mut self, clock_block : bool) {
+        self.clock_block = clock_block.clone()
+    }
     
 }

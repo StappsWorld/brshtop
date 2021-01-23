@@ -811,7 +811,7 @@ pub fn main() {
     );
     draw.out(vec![], true, key);
     if CONFIG.draw_clock.len() > 0 {
-        brshtop_box.clock_on = true;
+        brshtop_box.set_clock_on(true);
     }
     if DEBUG {
         timeit.stop("Init".to_owned());
@@ -956,39 +956,39 @@ pub fn create_box(
     match box_to_use {
         Some(o) => match o {
             Boxes::BrshtopBox(b) => {
-                wx = b.x;
-                wy = b.y;
-                ww = b.width;
-                wh = b.height;
-                wt = b.name.clone();
+                wx = b.get_x();
+                wy = b.get_y();
+                ww = b.get_width();
+                wh = b.get_height();
+                wt = b.get_name();
             }
             Boxes::CpuBox(b) => {
-                wx = b.x;
-                wy = b.y;
-                ww = b.parent.width;
-                wh = b.parent.height;
-                wt = b.name.clone();
+                wx = b.get_x();
+                wy = b.get_y();
+                ww = b.get_parent().get_width();
+                wh = b.get_parent().get_height();
+                wt = b.get_name();
             }
             Boxes::MemBox(b) => {
-                wx = b.x as u32;
-                wy = b.y as u32;
-                ww = b.parent.width;
-                wh = b.parent.height;
-                wt = b.name.clone();
+                wx = b.get_x() as u32;
+                wy = b.get_y() as u32;
+                ww = b.get_parent().get_width();
+                wh = b.get_parent().get_height();
+                wt = b.get_name();
             }
             Boxes::NetBox(b) => {
-                wx = b.x as u32;
-                wy = b.y as u32;
-                ww = b.parent.width;
-                wh = b.parent.height;
-                wt = b.name.clone();
+                wx = b.get_x() as u32;
+                wy = b.get_y() as u32;
+                ww = b.get_parent().get_width();
+                wh = b.get_parent().get_height();
+                wt = b.get_name();
             }
             Boxes::ProcBox(b) => {
-                wx = b.parent.x;
-                wy = b.parent.y;
-                ww = b.parent.width;
-                wh = b.parent.height;
-                wt = b.name.clone();
+                wx = b.get_parent().get_x();
+                wy = b.get_parent().get_y();
+                ww = b.get_parent().get_width();
+                wh = b.get_parent().get_height();
+                wt = b.get_name();
             }
         },
         None => (),
@@ -1362,7 +1362,7 @@ pub fn process_keys<'a>(
             .contains(&key)
         {
             mouse_pos = key_class.get_mouse();
-            if mouse_pos.0 >= procbox.parent.x as i32
+            if mouse_pos.0 >= procbox.get_parent().get_x() as i32
                 && procbox.current_y as i32 + 1 <= mouse_pos.1
                 && mouse_pos.1 < (procbox.current_y + procbox.current_h - 1) as i32
             {
@@ -1654,8 +1654,8 @@ pub fn process_keys<'a>(
                     .unwrap()
                     + 1];
             }
-            brshtop_box.proc_mode = CONFIG.view_mode == ViewMode::Proc;
-            brshtop_box.stat_mode = CONFIG.view_mode == ViewMode::Stat;
+            brshtop_box.set_proc_mode(CONFIG.view_mode == ViewMode::Proc);
+            brshtop_box.set_stat_mode(CONFIG.view_mode == ViewMode::Stat);
             draw.clear(vec![], true);
             term.refresh(
                 vec![],
@@ -1720,13 +1720,13 @@ pub fn process_keys<'a>(
                 procbox.last_selection = procbox.selected;
                 procbox.selected = 0;
                 proccollector.detailed_pid = Some(procbox.selected_pid);
-                procbox.parent.resized = true;
+                procbox.get_parent().set_resized(true);
             } else if proccollector.detailed {
                 procbox.selected = procbox.last_selection;
                 procbox.last_selection = 0;
                 proccollector.detailed = false;
                 proccollector.detailed_pid = None;
-                procbox.parent.resized = true;
+                procbox.get_parent().set_resized(true);
             } else {
                 continue;
             }
