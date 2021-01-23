@@ -18,38 +18,28 @@ use {
     },
     inflector::Inflector,
     math::round::ceil,
-    std::collections::HashMap,
+    std::{collections::HashMap, convert::TryFrom},
 };
 
 pub struct MemBox {
-    pub parent: BrshtopBox,
-    pub name: String,
-    pub height_p: u32,
-    pub width_p: u32,
-    pub x: i32,
-    pub y: i32,
-    pub mem_meter: i32,
-    pub mem_size: usize,
-    pub disk_meter: i32,
-    pub divider: i32,
-    pub mem_width: u32,
-    pub disks_width: u32,
-    pub graph_height: u32,
-    pub redraw: bool,
-    pub buffer: String,
-    pub swap_on: bool,
-    pub mem_names: Vec<String>,
-    pub swap_names: Vec<String>,
+    parent: BrshtopBox,
+    mem_meter: i32,
+    mem_size: usize,
+    disk_meter: i32,
+    divider: i32,
+    mem_width: u32,
+    disks_width: u32,
+    graph_height: u32,
+    redraw: bool,
+    buffer: String,
+    swap_on: bool,
+    mem_names: Vec<String>,
+    swap_names: Vec<String>,
 }
 impl MemBox {
     pub fn new(brshtop_box: &mut BrshtopBox, CONFIG: &mut Config, ARG_MODE: ViewMode) -> Self {
         let membox = MemBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
-            name: "mem".to_owned(),
-            height_p: 38,
-            width_p: 45,
-            x: 1,
-            y: 1,
             mem_meter: 0,
             mem_size: 0,
             disk_meter: 0,
@@ -69,8 +59,14 @@ impl MemBox {
                 .map(|s| s.to_owned().to_owned())
                 .collect(),
         };
-        brshtop_box.buffers.push(membox.buffer.clone());
-        membox.parent.resized = true;
+        brshtop_box.push_buffers(membox.buffer.clone());
+
+        membox.set_parent_name("mem".to_owned());
+        membox.set_parent_height_p(38);
+        membox.set_parent_width_p(45);
+        membox.set_parent_x(1);
+        membox.set_parent_y(1);
+        membox.set_parent_resized(true);
         membox
     }
 
@@ -83,95 +79,115 @@ impl MemBox {
         let mut width_p: u32 = 0;
         let mut height_p: u32 = 0;
 
-        if self.parent.stat_mode {
+        if self.get_parent().get_stat_mode() {
             width_p = 100;
-            height_p = self.parent.height_p;
+            height_p = self.get_parent().get_height_p();
         } else {
-            width_p = self.parent.width_p;
-            height_p = self.parent.height_p;
+            width_p = self.get_parent().get_width_p();
+            height_p = self.get_parent().get_height_p();
         }
-        self.parent.width = term.width as u32 * width_p / 100;
-        self.parent.height = (term.height as u32 * height_p / 100) + 1;
-        brshtop_box._b_mem_h = self.parent.height as i32;
-        self.y = brshtop_box._b_cpu_h + 1;
+        self.set_parent_width(term.width as u32 * width_p / 100);
+        self.set_parent_height((term.height as u32 * height_p / 100) + 1);
+        brshtop_box.set_b_mem_h(self.get_parent().get_height() as i32);
+        self.set_parent_y(u32::try_from(brshtop_box.get_b_cpu_h() + 1).unwrap_or(0));
         if CONFIG.show_disks {
-            self.mem_width = ceil((self.parent.width - 3) as f64 / 2.0, 0) as u32;
-            self.disks_width = self.parent.width - self.mem_width - 3;
-            if self.mem_width + self.disks_width < self.parent.width - 2 {
-                self.mem_width += 1;
+            self.set_mem_width(
+                u32::try_from(
+                    ceil((self.get_parent().get_width() as i32 - 3) as f64 / 2.0, 0) as i32,
+                )
+                .unwrap_or(0),
+            );
+            self.set_disks_width(
+                u32::try_from(
+                    self.get_parent().get_width() as i32 - self.get_mem_width() as i32 - 3,
+                )
+                .unwrap_or(0),
+            );
+            if ((self.get_mem_width() + self.get_disks_width()) as i32)
+                < self.get_parent().get_width() as i32 - 2
+            {
+                self.set_mem_width(self.get_mem_width() + 1);
             }
-            self.divider = self.x + self.mem_width as i32;
+            self.set_divider(self.get_parent().get_x() as i32 + self.get_mem_width() as i32);
         } else {
-            self.mem_width = self.parent.width - 1;
+            self.set_mem_width(
+                u32::try_from(self.get_parent().get_width() as i32 - 1).unwrap_or(0),
+            );
         }
 
-        let mut item_height: u32 = if self.swap_on && !CONFIG.swap_disk {
+        let mut item_height: u32 = if self.get_swap_on() && !CONFIG.swap_disk {
             6
         } else {
             4
         };
-        self.mem_width = if self.parent.height
-            - if self.swap_on && !CONFIG.swap_disk {
+        self.set_mem_width(
+            if self.get_parent().get_height()
+                - if self.get_swap_on() && !CONFIG.swap_disk {
+                    3
+                } else {
+                    2
+                }
+                > 2 * item_height
+            {
                 3
-            } else {
+            } else if self.get_mem_width() > 25 {
                 2
-            }
-            > 2 * item_height
-        {
-            3
-        } else if self.mem_width > 25 {
-            2
-        } else {
-            1
-        };
-
-        self.mem_meter = (self.parent.width
-            - if CONFIG.show_disks {
-                self.disks_width
             } else {
-                0
-            }
-            - if self.mem_size > 2 { 9 } else { 20 }) as i32;
+                1
+            },
+        );
 
-        if self.mem_size == 1 {
-            self.mem_meter += 6;
+        self.set_mem_meter(
+            (self.get_parent().get_width()
+                - if CONFIG.show_disks {
+                    self.get_disks_width()
+                } else {
+                    0
+                }
+                - if self.get_mem_size() > 2 { 9 } else { 20 }) as i32,
+        );
+
+        if self.get_mem_size() == 1 {
+            self.set_mem_meter(self.get_mem_meter() + 6);
         }
-        if self.mem_meter < 1 {
-            self.mem_meter = 0;
+        if self.get_mem_meter() < 1 {
+            self.set_mem_meter(0);
         }
 
         if CONFIG.mem_graphs {
-            self.graph_height = ((self.parent.height
-                - if self.swap_on && !CONFIG.swap_disk {
-                    2
-                } else {
-                    1
-                })
-                - if self.mem_size == 3 { 2 } else { 1 } * item_height)
-                / item_height;
-            if self.graph_height == 0 {
-                self.graph_height = 1;
+            self.set_graph_height(
+                ((self.get_parent().get_height()
+                    - if self.get_swap_on() && !CONFIG.swap_disk {
+                        2
+                    } else {
+                        1
+                    })
+                    - if self.mem_size == 3 { 2 } else { 1 } * item_height)
+                    / item_height,
+            );
+            if self.get_graph_height() == 0 {
+                self.set_graph_height(1);
             }
-            if self.graph_height > 1 {
-                self.mem_meter += 6;
+            if self.get_graph_height() > 1 {
+                self.set_mem_meter(self.get_mem_meter() + 6);
             }
         } else {
-            self.graph_height = 0;
+            self.set_graph_height(0);
         }
 
         if CONFIG.show_disks {
-            self.disk_meter = self.parent.width as i32 - self.mem_width as i32 - 23;
-            if self.disks_width < 25 {
-                self.disk_meter += 10;
+            self.set_disk_meter(self.get_parent().get_width() as i32 - self.get_mem_width() as i32 - 23);
+            if self.get_disks_width() < 25 {
+                self.set_disk_meter(self.get_disk_meter() + 10);
             }
-            if self.disk_meter < 1 {
-                self.disk_meter = 0;
+            if self.get_disk_meter() < 1 {
+                self.set_disk_meter(0);
             }
         }
     }
 
     pub fn draw_bg(&mut self, THEME: &mut Theme, CONFIG: &mut Config, term: &mut Term) -> String {
-        if self.parent.proc_mode {
+        if self.get_parent().get_proc_mode() {
             String::default()
         } else {
             let mut out: String = String::default();
@@ -194,11 +210,14 @@ impl MemBox {
             );
             if CONFIG.show_disks {
                 let mut adder: String = String::default();
-                for i in 1..self.parent.height - 1 {
+                for i in 1..self.get_parent().get_height() - 1 {
                     adder.push_str(
                         format!(
                             "{}{}",
-                            mv::to(self.y as u32 + i, self.divider as u32),
+                            mv::to(
+                                self.get_parent().get_y() as u32 + i,
+                                self.get_divider() as u32
+                            ),
                             symbol::v_line
                         )
                         .as_str(),
@@ -208,7 +227,7 @@ impl MemBox {
                 out.push_str(
                     format!(
                         "{}{}{}{}{}{}{}{}{}{}{}{}",
-                        mv::to(self.y as u32, self.divider as u32 + 2),
+                        mv::to(self.get_parent().get_y(), self.get_divider() as u32 + 2),
                         THEME
                             .colors
                             .mem_box
@@ -220,9 +239,12 @@ impl MemBox {
                             .colors
                             .mem_box
                             .call(symbol::title_right.to_owned(), term),
-                        mv::to(self.y as u32, self.divider as u32),
+                        mv::to(self.get_parent().get_y(), self.get_divider() as u32),
                         THEME.colors.mem_box.call(symbol::div_up.to_owned(), term),
-                        mv::to(self.y as u32 + self.parent.height - 1, self.divider as u32),
+                        mv::to(
+                            self.get_parent().get_y() as u32 + self.get_parent().get_height() - 1,
+                            self.get_divider() as u32
+                        ),
                         THEME.colors.mem_box.call(symbol::div_down.to_owned(), term),
                         THEME.colors.div_line,
                         adder
@@ -245,9 +267,9 @@ impl MemBox {
         key: &mut Key,
         collector: &mut Collector,
         draw: &mut Draw,
-        menu : &mut Menu,
+        menu: &mut Menu,
     ) {
-        if self.parent.proc_mode {
+        if self.get_parent().get_proc_mode() {
             return;
         }
 
@@ -261,24 +283,25 @@ impl MemBox {
         let mut gmv: String = String::default();
         let mut gli: String = String::default();
 
-        let mut x = self.x + 1;
-        let mut y = self.y + 1;
-        let mut w = self.parent.width - 2;
-        let mut h = self.parent.height - 2;
+        let parent_box: BrshtopBox = self.get_parent();
+        let mut x = parent_box.get_x() + 1;
+        let mut y = parent_box.get_y() + 1;
+        let mut w = parent_box.get_width() - 2;
+        let mut h = parent_box.get_height() - 2;
 
-        if self.parent.resized || self.redraw {
+        if parent_box.get_resized() || self.get_redraw() {
             self.calc_size(term, brshtop_box, CONFIG);
             out_misc.push_str(self.draw_bg(THEME, CONFIG, term).as_str());
             meters.mem = HashMap::<String, MeterUnion>::new();
             meters.swap = HashMap::<String, MeterUnion>::new();
             meters.disks_used = HashMap::<String, Meter>::new();
             meters.disks_free = HashMap::<String, Meter>::new();
-            if self.mem_meter > 0 {
-                for name in self.mem_names {
+            if self.get_mem_meter() > 0 {
+                for name in self.get_mem_names() {
                     if CONFIG.mem_graphs {
                         meters.mem[&name] = MeterUnion::Graph(Graph::new(
-                            self.mem_meter,
-                            self.graph_height as i32,
+                            self.get_mem_meter(),
+                            self.get_graph_height() as i32,
                             Some(ColorSwitch::VecString(THEME.gradient[&name])),
                             mem.vlist[&name]
                                 .iter()
@@ -293,7 +316,7 @@ impl MemBox {
                     } else {
                         meters.mem[&name] = MeterUnion::Meter(Meter::new(
                             mem.percent[&name] as i32,
-                            self.mem_meter as u32,
+                            self.get_mem_meter() as u32,
                             name.clone(),
                             false,
                             THEME,
@@ -301,12 +324,12 @@ impl MemBox {
                         ));
                     }
                 }
-                if self.swap_on {
-                    for name in self.swap_names {
+                if self.get_swap_on() {
+                    for name in self.get_swap_names() {
                         if CONFIG.mem_graphs && !CONFIG.swap_disk {
                             meters.swap[&name] = MeterUnion::Graph(Graph::new(
-                                self.mem_meter,
-                                self.graph_height as i32,
+                                self.get_mem_meter(),
+                                self.get_graph_height() as i32,
                                 Some(ColorSwitch::VecString(THEME.gradient[&name])),
                                 mem.vlist[&name]
                                     .iter()
@@ -321,7 +344,7 @@ impl MemBox {
                         } else if CONFIG.swap_disk && CONFIG.show_disks {
                             meters.disks_used[&"__swap".to_owned()] = Meter::new(
                                 mem.swap_percent[&"used".to_owned()] as i32,
-                                self.disk_meter as u32,
+                                self.get_disk_meter() as u32,
                                 "used".to_owned(),
                                 false,
                                 THEME,
@@ -330,7 +353,7 @@ impl MemBox {
                             if mem.disks.len() * 3 <= h as usize + 1 {
                                 meters.disks_free[&"__swap".to_owned()] = Meter::new(
                                     mem.swap_percent[&"free".to_owned()] as i32,
-                                    self.mem_meter as u32,
+                                    self.get_mem_meter() as u32,
                                     "free".to_owned(),
                                     false,
                                     THEME,
@@ -341,7 +364,7 @@ impl MemBox {
                         } else {
                             meters.swap[&name] = MeterUnion::Meter(Meter::new(
                                 mem.swap_percent[&name] as i32,
-                                self.mem_meter as u32,
+                                self.get_mem_meter() as u32,
                                 name,
                                 false,
                                 THEME,
@@ -351,7 +374,7 @@ impl MemBox {
                     }
                 }
             }
-            if self.disk_meter > 0 {
+            if self.get_disk_meter() > 0 {
                 for (n, name) in mem.disks.keys().enumerate() {
                     if n * 2 > h as usize {
                         break;
@@ -363,7 +386,7 @@ impl MemBox {
                             DiskInfo::String(s) => s.parse::<i32>().unwrap_or(0),
                             DiskInfo::None => 0,
                         },
-                        self.disk_meter as u32,
+                        self.get_disk_meter() as u32,
                         "used".to_owned(),
                         false,
                         THEME,
@@ -377,7 +400,7 @@ impl MemBox {
                                 DiskInfo::String(s) => s.parse::<i32>().unwrap_or(0),
                                 DiskInfo::None => 0,
                             },
-                            self.disk_meter as u32,
+                            self.get_disk_meter() as u32,
                             "free".to_owned(),
                             false,
                             THEME,
@@ -390,8 +413,8 @@ impl MemBox {
                 let mut top = Vec::<Vec<i32>>::new();
                 for i in 0..5 {
                     let mut adder: Vec<i32> = Vec::<i32>::new();
-                    adder.push(x + self.mem_width as i32 - 8);
-                    adder.push(y - 1);
+                    adder.push(x as i32 + self.get_mem_width() as i32 - 8);
+                    adder.push(y as i32 - 1);
                     top.push(adder);
                 }
                 key.mouse.insert("g".to_owned(), top);
@@ -420,8 +443,8 @@ impl MemBox {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
                     for i in 0..4 {
                         let mut adder: Vec<i32> = Vec::<i32>::new();
-                        adder.push(x + w as i32 - 6 + i);
-                        adder.push(y - 1);
+                        adder.push(x as i32 + w as i32 - 6 + i);
+                        adder.push(y as i32 - 1);
                         top.push(adder);
                     }
                     key.mouse.insert("s".to_owned(), top);
@@ -473,11 +496,11 @@ impl MemBox {
                 mem.string[&"total".to_owned()],
                 fx::ub,
                 THEME.colors.main_fg,
-                width = self.mem_width as usize - 9,
+                width = self.get_mem_width() as usize - 9,
             )
             .as_str(),
         );
-        if self.graph_height > 0 {
+        if self.get_graph_height() > 0 {
             gli = format!(
                 "{}{}{}{}{}{}{}{}",
                 mv::left(2),
@@ -486,22 +509,22 @@ impl MemBox {
                     .mem_box
                     .call(symbol::title_right.to_owned(), term),
                 THEME.colors.div_line,
-                symbol::h_line.repeat(self.mem_width as usize - 1),
+                symbol::h_line.repeat(self.get_mem_width() as usize - 1),
                 if CONFIG.show_disks {
                     "".to_owned()
                 } else {
                     THEME.colors.mem_box.to_string()
                 },
                 symbol::title_left,
-                mv::left(self.mem_width - 1),
+                mv::left(self.get_mem_width() - 1),
                 THEME.colors.title,
             );
-            if self.graph_height >= 2 {
+            if self.get_graph_height() >= 2 {
                 gbg = mv::left(1);
                 gmv = format!(
                     "{}{}",
-                    mv::left(self.mem_width - 2),
-                    mv::up(self.graph_height - 1)
+                    mv::left(u32::try_from(self.get_mem_width() as i32 - 2).unwrap_or(0)),
+                    mv::up(u32::try_from(self.get_graph_height() as i32 - 1).unwrap_or(0))
                 );
             }
         }
@@ -515,23 +538,25 @@ impl MemBox {
                 out.push_str(
                     format!(
                         "{}{}{:<width1$.width2$}{}{}{}{}{}{}{:>4}",
-                        mv::to((y + cy as i32) as u32, (x + cx as i32) as u32),
+                        mv::to(y + cy, x + cx),
                         gli,
                         name.to_title_case()[if big_mem { ..name.len() } else { ..5 }].to_owned()
                             + ":",
                         mv::to(
-                            (y + cy as i32) as u32,
-                            (x + cx as i32 + self.mem_width as i32
-                                - 3
-                                - mem.string[&name].len() as i32)
-                                as u32
+                            y + cy,
+                            u32::try_from(
+                                x as i32 + cx as i32 + self.get_mem_width() as i32
+                                    - 3
+                                    - mem.string[&name].len() as i32
+                            )
+                            .unwrap_or(0)
                         ),
                         Fx::trans(mem.string[&name]),
-                        mv::to((y + cy as i32 + 1) as u32, (x + cx as i32) as u32),
+                        mv::to(y + cy + 1, x + cx),
                         gbg,
                         match meters.mem[&name] {
                             MeterUnion::Meter(m) => m.call(
-                                if self.parent.resized {
+                                if self.get_parent().get_resized() {
                                     None
                                 } else {
                                     Some(mem.percent[&name] as i32)
@@ -539,7 +564,7 @@ impl MemBox {
                                 term
                             ),
                             MeterUnion::Graph(g) => g.call(
-                                if self.parent.resized {
+                                if self.get_parent().get_resized() {
                                     None
                                 } else {
                                     Some(mem.percent[&name] as i32)
@@ -554,22 +579,22 @@ impl MemBox {
                     )
                     .as_str(),
                 );
-                cy += if self.graph_height == 0 {
+                cy += if self.get_graph_height() == 0 {
                     2
                 } else {
-                    self.graph_height + 1
+                    self.get_graph_height() + 1
                 };
             } else {
                 let mem_check = self.mem_size > 1;
                 out.push_str(
                     format!(
                         "{}{:width1$.width2$} {}{}{:width3$}",
-                        mv::to((y + cy as i32) as u32, (x + cx as i32) as u32),
+                        mv::to(y + cy, x + cx),
                         name.to_title_case(),
                         gbg,
                         match meters.mem[&name] {
                             MeterUnion::Graph(g) => g.call(
-                                if self.parent.resized {
+                                if self.get_parent().get_resized() {
                                     None
                                 } else {
                                     Some(mem.percent[&name] as i32)
@@ -577,7 +602,7 @@ impl MemBox {
                                 term
                             ),
                             MeterUnion::Meter(m) => m.call(
-                                if self.parent.resized {
+                                if self.get_parent().get_resized() {
                                     None
                                 } else {
                                     Some(mem.percent[&name] as i32)
@@ -597,42 +622,36 @@ impl MemBox {
                     )
                     .as_str(),
                 );
-                cy += if self.graph_height == 0 {
+                cy += if self.get_graph_height() == 0 {
                     1
                 } else {
-                    self.graph_height
+                    self.get_graph_height()
                 };
             }
         }
 
         // * Swap
-        if self.swap_on && CONFIG.show_swap && !CONFIG.swap_disk && mem.swap_string.len() > 0 {
+        if self.get_swap_on() && CONFIG.show_swap && !CONFIG.swap_disk && mem.swap_string.len() > 0
+        {
             if h - cy > 5 {
-                out.push_str(
-                    format!(
-                        "{}{}",
-                        mv::to((y + cy as i32) as u32, (x + cx as i32) as u32),
-                        gli
-                    )
-                    .as_str(),
-                );
+                out.push_str(format!("{}{}", mv::to(y + cy, x + cx), gli).as_str());
             }
             cy += 1;
             out.push_str(
                 format!(
                     "{}{}{}Swap:{:>width$}{}{}",
-                    mv::to((y + cy as i32) as u32, (x + cx as i32) as u32),
+                    mv::to(y + cy, x + cx),
                     THEME.colors.title,
                     fx::b,
                     mem.swap_string[&"total".to_owned()],
                     fx::ub,
                     THEME.colors.main_fg,
-                    width = self.mem_width as usize - 8,
+                    width = self.get_mem_width() as usize - 8,
                 )
                 .as_str(),
             );
             cy += 1;
-            for name in self.swap_names {
+            for name in self.get_swap_names() {
                 if collector.collect_interrupt {
                     return;
                 }
@@ -640,23 +659,25 @@ impl MemBox {
                     out.push_str(
                         format!(
                             "{}{}{:<width1$.width2$}{}{}{}{}{}{}{:>4}",
-                            mv::to((y + cy as i32) as u32, (x + cx as i32) as u32),
+                            mv::to(y + cy, x + cx),
                             gli,
                             name.to_title_case()[..if big_mem { name.len() } else { 5 }].to_owned()
                                 + ":",
                             mv::to(
-                                (y + cy as i32) as u32,
-                                (x + cx as i32 + self.mem_width as i32
-                                    - 3
-                                    - mem.swap_string[&name].len() as i32)
-                                    as u32
+                                y + cy,
+                                u32::try_from(
+                                    x as i32 + cx as i32 + self.get_mem_width() as i32
+                                        - 3
+                                        - mem.swap_string[&name].len() as i32
+                                )
+                                .unwrap_or(0)
                             ),
                             Fx::trans(mem.swap_string[&name]),
-                            mv::to((y + cy as i32 + 1) as u32, (x + cx as i32) as u32),
+                            mv::to(y + cy + 1, x + cx),
                             gbg,
                             match meters.swap[&name] {
                                 MeterUnion::Graph(g) => g.call(
-                                    if self.parent.resized {
+                                    if self.get_parent().get_resized() {
                                         None
                                     } else {
                                         Some(mem.swap_percent[&name] as i32)
@@ -664,7 +685,7 @@ impl MemBox {
                                     term
                                 ),
                                 MeterUnion::Meter(m) => m.call(
-                                    if self.parent.resized {
+                                    if self.get_parent().get_resized() {
                                         None
                                     } else {
                                         Some(mem.swap_percent[&name] as i32)
@@ -689,12 +710,12 @@ impl MemBox {
                     out.push_str(
                         format!(
                             "{}{:width1$.width2$} {}{}{:width3$}",
-                            mv::to((y + cy as i32) as u32, (x + cx as i32) as u32),
+                            mv::to(y + cy, x + cx),
                             name.to_title_case(),
                             gbg,
                             match meters.swap[&name] {
                                 MeterUnion::Graph(g) => g.call(
-                                    if self.parent.resized {
+                                    if self.get_parent().get_resized() {
                                         None
                                     } else {
                                         Some(mem.percent[&name] as i32)
@@ -702,7 +723,7 @@ impl MemBox {
                                     term
                                 ),
                                 MeterUnion::Meter(m) => m.call(
-                                    if self.parent.resized {
+                                    if self.get_parent().get_resized() {
                                         None
                                     } else {
                                         Some(mem.percent[&name] as i32)
@@ -722,40 +743,33 @@ impl MemBox {
                         )
                         .as_str(),
                     );
-                    cy += if self.graph_height == 0 {
+                    cy += if self.get_graph_height() == 0 {
                         1
                     } else {
-                        self.graph_height
+                        self.get_graph_height()
                     };
                 }
             }
         }
 
-        if self.graph_height > 0 && cy != h {
-            out.push_str(
-                format!(
-                    "{}{}",
-                    mv::to((y + cy as i32) as u32, (x + cx as i32) as u32),
-                    gli
-                )
-                .as_str(),
-            );
+        if self.get_graph_height() > 0 && cy != h {
+            out.push_str(format!("{}{}", mv::to(y + cy, x + cx), gli).as_str());
         }
 
         // * Disks
         if CONFIG.show_disks && mem.disks.len() > 0 {
-            cx = (x + self.mem_width as i32 - 1) as u32;
+            cx = u32::try_from(x as i32 + self.mem_width as i32 - 1).unwrap_or(0);
             cy = 0;
-            let mut big_disk: bool = self.disks_width >= 25;
+            let mut big_disk: bool = self.get_disks_width() >= 25;
             let gli: String = format!(
                 "{}{}{}{}{}{}{}",
                 mv::left(2),
                 THEME.colors.div_line,
                 symbol::title_right,
-                symbol::h_line.repeat(self.disks_width as usize),
+                symbol::h_line.repeat(self.get_disks_width() as usize),
                 THEME.colors.mem_box,
                 symbol::title_left,
-                mv::left(self.disks_width - 1),
+                mv::left(u32::try_from(self.get_disks_width() as i32 - 1).unwrap_or(0)),
             );
 
             for (name, item) in mem.disks {
@@ -776,17 +790,20 @@ impl MemBox {
                 out.push_str(
                     Fx::trans(format!(
                         "{}{}{}{}{:width$.12}{}{:>9}",
-                        mv::to((y + cy as i32) as u32, (x + cx as i32) as u32),
+                        mv::to(y + cy, x + cx),
                         gli,
                         THEME.colors.title,
                         fx::b,
                         item_s,
                         mv::to(
-                            (y + cy as i32) as u32,
-                            (x + cx as i32 + self.disks_width as i32 - 11) as u32
+                            y + cy,
+                            u32::try_from(
+                                x as i32 + cx as i32 + self.get_disks_width() as i32 - 11
+                            )
+                            .unwrap_or(0)
                         ),
                         insert,
-                        width = self.disks_width as usize - 2,
+                        width = usize::try_from(self.get_disks_width() as i32 - 2).unwrap_or(0),
                     ))
                     .as_str(),
                 );
@@ -795,17 +812,20 @@ impl MemBox {
                     format!(
                         "{}{}{}{}{}{}{}",
                         mv::to(
-                            (y + cy as i32) as u32,
-                            (x + cx as i32 + (self.disks_width / 2) as i32
-                                - (item[&"io".to_owned()].to_string().len() / 2) as i32
-                                - 2) as u32
+                            y + cy,
+                            u32::try_from(
+                                x as i32 + cx as i32 + (self.get_disks_width() / 2) as i32
+                                    - (item[&"io".to_owned()].to_string().len() / 2) as i32
+                                    - 2
+                            )
+                            .unwrap_or(0)
                         ),
                         fx::ub,
                         THEME.colors.main_fg,
                         item[&"io".to_owned()],
                         fx::ub,
                         THEME.colors.main_fg,
-                        mv::to((y + cy as i32 + 1) as u32, (x + cx as i32) as u32),
+                        mv::to(y + cy + 1, x + cx),
                     )
                     .as_str(),
                 );
@@ -839,7 +859,7 @@ impl MemBox {
                     if cy > h - 1 {
                         break;
                     }
-                    out.push_str(mv::to((y + cy as i32) as u32, (x + cx as i32) as u32).as_str());
+                    out.push_str(mv::to(y + cy, x + cx).as_str());
                     out.push_str(if big_disk {
                         format!(
                             "Free:{:>4} ",
@@ -870,7 +890,7 @@ impl MemBox {
             }
         }
         draw.buffer(
-            self.buffer,
+            self.get_buffer(),
             vec![format!("{}{}{}", out_misc, out, term.fg)],
             false,
             false,
@@ -880,7 +900,165 @@ impl MemBox {
             false,
             key,
         );
-        self.parent.resized = false;
-        self.redraw = false;
+        self.set_parent_resized(false);
+        self.set_redraw(false);
+    }
+
+    pub fn get_parent(&self) -> BrshtopBox {
+        self.parent.clone()
+    }
+
+    pub fn set_parent(&mut self, parent: BrshtopBox) {
+        self.parent = parent.clone()
+    }
+
+    pub fn set_parent_name(&mut self, name: String) {
+        self.parent.set_name(name.clone())
+    }
+
+    pub fn set_parent_height_p(&mut self, height_p: u32) {
+        self.parent.set_height_p(height_p.clone())
+    }
+
+    pub fn set_parent_width_p(&mut self, width_p: u32) {
+        self.parent.set_width_p(width_p.clone())
+    }
+
+    pub fn set_parent_x(&mut self, x: u32) {
+        self.parent.set_x(x.clone())
+    }
+
+    pub fn set_parent_y(&mut self, y: u32) {
+        self.parent.set_y(y.clone())
+    }
+
+    pub fn set_parent_resized(&mut self, resized: bool) {
+        self.parent.set_resized(resized.clone())
+    }
+
+    pub fn set_parent_width(&mut self, width: u32) {
+        self.parent.set_width(width.clone())
+    }
+
+    pub fn set_parent_height(&mut self, height: u32) {
+        self.parent.set_height(height.clone())
+    }
+
+    pub fn get_mem_meter(&self) -> i32 {
+        self.mem_meter.clone()
+    }
+
+    pub fn set_mem_meter(&mut self, mem_meter: i32) {
+        self.mem_meter = mem_meter.clone()
+    }
+
+    pub fn get_mem_size(&self) -> usize {
+        self.mem_size.clone()
+    }
+
+    pub fn set_mem_size(&mut self, mem_size: usize) {
+        self.mem_size = mem_size.clone()
+    }
+
+    pub fn get_disk_meter(&self) -> i32 {
+        self.disk_meter.clone()
+    }
+
+    pub fn set_disk_meter(&mut self, disk_meter: i32) {
+        self.disk_meter = disk_meter.clone()
+    }
+
+    pub fn get_divider(&self) -> i32 {
+        self.divider.clone()
+    }
+
+    pub fn set_divider(&mut self, divider: i32) {
+        self.divider = divider.clone()
+    }
+
+    pub fn get_mem_width(&self) -> u32 {
+        self.mem_width.clone()
+    }
+
+    pub fn set_mem_width(&mut self, mem_width: u32) {
+        self.mem_width = mem_width.clone()
+    }
+
+    pub fn get_disks_width(&self) -> u32 {
+        self.disks_width.clone()
+    }
+
+    pub fn set_disks_width(&mut self, disks_width: u32) {
+        self.disks_width = disks_width.clone()
+    }
+
+    pub fn get_graph_height(&self) -> u32 {
+        self.graph_height.clone()
+    }
+
+    pub fn set_graph_height(&mut self, graph_height: u32) {
+        self.graph_height = graph_height.clone()
+    }
+
+    pub fn get_redraw(&self) -> bool {
+        self.redraw.clone()
+    }
+
+    pub fn set_redraw(&mut self, redraw: bool) {
+        self.redraw = redraw.clone()
+    }
+
+    pub fn get_buffer(&self) -> String {
+        self.buffer.clone()
+    }
+
+    pub fn set_buffer(&mut self, buffer: String) {
+        self.buffer = buffer.clone()
+    }
+
+    pub fn get_swap_on(&self) -> bool {
+        self.swap_on.clone()
+    }
+
+    pub fn set_swap_on(&mut self, swap_on: bool) {
+        self.swap_on = swap_on.clone()
+    }
+
+    pub fn get_mem_names(&self) -> Vec<String> {
+        self.mem_names.clone()
+    }
+
+    pub fn set_mem_names(&mut self, mem_names: Vec<String>) {
+        self.mem_names = mem_names.clone()
+    }
+
+    pub fn get_mem_names_index(&self, index: usize) -> Option<String> {
+        match self.get_mem_names().get(index) {
+            Some(s) => Some(s.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_mem_names_index(&mut self, index: usize, element: String) {
+        self.get_mem_names().insert(index, element.clone())
+    }
+
+    pub fn get_swap_names(&self) -> Vec<String> {
+        self.swap_names.clone()
+    }
+
+    pub fn set_swap_names(&mut self, swap_names: Vec<String>) {
+        self.swap_names = swap_names.clone()
+    }
+
+    pub fn get_swap_names_index(&self, index: usize) -> Option<String> {
+        match self.get_swap_names().get(index) {
+            Some(s) => Some(s.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_swap_names_index(&mut self, index: usize, element: String) {
+        self.get_mem_names().insert(index, element.clone())
     }
 }

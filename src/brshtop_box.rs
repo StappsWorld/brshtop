@@ -2,6 +2,7 @@ use {
     crate::{
         config::{Config, ViewMode},
         cpubox::CpuBox,
+        cpucollector::CpuCollector,
         CPU_NAME,
         draw::Draw,
         error::*,
@@ -109,17 +110,17 @@ impl BrshtopBox {
         }
     }
 
-    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, term: &mut Term, CONFIG : &mut Config) {
+    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, term: &mut Term, CONFIG : &mut Config, cpu : &mut CpuCollector) {
         for sub in boxes {
             match sub {
                 Boxes::BrshtopBox(b) => (),
                 Boxes::CpuBox(b) => {
-                    b.calc_size(term, self);
-                    b.resized = true;
+                    b.calc_size(term, self, cpu);
+                    b.set_parent_resized(true);
                 },
                 Boxes::MemBox(b) => {
                     b.calc_size(term, self, CONFIG);
-                    b.parent.resized = true;
+                    b.set_parent_resized(true);
                 },
                 Boxes::NetBox(n) => {
                     n.calc_size(term, self);
@@ -146,22 +147,22 @@ impl BrshtopBox {
         term: &mut Term,
     ) {
         let mut update_string: String = format!("{}ms", config.update_ms);
-        let xpos: u32 = cpu_box.x + cpu_box.parent.width - (update_string.len() as u32) - 15;
+        let xpos: u32 = cpu_box.get_parent().get_x() + cpu_box.get_parent().get_width() - (update_string.len() as u32) - 15;
 
         if !key.mouse.contains_key(&"+".to_owned()) {
             let mut add_for_mouse_parent = Vec::<Vec<i32>>::new();
             let mut add_for_mouse = Vec::<i32>::new();
             for i in 0..3 {
                 add_for_mouse.push((xpos + 7 + i) as i32);
-                add_for_mouse.push((cpu_box.y) as i32);
+                add_for_mouse.push((cpu_box.get_parent().get_y()) as i32);
             }
             add_for_mouse_parent.push(add_for_mouse);
             key.mouse.insert("+".to_owned(), add_for_mouse_parent);
             let mut sub_for_mouse_parent = Vec::<Vec<i32>>::new();
             let mut sub_for_mouse = Vec::<i32>::new();
             for i in 0..3 {
-                sub_for_mouse.push((cpu_box.x + cpu_box.parent.width - 4 + i) as i32);
-                sub_for_mouse.push(cpu_box.y as i32);
+                sub_for_mouse.push((cpu_box.get_parent().get_x() + cpu_box.get_parent().get_width() - 4 + i) as i32);
+                sub_for_mouse.push(cpu_box.get_parent().get_y() as i32);
             }
             sub_for_mouse_parent.push(sub_for_mouse);
             key.mouse.insert("-".to_owned(), sub_for_mouse_parent);
@@ -176,7 +177,7 @@ impl BrshtopBox {
             vec![
                 format!(
                     "{}{}{}{} ",
-                    mv::to(cpu_box.y, xpos),
+                    mv::to(cpu_box.get_parent().get_y(), xpos),
                     theme.colors.cpu_box.call(
                         format!("{}{}", symbol::h_line.repeat(7), symbol::title_left),
                         term
@@ -257,14 +258,14 @@ impl BrshtopBox {
             }
         }
 
-        let clock_len = clock_string[..cpu_box.parent.width as usize - 56].len();
+        let clock_len = clock_string[..cpu_box.get_parent().get_width() as usize - 56].len();
 
-        if self.clock_len != clock_len as u32 && !cpu_box.resized {
+        if self.clock_len != clock_len as u32 && !cpu_box.get_parent().get_resized() {
             out = format!(
                 "{}{}{}{}",
                 mv::to(
-                    cpu_box.y,
-                    ((cpu_box.parent.width) / 2) as u32 - (clock_len / 2) as u32
+                    cpu_box.get_parent().get_y(),
+                    ((cpu_box.get_parent().get_width()) / 2) as u32 - (clock_len / 2) as u32
                 ),
                 fx::ub,
                 theme.colors.cpu_box,
@@ -278,8 +279,8 @@ impl BrshtopBox {
             format!(
                 "{}{}{}{}{}{}{}{}{}{}",
                 mv::to(
-                    cpu_box.y,
-                    (cpu_box.parent.width / 2) as u32 - (clock_len / 2) as u32
+                    cpu_box.get_parent().get_y(),
+                    (cpu_box.get_parent().get_width() / 2) as u32 - (clock_len / 2) as u32
                 ),
                 fx::ub,
                 theme.colors.cpu_box,
@@ -457,6 +458,14 @@ impl BrshtopBox {
 
     pub fn set_b_cpu_h(&mut self, _b_cpu_h : i32) {
         self._b_cpu_h = _b_cpu_h.clone()
+    }
+
+    pub fn get_b_mem_h(&self) -> i32 {
+        self._b_mem_h.clone()
+    }
+
+    pub fn set_b_mem_h(&mut self, _b_mem_h : i32) {
+        self._b_mem_h = _b_mem_h.clone()
     }
 
     pub fn get_redraw_all(&self) -> bool {

@@ -527,7 +527,7 @@ impl<'a> CpuCollector<'a> {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.calc_size(term, brshtop_box);
+                            cpu_box.calc_size(term, brshtop_box, self);
                             return;
                         }
                     };
@@ -548,7 +548,7 @@ impl<'a> CpuCollector<'a> {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.calc_size(term, brshtop_box);
+                            cpu_box.calc_size(term, brshtop_box, self);
                             return;
                         }
                     };
@@ -601,7 +601,7 @@ impl<'a> CpuCollector<'a> {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.calc_size(term, brshtop_box);
+                            cpu_box.calc_size(term, brshtop_box ,self);
                             return;
                         }
                     };
@@ -627,7 +627,7 @@ impl<'a> CpuCollector<'a> {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.calc_size(term, brshtop_box);
+                            cpu_box.calc_size(term, brshtop_box ,self);
                             return;
                         }
                     };

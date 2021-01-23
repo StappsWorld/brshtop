@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use {
     crate::{
         brshtop_box::BrshtopBox,
@@ -23,7 +25,7 @@ use {
         memory::{os::linux::VirtualMemoryExt, swap_memory, virtual_memory, SwapMemory, VirtualMemory},
         Bytes,
     },
-    std::{collections::HashMap, fmt, path::Path, time::SystemTime},
+    std::{collections::HashMap, convert::TryFrom, fmt, path::Path, time::SystemTime},
 };
 
 #[derive(Clone)]
@@ -44,22 +46,22 @@ pub enum DiskInfo {
 }
 
 pub struct MemCollector<'a> {
-    pub parent: Collector<'a>,
-    pub values: HashMap<String, Bytes>,
-    pub vlist: HashMap<String, Vec<Bytes>>,
-    pub percent: HashMap<String, Bytes>,
-    pub string: HashMap<String, String>,
-    pub swap_values: HashMap<String, Bytes>,
-    pub swap_vlist: HashMap<String, Vec<Bytes>>,
-    pub swap_percent: HashMap<String, Bytes>,
-    pub swap_string: HashMap<String, String>,
-    pub disks: HashMap<String, HashMap<String, DiskInfo>>,
-    pub disk_hist: HashMap<String, Vec<Bytes>>,
-    pub timestamp: SystemTime,
-    pub io_error: bool,
-    pub old_disks: Vec<String>,
-    pub excludes: Vec<FileSystem>,
-    pub buffer: String,
+    parent: Collector<'a>,
+    values: HashMap<String, Bytes>,
+    vlist: HashMap<String, Vec<Bytes>>,
+    percent: HashMap<String, Bytes>,
+    string: HashMap<String, String>,
+    swap_values: HashMap<String, Bytes>,
+    swap_vlist: HashMap<String, Vec<Bytes>>,
+    swap_percent: HashMap<String, Bytes>,
+    swap_string: HashMap<String, String>,
+    disks: HashMap<String, HashMap<String, DiskInfo>>,
+    disk_hist: HashMap<String, Vec<Bytes>>,
+    timestamp: SystemTime,
+    io_error: bool,
+    old_disks: Vec<String>,
+    excludes: Vec<FileSystem>,
+    buffer: String,
 }
 impl<'a> MemCollector<'a> {
     pub fn new(membox: &mut MemBox) -> Self {
@@ -79,7 +81,7 @@ impl<'a> MemCollector<'a> {
             io_error: false,
             old_disks: Vec::<String>::new(),
             excludes: vec![FileSystem::Other("squashfs".to_owned())],
-            buffer: membox.buffer.clone(),
+            buffer: membox.get_buffer().clone(),
         };
         if SYSTEM.to_owned() == "BSD".to_owned() {
             for s in vec!["devfs", "tmpfs", "procfs", "linprocfs", "gvfs", "fusefs"]
@@ -87,7 +89,9 @@ impl<'a> MemCollector<'a> {
                 .map(|s| s.to_owned().to_owned())
                 .collect::<Vec<String>>()
             {
-                mem.excludes.push(FileSystem::Other(s));
+                let mut new_v : Vec<FileSystem> = mem.get_excludes();
+                new_v.push(FileSystem::Other(s));
+                mem.set_excludes(new_v);
             }
         }
         mem
@@ -118,29 +122,27 @@ impl<'a> MemCollector<'a> {
             }
         };
 
-        self.values.insert("cached".to_owned(), mem.cached());
-        self.values.insert("total".to_owned(), mem.total());
-        self.values.insert("free".to_owned(), mem.free());
-        self.values.insert("available".to_owned(), mem.available());
-        self.values
-            .insert("used".to_owned(), mem.total() - mem.available());
+        self.set_values_index("cached".to_owned(), mem.cached());
+        self.set_values_index("total".to_owned(), mem.total());
+        self.set_values_index("free".to_owned(), mem.free());
+        self.set_values_index("available".to_owned(), mem.available());
+        self.set_values_index("used".to_owned(), u64::try_from(mem.total() as i64 - mem.available() as i64).unwrap_or(0));
 
-        for (key, value) in self.values {
-            self.string
-                .insert(key, floating_humanizer(value as f64, false, false, 0, false));
+        for (key, value) in self.get_values() {
+            self.set_string_index(key, floating_humanizer(value as f64, false, false, 0, false));
             if key == "total".to_owned() {
                 continue;
             }
-            self.percent[&key] = value * 100 / self.values[&"total".to_owned()];
+            self.set_percent_index(key.clone(), value * 100 / self.get_values_index("total".to_owned()).unwrap_or(1));
             if CONFIG.mem_graphs {
-                if !self.vlist.contains_key(&key) {
+                if !self.get_vlist().contains_key(&key.clone()) {
                     self.vlist.insert(key, vec![]);
                 }
                 self.vlist
                     .get_mut(&key)
                     .unwrap()
                     .push(self.percent.get(&key).unwrap_or(&0).clone());
-                if self.vlist[&key].len() as u32 > membox.parent.width {
+                if self.vlist[&key].len() as u32 > membox.get_parent().get_width() {
                     self.vlist.get_mut(&key).unwrap().remove(0);
                 }
             }
@@ -498,6 +500,375 @@ impl<'a> MemCollector<'a> {
     /// JUST CALL MemBox.draw_fg()
     pub fn draw(&mut self, membox: &mut MemBox, term : &mut Term, brshtop_box : &mut BrshtopBox, CONFIG : &mut Config, meters : &mut Meters, THEME : &mut Theme, key : &mut Key, collector : &mut Collector, draw : &mut Draw, menu : &mut Menu) {
         membox.draw_fg(self, term, brshtop_box, CONFIG, meters, THEME, key, collector, draw, menu);
+    }
+
+    pub fn get_parent(&self) -> Collector<'a> {
+        self.parent.clone()
+    }
+
+    pub fn set_parent(&mut self, parent : Collector<'a>) {
+        self.parent = parent.clone()
+    }
+
+    pub fn get_values(&self) -> HashMap<String, Bytes> {
+        self.values.clone()
+    }
+
+    pub fn set_values(&mut self, values : HashMap<String, Bytes>) {
+        self.values = values.clone()
+    }
+
+    pub fn get_values_index(&self, index : String) -> Option<Bytes> {
+        match self.values.get(&index.clone()) {
+            Some(u) => Some(u.to_owned().clone()),
+            None => None 
+        }
+    }
+
+    pub fn set_values_index(&mut self, index : String, element : Bytes) {
+        self.values.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_vlist(&self) -> HashMap<String, Vec<Bytes>> {
+        self.vlist.clone()
+    }
+
+    pub fn set_vlist(&mut self, vlist : HashMap<String, Vec<Bytes>>) {
+        self.vlist = vlist.clone()
+    }
+
+    pub fn get_vlist_index(&self, index : String) -> Option<Vec<u64>> {
+        match self.get_vlist().get(&index.clone()) {
+            Some(u) => Some(u.iter().cloned().collect()),
+            None => None,
+        }
+    }
+
+    pub fn set_vlist_index(&mut self, index : String, element : Vec<Bytes>) {
+        self.vlist.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_vlist_inner_index(&self, index1 : String, index2 : usize) -> Option<Bytes> {
+        match self.get_vlist().get(&index1.clone()) {
+            Some(v) => match v.get(index2) {
+                Some(b) => Some(b.to_owned().clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn set_vlist_inner_index(&mut self, index1 : String, index2 : usize, element : Bytes) {
+        self.set_vlist_index(index1.clone(), match self.get_vlist_index(index1.clone()) {
+            Some(v) => {
+                let mut new_v = v.clone();
+                new_v.insert(index2, element.clone());
+                new_v
+            },
+            None => {
+                let mut new_v : Vec<Bytes> = Vec::<Bytes>::new();
+                for i in 0..index2 {
+                    new_v.push(0);
+                }
+                new_v.push(element.clone());
+                new_v
+            },
+        })
+    }
+
+    pub fn get_percent(&self) -> HashMap<String, Bytes> {
+        self.percent.clone()
+    }
+
+    pub fn set_percent(&mut self, percent : HashMap<String, Bytes>) {
+        self.percent = percent.clone()
+    }
+
+    pub fn get_percent_index(&self, index : String) -> Option<Bytes> {
+        match self.get_percent().get(&index.clone()) {
+            Some(b) => Some(b.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_percent_index(&mut self, index : String, element : Bytes) {
+        self.percent.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_string(&self) -> HashMap<String, String> {
+        self.string.clone()
+    }
+
+    pub fn set_string(&mut self, string : HashMap<String, String>) {
+        self.string = string.clone()
+    }
+
+    pub fn get_string_index(&self, index : String) -> Option<String> {
+        match self.get_string().get(&index.to_owned().clone()) {
+            Some(s) => Some(s.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_string_index(&mut self, index : String, element : String) {
+        self.string.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_swap_values(&self) -> HashMap<String, Bytes> {
+        self.swap_values.clone()
+    }
+
+    pub fn set_swap_values(&mut self, swap_values : HashMap<String, Bytes>) {
+        self.swap_values = swap_values.clone()
+    }
+
+    pub fn get_swap_values_index(&self, index : String) -> Option<Bytes> {
+        match self.get_swap_values().get(&index.to_owned().clone()) {
+            Some(u ) => Some(u.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_swap_values_index(&mut self, index : String, element : Bytes) {
+        self.swap_values.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_swap_vlist(&self) -> HashMap<String, Vec<Bytes>> {
+        self.swap_vlist.clone()
+    }
+
+    pub fn set_swap_vlist(&mut self, swap_vlist : HashMap<String, Vec<Bytes>>) {
+        self.swap_vlist = swap_vlist.clone()
+    }
+
+    pub fn get_swap_vlist_index(&self, index : String) -> Option<Vec<u64>> {
+        match self.get_swap_vlist().get(&index.clone()) {
+            Some(u) => Some(u.iter().cloned().collect()),
+            None => None,
+        }
+    }
+
+    pub fn set_swap_vlist_index(&mut self, index : String, element : Vec<Bytes>) {
+        self.swap_vlist.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_swap_vlist_inner_index(&self, index1 : String, index2 : usize) -> Option<Bytes> {
+        match self.get_swap_vlist().get(&index1.clone()) {
+            Some(v) => match v.get(index2) {
+                Some(b) => Some(b.to_owned().clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn set_swap_vlist_inner_index(&mut self, index1 : String, index2 : usize, element : Bytes) {
+        self.set_swap_vlist_index(index1.clone(), match self.get_swap_vlist_index(index1.clone()) {
+            Some(v) => {
+                let mut new_v = v.clone();
+                new_v.insert(index2, element.clone());
+                new_v
+            },
+            None => {
+                let mut new_v : Vec<Bytes> = Vec::<Bytes>::new();
+                for _ in 0..index2 {
+                    new_v.push(0);
+                }
+                new_v.push(element.clone());
+                new_v
+            },
+        })
+    }
+
+    pub fn get_swap_percent(&self) -> HashMap<String, Bytes> {
+        self.swap_percent.clone()
+    }
+
+    pub fn set_swap_percent(&mut self, swap_percent : HashMap<String, Bytes>) {
+        self.swap_percent = swap_percent.clone()
+    }
+
+    pub fn get_swap_percent_index(&self, index : String) -> Option<Bytes> {
+        match self.get_swap_percent().get(&index.clone()) {
+            Some(b) => Some(b.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_swap_percent_index(&mut self, index : String, element : Bytes) {
+        self.swap_percent.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_swap_string(&self) -> HashMap<String, String> {
+        self.swap_string.clone()
+    }
+
+    pub fn set_swap_string(&mut self, swap_string : HashMap<String, String>) {
+        self.swap_string = swap_string.clone()
+    }
+
+    pub fn get_swap_string_index(&self, index : String) -> Option<String> {
+        match self.get_swap_string().get(&index.to_owned().clone()) {
+            Some(s) => Some(s.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_swap_string_index(&mut self, index : String, element : String) {
+        self.swap_string.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_disks(&self) -> HashMap<String, HashMap<String, DiskInfo>> {
+        self.disks.clone()
+    }
+
+    pub fn set_disks(&mut self, disks : HashMap<String, HashMap<String, DiskInfo>>) {
+        self.disks = disks.clone()
+    }
+
+    pub fn get_disks_index(&self, index : String) -> Option<HashMap<String, DiskInfo>> {
+        match self.get_disks().get(&index.clone()) {
+            Some(h) => Some(h.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_disks_index(&mut self, index : String, element : HashMap<String, DiskInfo>) {
+        self.disks.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_disks_inner_index(&self, index1 : String, index2 : String) -> Option<DiskInfo> {
+        match self.get_disks_index(index1.clone()) {
+            Some(h) => match h.to_owned().get(&index2.clone()) {
+                Some(d) => Some(d.to_owned().clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn set_disks_inner_index(&mut self, index1 : String, index2 : String, element : DiskInfo) {
+        self.set_disks_index(index1.clone(), match self.get_disks_index(index1.clone()) {
+            Some(h) => {
+                let mut new_h : HashMap<String, DiskInfo> = h.clone();
+                new_h.insert(index2.clone(), element.clone());
+                new_h
+            },
+            None => {
+                let mut new_h : HashMap<String, DiskInfo> = HashMap::<String, DiskInfo>::new();
+                new_h.insert(index2.clone(), element.clone());
+                new_h
+            },
+        })
+    }
+
+    pub fn get_disk_hist(&self) -> HashMap<String, Vec<Bytes>> {
+        self.disk_hist.clone()
+    }
+
+    pub fn set_disk_hist(&mut self, disk_hist : HashMap<String, Vec<Bytes>>) {
+        self.disk_hist = disk_hist.clone()
+    }
+
+    pub fn get_disk_hist_index(&self, index : String) -> Option<Vec<Bytes>> {
+        match self.get_disk_hist().get(&index.clone()) {
+            Some(v) => Some(v.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_disk_hist_index(&mut self, index : String, element : Vec<Bytes>) {
+        self.disk_hist.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_disk_hist_inner_index(&self, index1 : String, index2 : usize) -> Option<Bytes> {
+        match self.get_disk_hist_index(index1.clone()) {
+            Some(v) => match v.get(index2.clone()) {
+                Some(b) => Some(b.to_owned().clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn set_disk_hist_inner_index(&mut self, index1 : String, index2 : usize, element : Bytes) {
+        self.set_disk_hist_index(index1.clone(), match self.get_disk_hist_index(index1.clone()) {
+            Some(v) => {
+                let mut new_v = v.clone();
+                new_v.insert(index2, element.clone());
+                new_v
+            },
+            None => {
+                let mut new_v : Vec<Bytes> = Vec::<Bytes>::new();
+                for i in 0..index2 {
+                    new_v.push(0);
+                }
+                new_v.push(element.clone());
+                new_v
+            },
+        })
+    }
+
+    pub fn get_timestamp(&self) -> SystemTime {
+        self.timestamp.clone()
+    }
+
+    pub fn set_timestamp(&mut self, timestamp : SystemTime) {
+        self.timestamp = timestamp.clone()
+    }
+
+    pub fn get_io_error(&self) -> bool {
+        self.io_error.clone()
+    }
+
+    pub fn set_io_error(&mut self, io_error : bool) {
+        self.io_error = io_error.clone()
+    }
+
+    pub fn get_old_disks(&self) -> Vec<String> {
+        self.old_disks.clone()
+    }
+
+    pub fn set_old_disks(&mut self, old_disks : Vec<String>) {
+        self.old_disks = old_disks.clone()
+    }
+
+    pub fn get_old_disks_index(&self, index : usize) -> Option<String> {
+        match self.get_old_disks().get(index) {
+            Some(s) => Some(s.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_old_disks_index(&mut self, index : usize, element : String) {
+        self.old_disks.insert(index, element.clone())
+    }
+
+    pub fn get_excludes(&self) -> Vec<FileSystem> {
+        self.excludes.clone()
+    }
+
+    pub fn set_excludes(&mut self, excludes : Vec<FileSystem>) {
+        self.excludes = excludes.clone()
+    }
+
+    pub fn get_excludes_index(&self, index : usize) -> Option<FileSystem> {
+        match self.excludes.get(index) {
+            Some(f) => Some(f.to_owned().clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_excludes_index(&mut self, index : usize, element : FileSystem) {
+        self.excludes.insert(index, element.clone());
+    }
+
+    pub fn get_buffer(&self) -> String {
+        self.buffer.clone()
+    }
+
+    pub fn set_buffer(&mut self, buffer : String) {
+        self.buffer = buffer.clone()
     }
 
 }

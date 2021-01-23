@@ -591,7 +591,7 @@ pub fn main() {
         if CONFIG.check_temp {
             cpu_collector.get_sensors(CONFIG);
         }
-        brshtop_box.calc_sizes(boxes, term, CONFIG);
+        brshtop_box.calc_sizes(boxes, term, CONFIG, cpu_collector);
         brshtop_box.draw_bg(false, draw, boxes, menu, CONFIG, cpu_box, key, THEME, term);
         init.success(CONFIG, draw, term, key);
     }
@@ -963,18 +963,20 @@ pub fn create_box(
                 wt = b.get_name();
             }
             Boxes::CpuBox(b) => {
-                wx = b.get_x();
-                wy = b.get_y();
-                ww = b.get_parent().get_width();
-                wh = b.get_parent().get_height();
-                wt = b.get_name();
+                let parent_box = b.get_parent();
+                wx = parent_box.get_x();
+                wy = parent_box.get_y();
+                ww = parent_box.get_width();
+                wh = parent_box.get_height();
+                wt = parent_box.get_name();
             }
             Boxes::MemBox(b) => {
-                wx = b.get_x() as u32;
-                wy = b.get_y() as u32;
-                ww = b.get_parent().get_width();
-                wh = b.get_parent().get_height();
-                wt = b.get_name();
+                let parent_box = b.get_parent();
+                wx = parent_box.get_x();
+                wy = parent_box.get_y();
+                ww = parent_box.get_width();
+                wh = parent_box.get_height();
+                wt = parent_box.get_name();
             }
             Boxes::NetBox(b) => {
                 wx = b.get_x() as u32;
