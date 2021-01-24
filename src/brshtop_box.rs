@@ -23,17 +23,17 @@ use {
     uname::uname,
 };
 
-pub enum Boxes<'a> {
-    BrshtopBox(&'a BrshtopBox),
-    CpuBox(&'a CpuBox),
-    MemBox(&'a MemBox),
-    NetBox(&'a NetBox),
-    ProcBox(&'a ProcBox),
+pub enum Boxes {
+    BrshtopBox,
+    CpuBox,
+    MemBox,
+    NetBox,
+    ProcBox,
 }
 
-pub enum SubBoxes<'a> {
-    CpuBox(&'a CpuBox),
-    NetBox(&'a NetBox),
+pub enum SubBoxes {
+    CpuBox,
+    NetBox,
 }
 
 #[derive(Clone)]
@@ -117,25 +117,29 @@ impl BrshtopBox {
         term: &Term,
         CONFIG: &Config,
         cpu: &CpuCollector,
+        cpu_box: &CpuBox,
+        mem_box : &MemBox,
+        net_box : &NetBox,
+        proc_box : &ProcBox,
     ) {
         for sub in boxes {
             match sub {
-                Boxes::BrshtopBox(b) => (),
-                Boxes::CpuBox(b) => {
-                    b.calc_size(term, self, cpu);
-                    b.set_parent_resized(true);
+                Boxes::BrshtopBox => (),
+                Boxes::CpuBox => {
+                    cpu_box.calc_size(term, self, cpu);
+                    cpu_box.set_parent_resized(true);
                 }
-                Boxes::MemBox(b) => {
-                    b.calc_size(term, self, CONFIG);
-                    b.set_parent_resized(true);
+                Boxes::MemBox => {
+                    mem_box.calc_size(term, self, CONFIG);
+                    mem_box.set_parent_resized(true);
                 }
-                Boxes::NetBox(n) => {
-                    n.calc_size(term, self);
-                    n.set_parent_resized(true);
+                Boxes::NetBox => {
+                    net_box.calc_size(term, self);
+                    net_box.set_parent_resized(true);
                 }
-                Boxes::ProcBox(p) => {
-                    p.calc_size(term, self);
-                    p.parent.resized = true;
+                Boxes::ProcBox => {
+                    proc_box.calc_size(term, self);
+                    proc_box.parent.resized = true;
                 }
             }
         }
@@ -348,6 +352,9 @@ impl BrshtopBox {
         menu: &Menu,
         config: &Config,
         cpu_box: &CpuBox,
+        mem_box : &MemBox,
+        net_box : &NetBox,
+        proc_box : &ProcBox,
         key: &Key,
         theme: &Theme,
         term: &Term,
@@ -357,10 +364,10 @@ impl BrshtopBox {
             subclasses
                 .into_iter()
                 .map(|b| match b {
-                    Boxes::CpuBox(cb) => cb.draw_bg(key, theme, term, config),
-                    Boxes::MemBox(mb) => mb.draw_bg(theme, config, term),
-                    Boxes::NetBox(nb) => nb.draw_bg(theme, term),
-                    Boxes::ProcBox(pb) => pb.draw_bg(theme, term),
+                    Boxes::CpuBox => cpu_box.draw_bg(key, theme, term, config),
+                    Boxes::MemBox => mem_box.draw_bg(theme, config, term),
+                    Boxes::NetBox => net_box.draw_bg(theme, term),
+                    Boxes::ProcBox => proc_box.draw_bg(theme, term),
                     _ => String::default(),
                 })
                 .collect(),

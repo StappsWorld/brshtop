@@ -24,8 +24,8 @@ use {
 };
 
 #[derive(Clone)]
-pub struct CpuCollector<'a> {
-    pub parent: Collector<'a>,
+pub struct CpuCollector {
+    pub parent: Collector,
     pub cpu_usage: Vec<Vec<u32>>,
     pub cpu_temp: Vec<Vec<u32>>,
     pub cpu_temp_high: i32,
@@ -40,7 +40,7 @@ pub struct CpuCollector<'a> {
     pub sensor_swap: bool,
     pub cpu_temp_only: bool,
 }
-impl<'a> CpuCollector<'a> {
+impl CpuCollector {
     pub fn new() -> Self {
         let mut cpu_usage_mut = Vec::<Vec<u32>>::new();
         let mut cpu_temp_mut = Vec::<Vec<u32>>::new();

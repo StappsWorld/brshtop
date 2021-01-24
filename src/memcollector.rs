@@ -46,8 +46,8 @@ impl fmt::Display for DiskInfo {
     }
 }
 
-pub struct MemCollector<'a> {
-    parent: Collector<'a>,
+pub struct MemCollector {
+    parent: Collector,
     values: HashMap<String, Bytes>,
     vlist: HashMap<String, Vec<Bytes>>,
     percent: HashMap<String, Bytes>,
@@ -64,7 +64,7 @@ pub struct MemCollector<'a> {
     excludes: Vec<FileSystem>,
     buffer: String,
 }
-impl<'a> MemCollector<'a> {
+impl MemCollector {
     pub fn new(membox: &MemBox) -> Self {
         let mem = MemCollector {
             parent: Collector::new(),
@@ -596,11 +596,11 @@ impl<'a> MemCollector<'a> {
         );
     }
 
-    pub fn get_parent(&self) -> Collector<'a> {
+    pub fn get_parent(&self) -> Collector {
         self.parent.clone()
     }
 
-    pub fn set_parent(&mut self, parent: Collector<'a>) {
+    pub fn set_parent(&mut self, parent: Collector) {
         self.parent = parent.clone()
     }
 

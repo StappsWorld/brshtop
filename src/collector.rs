@@ -1,4 +1,4 @@
-use crate::{cpucollector, netbox, procbox};
+use crate::{cpucollector, netbox, procbox, proccollector};
 
 use {
     crate::{
@@ -34,10 +34,10 @@ use {
 
 #[derive(Clone)]
 pub enum Collectors {
-    CpuCollector(&CpuCollector),
-    NetCollector(&NetCollector),
-    ProcCollector(& ProcCollector),
-    MemCollector(&MemCollector),
+    CpuCollector,
+    NetCollector,
+    ProcCollector,
+    MemCollector,
 }
 
 pub struct Collector {
@@ -73,8 +73,8 @@ impl Collector {
             collect_run: Event::Flag(false),
             collect_done: Event::Flag(false),
             collect_idle: Event::Flag(true),
-            collect_queue: Vec::<Collectors<'a>>::new(),
-            default_collect_queue: Vec::<Collectors<'a>>::new(),
+            collect_queue: Vec::<Collectors>::new(),
+            default_collect_queue: Vec::<Collectors>::new(),
             collect_interrupt: false,
             proc_interrupt: false,
             use_draw_list: false,
@@ -84,7 +84,7 @@ impl Collector {
     /// Defaults draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False
     pub fn collect(
         &mut self,
-        collectors: Vec<Collectors<'a>>,
+        collectors: Vec<Collectors>,
         CONFIG: &Config,
         draw_now: bool,
         interrupt: bool,
@@ -114,7 +114,7 @@ impl Collector {
     }
 
     pub fn start(
-        &'a mut self,
+        &mut self,
         CONFIG: &Config,
         DEBUG: bool,
         collectors: Vec<Collectors>,
@@ -132,23 +132,32 @@ impl Collector {
         netbox: &NetBox,
         procbox: &ProcBox,
         membox: &MemBox,
+        cpu_collector : &CpuCollector,
+        mem_collector : &MemCollector,
+        net_collector : &NetCollector,
+        proc_collector : &ProcCollector,
     ) {
         self.stopping = false;
 
-        let thread_CONFIG = Arc::new(CONFIG);
-        let thread_brshtop_box = Arc::new(brshtop_box);
-        let thread_timeit = Arc::new(timeit);
-        let thread_menu = Arc::new(menu);
-        let thread_draw = Arc::new(draw);
-        let thread_term = Arc::new(term);
-        let thread_cpu_box = Arc::new(cpu_box);
-        let thread_key = Arc::new(key);
-        let thread_THEME = Arc::new(THEME);
-        let thread_graphs = Arc::new(graphs);
-        let thread_meters = Arc::new(meters);
-        let thread_netbox = Arc::new(netbox);
-        let thread_procbox = Arc::new(procbox);
-        let thread_membox = Arc::new(membox);
+        let thread_CONFIG = Arc::new(Mutex::new(CONFIG));
+        let thread_brshtop_box = Arc::new(Mutex::new(brshtop_box));
+        let thread_timeit = Arc::new(Mutex::new(timeit));
+        let thread_menu = Arc::new(Mutex::new(menu));
+        let thread_draw = Arc::new(Mutex::new(draw));
+        let thread_term = Arc::new(Mutex::new(term));
+        let thread_cpu_box = Arc::new(Mutex::new(cpu_box));
+        let thread_key = Arc::new(Mutex::new(key));
+        let thread_THEME = Arc::new(Mutex::new(THEME));
+        let thread_graphs = Arc::new(Mutex::new(graphs));
+        let thread_meters = Arc::new(Mutex::new(meters));
+        let thread_netbox = Arc::new(Mutex::new(netbox));
+        let thread_procbox = Arc::new(Mutex::new(procbox));
+        let thread_membox = Arc::new(Mutex::new(membox));
+        let thread_cpu_collector = Arc::new(Mutex::new(cpu_collector));
+        let thread_mem_collector = Arc::new(Mutex::new(mem_collector));
+        let thread_net_collector = Arc::new(Mutex::new(net_collector));
+        let thread_proc_collector = Arc::new(Mutex::new(proc_collector));
+
 
         self.thread = Some(thread::spawn(move || {
             let (flag_build, control_build) = make_pair();
@@ -171,6 +180,10 @@ impl Collector {
                 thread_netbox,
                 thread_procbox,
                 thread_membox,
+                thread_cpu_collector,
+                thread_net_collector,
+                thread_proc_collector,
+                thread_mem_collector,
             )
         }));
 
@@ -198,23 +211,48 @@ impl Collector {
 
     pub fn runner(
         &mut self,
-        thread_CONFIG: Arc<&Config>,
+        thread_CONFIG: Arc<Mutex<&Config>>,
         DEBUG: bool,
-        thread_brshtop_box: Arc<&BrshtopBox>,
-        thread_timeit: Arc<&TimeIt>,
-        thread_menu: Arc<&Menu>,
-        thread_draw: Arc<&Draw>,
-        thread_term: Arc<&Term>,
-        thread_cpu_box: Arc<&CpuBox>,
-        thread_key: Arc<&Key>,
-        thread_THEME: Arc<&Theme>,
+        thread_brshtop_box: Arc<Mutex<&BrshtopBox>>,
+        thread_timeit: Arc<Mutex<&TimeIt>>,
+        thread_menu: Arc<Mutex<&Menu>>,
+        thread_draw: Arc<Mutex<&Draw>>,
+        thread_term: Arc<Mutex<&Term>>,
+        thread_cpu_box: Arc<Mutex<&CpuBox>>,
+        thread_key: Arc<Mutex<&Key>>,
+        thread_THEME: Arc<Mutex<&Theme>>,
         ARG_MODE: ViewMode,
-        thread_graphs: Arc<&Graphs>,
-        thread_meters: Arc<&Meters>,
-        thread_netbox: Arc<&NetBox>,
-        thread_procbox: Arc<&ProcBox>,
-        thread_membox: Arc<&MemBox>,
+        thread_graphs: Arc<Mutex<&Graphs>>,
+        thread_meters: Arc<Mutex<&Meters>>,
+        thread_netbox: Arc<Mutex<&NetBox>>,
+        thread_procbox: Arc<Mutex<&ProcBox>>,
+        thread_membox: Arc<Mutex<&MemBox>>,
+        thread_cpu_collector : Arc<Mutex<&&CpuCollector>>,
+        thread_net_collector : Arc<Mutex<&&NetCollector>>,
+        thread_proc_collector : Arc<Mutex<&&ProcCollector>>,
+        thread_mem_collector : Arc<Mutex<&&MemCollector>>,
     ) {
+
+        let CONFIG  = thread_CONFIG.lock().unwrap().to_owned();
+        let brshtop_box = thread_brshtop_box.lock().unwrap().to_owned();
+        let timeit  = thread_timeit.lock().unwrap().to_owned();
+        let menu  = thread_menu.lock().unwrap().to_owned();
+        let draw  = thread_draw.lock().unwrap().to_owned();
+        let term  = thread_term.lock().unwrap().to_owned();
+        let cpu_box  = thread_cpu_box.lock().unwrap().to_owned();
+        let key  = thread_key.lock().unwrap().to_owned();
+        let THEME  = thread_THEME.lock().unwrap().to_owned();
+        let graphs  = thread_graphs.lock().unwrap().to_owned();
+        let meters  = thread_meters.lock().unwrap().to_owned();
+        let netbox  = thread_netbox.lock().unwrap().to_owned();
+        let procbox  = thread_procbox.lock().unwrap().to_owned();
+        let membox  = thread_membox.lock().unwrap().to_owned();
+        let cpu_collector = thread_cpu_collector.lock().unwrap().to_owned();
+        let net_collector = thread_net_collector.lock().unwrap().to_owned();
+        let proc_collector = thread_proc_collector.lock().unwrap().to_owned();
+        let mem_collector = thread_mem_collector.lock().unwrap().to_owned();
+
+
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
@@ -242,25 +280,25 @@ impl Collector {
                 let collector = self.pop_collect_queue();
                 if !self.get_only_draw() {
                     match collector {
-                        Collectors::CpuCollector(c) => {
-                            c.collect(CONFIG, term, cpu_box, brshtop_box)
+                        Collectors::CpuCollector => {
+                            cpu_collector.collect(CONFIG, term, cpu_box, brshtop_box)
                         }
-                        Collectors::NetCollector(n) => n.collect(CONFIG, netbox),
-                        Collectors::ProcCollector(p) => p.collect(brshtop_box, CONFIG, procbox),
-                        Collectors::MemCollector(m) => m.collect(CONFIG, membox),
+                        Collectors::NetCollector => net_collector.collect(CONFIG, netbox),
+                        Collectors::ProcCollector => proc_collector.collect(brshtop_box, CONFIG, procbox),
+                        Collectors::MemCollector => mem_collector.collect(CONFIG, membox),
                     }
                 }
                 match collector {
-                    Collectors::CpuCollector(c) => c.draw(
+                    Collectors::CpuCollector => cpu_collector.draw(
                         cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu,
                     ),
-                    Collectors::NetCollector(n) => {
-                        n.draw(netbox, THEME, key, term, CONFIG, draw, graphs, menu)
+                    Collectors::NetCollector => {
+                        net_collector.draw(netbox, THEME, key, term, CONFIG, draw, graphs, menu)
                     }
-                    Collectors::ProcCollector(p) => {
-                        p.draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu)
+                    Collectors::ProcCollector => {
+                        proc_collector.draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu)
                     }
-                    Collectors::MemCollector(m) => m.draw(
+                    Collectors::MemCollector => mem_collector.draw(
                         membox,
                         term,
                         brshtop_box,
@@ -276,10 +314,10 @@ impl Collector {
 
                 if self.get_use_draw_list() {
                     draw_buffers.push(match collector {
-                        Collectors::CpuCollector(c) => c.buffer.clone(),
-                        Collectors::NetCollector(n) => n.buffer.clone(),
-                        Collectors::ProcCollector(p) => p.buffer.clone(),
-                        Collectors::MemCollector(m) => m.get_buffer().clone(),
+                        Collectors::CpuCollector => cpu_collector.buffer.clone(),
+                        Collectors::NetCollector => net_collector.buffer.clone(),
+                        Collectors::ProcCollector => proc_collector.buffer.clone(),
+                        Collectors::MemCollector => mem_collector.get_buffer().clone(),
                     });
                 }
 
@@ -386,29 +424,29 @@ impl Collector {
         &self.collect_done
     }
 
-    pub fn get_collect_queue(&self) -> Vec<Collectors<'a>> {
+    pub fn get_collect_queue(&self) -> Vec<Collectors> {
         self.collect_queue.clone()
     }
 
-    pub fn set_collect_queue(&mut self, collect_queue: Vec<Collectors<'a>>) {
+    pub fn set_collect_queue(&mut self, collect_queue: Vec<Collectors>) {
         self.collect_queue = collect_queue.clone()
     }
 
-    pub fn push_collect_queue(&mut self, element: Collectors<'a>) {
+    pub fn push_collect_queue(&mut self, element: Collectors) {
         self.collect_queue.push(element.clone())
     }
 
-    pub fn pop_collect_queue(&mut self) -> Collectors<'a> {
+    pub fn pop_collect_queue(&mut self) -> Collectors {
         self.collect_queue.pop().unwrap()
     }
 
-    pub fn get_collect_queue_index(&self, index: usize) -> Option<Collectors<'a>> {
+    pub fn get_collect_queue_index(&self, index: usize) -> Option<Collectors> {
         match self.get_collect_queue().get(index) {
             Some(c) => Some(c.clone()),
             None => None,
         }
     }
-    pub fn set_collect_queue_index(&mut self, index: usize, element: Collectors<'a>) -> Option<()> {
+    pub fn set_collect_queue_index(&mut self, index: usize, element: Collectors) -> Option<()> {
         if index > self.get_collect_queue().len() {
             None
         } else {
@@ -417,19 +455,19 @@ impl Collector {
         }
     }
 
-    pub fn get_default_collect_queue(&self) -> Vec<Collectors<'a>> {
+    pub fn get_default_collect_queue(&self) -> Vec<Collectors> {
         self.default_collect_queue.clone()
     }
 
-    pub fn set_default_collect_queue(&mut self, default_collect_queue: Vec<Collectors<'a>>) {
+    pub fn set_default_collect_queue(&mut self, default_collect_queue: Vec<Collectors>) {
         self.default_collect_queue = default_collect_queue.clone()
     }
 
-    pub fn push_default_collect_queue(&mut self, element: Collectors<'a>) {
+    pub fn push_default_collect_queue(&mut self, element: Collectors) {
         self.default_collect_queue.push(element.clone())
     }
 
-    pub fn get_default_collect_queue_index(&self, index: usize) -> Option<Collectors<'a>> {
+    pub fn get_default_collect_queue_index(&self, index: usize) -> Option<Collectors> {
         match self.get_default_collect_queue().get(index) {
             Some(c) => Some(c.clone()),
             None => None,
@@ -438,7 +476,7 @@ impl Collector {
     pub fn set_default_collect_queue_index(
         &mut self,
         index: usize,
-        element: Collectors<'a>,
+        element: Collectors,
     ) -> Option<()> {
         if index > self.get_default_collect_queue().len() {
             None
@@ -473,7 +511,7 @@ impl Collector {
         self.use_draw_list = use_draw_list.clone()
     }
 }
-impl<'a> Clone for Collector<'a> {
+impl<'a> Clone for Collector {
     fn clone(&self) -> Self {
         let (flag_build, control_build) = make_pair();
         Collector {

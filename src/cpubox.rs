@@ -200,7 +200,7 @@ impl CpuBox {
                 Some(theme.colors.cpu_box),
                 None,
                 true,
-                Some(Boxes::CpuBox(self)),
+                Some(Boxes::CpuBox),
                 term,
                 theme,
             ),
@@ -235,7 +235,7 @@ impl CpuBox {
                 Some(theme.colors.div_line),
                 None,
                 true,
-                Some(Boxes::CpuBox(self)),
+                Some(Boxes::CpuBox),
                 term,
                 theme,
             )

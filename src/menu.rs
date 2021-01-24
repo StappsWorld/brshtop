@@ -39,7 +39,7 @@ pub struct Menu {
     pub menu_length: HashMap<String, i32>,
     pub background: String,
 }
-impl<'a> Menu {
+impl Menu {
     pub fn new(
         MENUS: HashMap<String, HashMap<String, (String, String, String)>>,
         MENU_COLORS: HashMap<String, Vec<String>>,
@@ -97,8 +97,8 @@ impl<'a> Menu {
         THEME: &Theme,
         key_class: &Key,
         timer: &Timer,
-        collector: &Collector<'a>,
-        collectors: Vec<Collectors<'a>>,
+        collector: &Collector,
+        collectors: Vec<Collectors>,
         CONFIG: &Config,
         ARG_MODE: ViewMode,
         netcollector: &NetCollector,
@@ -356,8 +356,8 @@ impl<'a> Menu {
         draw: &Draw,
         term: &Term,
         key_class: &Key,
-        collector: &Collector<'a>,
-        collectors: Vec<Collectors<'a>>,
+        collector: &Collector,
+        collectors: Vec<Collectors>,
         CONFIG: &Config,
         timer: &Timer,
     ) {
@@ -683,13 +683,13 @@ impl<'a> Menu {
         netcollector: &NetCollector,
         brshtop_box: &BrshtopBox,
         boxes: Vec<Boxes>,
-        collector: &Collector<'a>,
+        collector: &Collector,
         init: &Init,
         cpubox: &CpuBox,
         cpucollector: &CpuCollector,
         netbox: &NetBox,
         proc_collector: &ProcCollector,
-        collectors: Vec<Collectors<'a>>,
+        collectors: Vec<Collectors>,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();

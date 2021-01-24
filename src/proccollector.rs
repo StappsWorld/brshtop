@@ -112,8 +112,8 @@ impl From<ProcCollectorDetails> for ProcessInfo {
 }
 
 #[derive(Clone)]
-pub struct ProcCollector<'a> {
-    pub parent: Collector<'a>,
+pub struct ProcCollector {
+    pub parent: Collector,
     pub buffer: String,
     pub search_filter: String,
     pub processes: HashMap<Pid, HashMap<String, ProcessInfo>>,
@@ -129,7 +129,7 @@ pub struct ProcCollector<'a> {
     pub tree_counter: usize,
     pub p_values: Vec<String>,
 }
-impl<'a> ProcCollector<'a> {
+impl ProcCollector {
     pub fn new(procbox: &ProcBox) -> Self {
         let mut proc = ProcCollector {
             parent: Collector::new(),

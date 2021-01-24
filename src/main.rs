@@ -467,10 +467,10 @@ pub fn main() {
     let mut updatechecker: UpdateChecker = UpdateChecker::new();
 
     let mut collectors: Vec<Collectors> = vec![
-        Collectors::MemCollector(&mem_collector),
-        Collectors::NetCollector(&net_collector),
-        Collectors::ProcCollector(&proc_collector),
-        Collectors::CpuCollector(&cpu_collector),
+        Collectors::MemCollector,
+        Collectors::NetCollector,
+        Collectors::ProcCollector,
+        Collectors::CpuCollector,
     ];
 
     let mut boxes: Vec<Boxes> = vec![
@@ -850,11 +850,11 @@ pub fn main() {
     );
 }
 
-pub fn run<'a>(
+pub fn run(
     term: &Term,
     key: &Key,
     timer: &Timer,
-    collector: &'a Collector<'a>,
+    collector: & Collector,
     boxes: Vec<Boxes>,
     init: &Init,
     cpu_box: &CpuBox,
@@ -865,13 +865,13 @@ pub fn run<'a>(
     THEME: &Theme,
     ARG_MODE: ViewMode,
     procbox: &ProcBox,
-    proccollector: &'a ProcCollector<'a>,
-    netcollector: &'a NetCollector<'a>,
+    proccollector: & ProcCollector,
+    netcollector: & NetCollector,
     cpucollector: &CpuCollector,
     netbox: &NetBox,
     update_checker: &UpdateChecker,
-    collectors: Vec<Collectors<'a>>,
-    memcollector: &'a MemCollector<'a>,
+    collectors: Vec<Collectors>,
+    memcollector: & MemCollector,
     graphs: &Graphs,
 ) {
     loop {
@@ -1339,7 +1339,7 @@ pub fn process_keys<'a>(
     ARG_MODE: ViewMode,
     key_class: &Key,
     procbox: &ProcBox,
-    collector: &'a Collector<'a>,
+    collector: &'a Collector,
     proccollector: &'a ProcCollector,
     CONFIG: &Config,
     draw: &Draw,
@@ -1354,7 +1354,7 @@ pub fn process_keys<'a>(
     boxes: Vec<Boxes>,
     netbox: &NetBox,
     update_checker: &UpdateChecker,
-    collectors: Vec<Collectors<'a>>,
+    collectors: Vec<Collectors>,
     timer: &Timer,
     memcollector: &'a MemCollector,
     graphs: &Graphs,
@@ -1393,7 +1393,7 @@ pub fn process_keys<'a>(
             {
                 procbox.filtering = false;
                 collector.collect(
-                    vec![Collectors::<'a>::ProcCollector(proccollector)],
+                    vec![Collectors::ProcCollector],
                     CONFIG,
                     true,
                     false,
@@ -1419,7 +1419,7 @@ pub fn process_keys<'a>(
                 continue;
             }
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 false,
@@ -1518,7 +1518,7 @@ pub fn process_keys<'a>(
         } else if key == "z".to_owned() {
             netcollector.reset = !netcollector.reset;
             collector.collect(
-                vec![Collectors::<'a>::NetCollector(netcollector)],
+                vec![Collectors::NetCollector],
                 CONFIG,
                 true,
                 false,
@@ -1529,7 +1529,7 @@ pub fn process_keys<'a>(
         } else if key == "y".to_owned() {
             CONFIG.net_sync = !CONFIG.net_sync;
             collector.collect(
-                vec![Collectors::<'a>::NetCollector(netcollector)],
+                vec![Collectors::NetCollector],
                 CONFIG,
                 true,
                 false,
@@ -1544,7 +1544,7 @@ pub fn process_keys<'a>(
                 .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
                 .collect::<HashMap<String, i32>>();
             collector.collect(
-                vec![Collectors::<'a>::NetCollector(netcollector)],
+                vec![Collectors::NetCollector],
                 CONFIG,
                 true,
                 false,
@@ -1566,7 +1566,7 @@ pub fn process_keys<'a>(
                     !proccollector.collapsed[&procbox.selected_pid];
             }
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 true,
@@ -1577,7 +1577,7 @@ pub fn process_keys<'a>(
         } else if key == "e".to_owned() {
             CONFIG.proc_tree = !CONFIG.proc_tree;
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 true,
@@ -1588,7 +1588,7 @@ pub fn process_keys<'a>(
         } else if key == "r".to_owned() {
             CONFIG.proc_reversed = !CONFIG.proc_reversed;
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 true,
@@ -1599,7 +1599,7 @@ pub fn process_keys<'a>(
         } else if key == "c".to_owned() {
             CONFIG.proc_per_core = !CONFIG.proc_per_core;
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 true,
@@ -1610,7 +1610,7 @@ pub fn process_keys<'a>(
         } else if key == "g".to_owned() {
             CONFIG.mem_graphs = !CONFIG.mem_graphs;
             collector.collect(
-                vec![Collectors::<'a>::MemCollector(memcollector)],
+                vec![Collectors::MemCollector],
                 CONFIG,
                 true,
                 true,
@@ -1623,7 +1623,7 @@ pub fn process_keys<'a>(
             collector.get_collect_idle_reference().wait(-1.0);
             CONFIG.swap_disk = !CONFIG.swap_disk;
             collector.collect(
-                vec![Collectors::<'a>::MemCollector(memcollector)],
+                vec![Collectors::MemCollector],
                 CONFIG,
                 true,
                 true,
@@ -1637,7 +1637,7 @@ pub fn process_keys<'a>(
                 procbox.start = 0;
             }
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 false,
@@ -1715,7 +1715,7 @@ pub fn process_keys<'a>(
         } else if key == "delete".to_owned() && proccollector.search_filter.len() > 0 {
             proccollector.search_filter = String::default();
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 false,
@@ -1748,7 +1748,7 @@ pub fn process_keys<'a>(
             graphs.detailed_cpu.NotImplemented = true;
             graphs.detailed_mem.NotImplemented = true;
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proccollector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 false,
@@ -1877,7 +1877,7 @@ pub fn now_awake<'a>(
     CONFIG: &'static Config,
     THEME: &'static Theme,
     DEBUG: bool,
-    collectors: Vec<Collectors<'static>>,
+    collectors: Vec<Collectors>,
     timeit: &'static TimeIt,
     ARG_MODE: ViewMode,
     graphs: &'static Graphs,

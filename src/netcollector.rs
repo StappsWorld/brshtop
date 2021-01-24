@@ -51,7 +51,7 @@ impl fmt::Display for NetCollectorStat {
 
 #[derive(Clone)]
 pub struct NetCollector<'a> {
-    pub parent: Collector<'a>,
+    pub parent: Collector,
     pub buffer: String,
     pub nics: Vec<&'a Nic>,
     pub nic_i: i32,
@@ -162,7 +162,7 @@ impl<'a> NetCollector<'a> {
         self.nic = Some(self.nics[self.nic_i as usize]);
     }
 
-    pub fn switch(&'a mut self, key: String, collector: &'a Collector<'a>, CONFIG: &Config) {
+    pub fn switch(&'a mut self, key: String, collector: &Collector, CONFIG: &Config) {
         if self.nics.len() < 2 {
             return;
         }
