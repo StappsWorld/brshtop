@@ -23,11 +23,9 @@ use {
         symbol,
         term::Term,
         theme::{Color, Colors, Theme},
-        THEME_DIR,
         timer::Timer,
-        THREADS,
         updatechecker::UpdateChecker,
-        VERSION,
+        THEME_DIR, THREADS, VERSION,
     },
     math::round::ceil,
     std::{collections::HashMap, iter::FromIterator, mem, path::Path},
@@ -92,25 +90,25 @@ impl<'a> Menu {
 
     pub fn main(
         &mut self,
-        theme: &mut Theme,
-        draw: &mut Draw,
-        term: &mut Term,
-        update_checker: &mut UpdateChecker,
-        THEME: &mut Theme,
-        key_class: &mut Key,
-        timer: &mut Timer,
-        collector: &mut Collector<'a>,
+        theme: &Theme,
+        draw: &Draw,
+        term: &Term,
+        update_checker: &UpdateChecker,
+        THEME: &Theme,
+        key_class: &Key,
+        timer: &Timer,
+        collector: &Collector<'a>,
         collectors: Vec<Collectors<'a>>,
-        CONFIG: &mut Config,
-        ARG_MODE: &mut ViewMode,
-        netcollector: &mut NetCollector,
-        brshtop_box: &mut BrshtopBox,
-        init: &mut Init,
-        cpubox: &mut CpuBox,
-        cpucollector: &mut CpuCollector,
+        CONFIG: &Config,
+        ARG_MODE: ViewMode,
+        netcollector: &NetCollector,
+        brshtop_box: &BrshtopBox,
+        init: &Init,
+        cpubox: &CpuBox,
+        cpucollector: &CpuCollector,
         boxes: Vec<Boxes>,
-        netbox: &mut NetBox,
-        proccollector: &mut ProcCollector,
+        netbox: &NetBox,
+        proccollector: &ProcCollector,
     ) {
         let mut out: String = String::default();
         let mut banner_mut: String = String::default();
@@ -139,7 +137,15 @@ impl<'a> Menu {
             if self.resized {
                 banner_mut = format!(
                     "{}{}{}{}{}{} ← esc{}{}Version: {}{}{}{}{}",
-                    banner::draw_banner((term.height / 2) as u32 - 10, 0, true, false, term, draw, key_class),
+                    banner::draw_banner(
+                        (term.height / 2) as u32 - 10,
+                        0,
+                        true,
+                        false,
+                        term,
+                        draw,
+                        key_class
+                    ),
                     mv::down(1),
                     mv::left(46),
                     Color::BlackBg(),
@@ -257,16 +263,7 @@ impl<'a> Menu {
                 }
 
                 if key == "q".to_owned() {
-                    clean_quit(
-                        None,
-                        None,
-                        key_class,
-                        collector,
-                        draw,
-                        term,
-                        CONFIG,
-                        None,
-                    );
+                    clean_quit(None, None, key_class, collector, draw, term, CONFIG, None);
                 } else if vec!["up", "mouse_scroll_up", "shift_tab"]
                     .iter()
                     .map(|s| s.clone().to_owned())
@@ -295,16 +292,7 @@ impl<'a> Menu {
                     || (key == "mouse_click".to_owned() && mouse_over)
                 {
                     if menu_current == "quit".to_owned() {
-                        clean_quit(
-                            None,
-                            None,
-                            key_class,
-                            collector,
-                            draw,
-                            term,
-                            CONFIG,
-                            None,
-                        );
+                        clean_quit(None, None, key_class, collector, draw, term, CONFIG, None);
                     } else if menu_current == "options".to_owned() {
                         self.options(
                             ARG_MODE,
@@ -329,7 +317,7 @@ impl<'a> Menu {
                         self.resized = true;
                     } else if menu_current == "help".to_owned() {
                         self.help(
-                            THEME, draw, term, key_class, collector, collectors, CONFIG, timer
+                            THEME, draw, term, key_class, collector, collectors, CONFIG, timer,
                         );
                         self.resized = true;
                     }
@@ -339,12 +327,10 @@ impl<'a> Menu {
             if timer.not_zero(CONFIG) && !self.resized {
                 skip = true;
             } else {
-                collector.collect(
-                    collectors, CONFIG, true, false, false, false, false,
-                );
-                collector.collect_done = Event::Wait;
-                collector.collect_done.wait(2.0);
-                collector.collect_done = Event::Flag(false);
+                collector.collect(collectors, CONFIG, true, false, false, false, false);
+                collector.set_collect_done(Event::Wait);
+                collector.get_collect_done_reference().wait(2.0);
+                collector.set_collect_done(Event::Flag(false));
 
                 if CONFIG.background_update {
                     self.background = format!(
@@ -366,14 +352,14 @@ impl<'a> Menu {
 
     pub fn help(
         &mut self,
-        theme: &mut Theme,
-        draw: &mut Draw,
-        term: &mut Term,
-        key_class: &mut Key,
-        collector: &mut Collector<'a>,
+        theme: &Theme,
+        draw: &Draw,
+        term: &Term,
+        key_class: &Key,
+        collector: &Collector<'a>,
         collectors: Vec<Collectors<'a>>,
-        CONFIG: &mut Config,
-        timer: &mut Timer,
+        CONFIG: &Config,
+        timer: &Timer,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -630,16 +616,7 @@ impl<'a> Menu {
                     }
 
                     if key == "q".to_owned() {
-                        clean_quit(
-                            None,
-                            None,
-                            key_class,
-                            collector,
-                            draw,
-                            term,
-                            CONFIG,
-                            None,
-                        );
+                        clean_quit(None, None, key_class, collector, draw, term, CONFIG, None);
                     } else if vec!["escape", "M", "enter", "backspace", "h", "f1"]
                         .contains(&key.as_str())
                     {
@@ -667,12 +644,10 @@ impl<'a> Menu {
                 if timer.not_zero(CONFIG) && !self.resized {
                     skip = true;
                 } else {
-                    collector.collect(
-                        collectors, CONFIG, true, false, false, false, false,
-                    );
-                    collector.collect_done = Event::Wait;
-                    collector.collect_done.wait(2.0);
-                    collector.collect_done = Event::Flag(false);
+                    collector.collect(collectors, CONFIG, true, false, false, false, false);
+                    collector.set_collect_done(Event::Wait);
+                    collector.get_collect_done_reference().wait(2.0);
+                    collector.set_collect_done(Event::Flag(false));
                     if CONFIG.background_update {
                         self.background = format!(
                             "{}{}{}",
@@ -697,23 +672,23 @@ impl<'a> Menu {
 
     pub fn options(
         &mut self,
-        ARG_MODE: &mut ViewMode,
-        THEME: &mut Theme,
-        theme: &mut Theme,
-        draw: &mut Draw,
-        term: &mut Term,
-        CONFIG: &mut Config,
-        key_class: &mut Key,
-        timer: &mut Timer,
-        netcollector: &mut NetCollector,
-        brshtop_box: &mut BrshtopBox,
+        ARG_MODE: ViewMode,
+        THEME: &Theme,
+        theme: &Theme,
+        draw: &Draw,
+        term: &Term,
+        CONFIG: &Config,
+        key_class: &Key,
+        timer: &Timer,
+        netcollector: &NetCollector,
+        brshtop_box: &BrshtopBox,
         boxes: Vec<Boxes>,
-        collector: &mut Collector<'a>,
-        init: &mut Init,
-        cpubox: &mut CpuBox,
-        cpucollector: &mut CpuCollector,
-        netbox: &mut NetBox,
-        proc_collector: &mut ProcCollector,
+        collector: &Collector<'a>,
+        init: &Init,
+        cpubox: &CpuBox,
+        cpucollector: &CpuCollector,
+        netbox: &NetBox,
+        proc_collector: &ProcCollector,
         collectors: Vec<Collectors<'a>>,
     ) {
         let mut out: String = String::default();
@@ -1520,9 +1495,9 @@ impl<'a> Menu {
                                                     .map(|(s, i)| (s.clone(), *i as i32))
                                                     .collect::<HashMap<String, i32>>();
                                                 } else if selected == "draw_clock".to_owned() {
-                                                    brshtop_box.clock_on =
-                                                        CONFIG.draw_clock.len() > 0;
-                                                    if !brshtop_box.clock_on {
+                                                    brshtop_box
+                                                        .set_clock_on(CONFIG.draw_clock.len() > 0);
+                                                    if !brshtop_box.get_clock_on() {
                                                         draw.clear(vec!["clock".to_owned()], true);
                                                     }
                                                 }
@@ -1543,6 +1518,7 @@ impl<'a> Menu {
                                             timer,
                                             CONFIG,
                                             THEME,
+                                            cpucollector,
                                         );
                                         self.resized = false;
                                     }
@@ -1570,16 +1546,7 @@ impl<'a> Menu {
                         input_val.push_str(key.as_str());
                     }
                 } else if key == "q".to_owned() {
-                    clean_quit(
-                        None,
-                        None,
-                        key_class,
-                        collector,
-                        draw,
-                        term,
-                        CONFIG,
-                        None,
-                    );
+                    clean_quit(None, None, key_class, collector, draw, term, CONFIG, None);
                 } else if ["escape", "o", "M", "f2"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
@@ -1659,7 +1626,7 @@ impl<'a> Menu {
                         if selected == "net_auto".to_owned() {
                             netcollector.auto_min = CONFIG.net_auto;
                         }
-                        netbox.redraw = true;
+                        netbox.set_redraw(true);
                     } else if selected == "theme_background".to_owned() {
                         term.bg = if CONFIG.theme_background {
                             theme.colors.main_bg
@@ -1684,6 +1651,7 @@ impl<'a> Menu {
                         timer,
                         CONFIG,
                         THEME,
+                        cpucollector,
                     );
                     self.resized = true;
                 } else if ["left", "right"]
@@ -1705,13 +1673,11 @@ impl<'a> Menu {
                             color_i = 0;
                         }
                     }
-                    collector.collect_idle = Event::Wait;
-                    collector.collect_idle.wait(-1.0);
-                    CONFIG.color_theme = theme.themes.keys().cloned().collect::<Vec<String>>()[color_i];
-                    mem::replace(
-                        THEME,
-                        Theme::from_str(CONFIG.color_theme).unwrap(),
-                    );
+                    collector.set_collect_idle(Event::Wait);
+                    collector.get_collect_idle_reference().wait(-1.0);
+                    CONFIG.color_theme =
+                        theme.themes.keys().cloned().collect::<Vec<String>>()[color_i];
+                    THEME.replace_self(Theme::from_str(CONFIG.color_theme).unwrap_or(Theme::default()));
                     term.refresh(
                         vec![],
                         boxes,
@@ -1726,6 +1692,7 @@ impl<'a> Menu {
                         timer,
                         CONFIG,
                         THEME,
+                        cpucollector,
                     );
                     timer.finish(key_class, CONFIG);
                 } else if ["left", "right"]
@@ -1780,8 +1747,8 @@ impl<'a> Menu {
                             cpu_sensor_i = 0;
                         }
                     }
-                    collector.collect_idle = Event::Wait;
-                    collector.collect_idle.wait(-1.0);
+                    collector.set_collect_idle(Event::Wait);
+                    collector.get_collect_idle_reference().wait(-1.0);
                     cpucollector.sensor_swap = true;
                     CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i];
                     if CONFIG.check_temp
@@ -1803,6 +1770,7 @@ impl<'a> Menu {
                             timer,
                             CONFIG,
                             THEME,
+                            cpucollector,
                         );
                         self.resized = false;
                     }
@@ -1825,10 +1793,10 @@ impl<'a> Menu {
                         }
                     }
                     CONFIG.view_mode = CONFIG.view_modes[view_mode_i];
-                    brshtop_box.proc_mode = CONFIG.view_mode == ViewMode::Proc;
-                    brshtop_box.stat_mode = CONFIG.view_mode == ViewMode::Stat;
-                    if ARG_MODE.clone() != ViewMode::None {
-                        mem::replace(ARG_MODE, ViewMode::None);
+                    brshtop_box.set_proc_mode(CONFIG.view_mode == ViewMode::Proc);
+                    brshtop_box.set_stat_mode(CONFIG.view_mode == ViewMode::Stat);
+                    if ARG_MODE != ViewMode::None {
+                        ARG_MODE.replace_self(ViewMode::None);
                     }
                     draw.clear(vec![], true);
                     term.refresh(
@@ -1845,6 +1813,7 @@ impl<'a> Menu {
                         timer,
                         CONFIG,
                         THEME,
+                        cpucollector,
                     );
                     self.resized = false;
                 } else if key == "up".to_owned() {
@@ -1887,11 +1856,9 @@ impl<'a> Menu {
             if timer.not_zero(CONFIG) && !self.resized {
                 skip = true;
             } else {
-                collector.collect(
-                    collectors, CONFIG, true, false, false, false, false,
-                );
-                collector.collect_done = Event::Wait;
-                collector.collect_done.wait(2.0);
+                collector.collect(collectors, CONFIG, true, false, false, false, false);
+                collector.set_collect_done(Event::Wait);
+                collector.get_collect_done_reference().wait(2.0);
                 if CONFIG.background_update {
                     self.background = format!(
                         "{}{}{}",

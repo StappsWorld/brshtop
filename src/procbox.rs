@@ -32,6 +32,7 @@ use {
     },
     std::{
         collections::HashMap,
+        convert::TryFrom,
         iter::Enumerate,
         path::*
     },
@@ -61,8 +62,8 @@ pub struct ProcBox {
     pub redraw : bool,
 }
 impl<'a> ProcBox {
-    pub fn new(brshtop_box: &mut BrshtopBox, CONFIG: &mut Config, ARG_MODE: ViewMode) -> Self {
-        brshtop_box.buffers.push("proc".to_owned());
+    pub fn new(brshtop_box: &BrshtopBox, CONFIG: &Config, ARG_MODE: ViewMode) -> Self {
+        brshtop_box.push_buffers("proc".to_owned());
         let procbox = ProcBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
             name: "proc".to_owned(),
@@ -86,36 +87,36 @@ impl<'a> ProcBox {
             pid_counter: HashMap::<u32, u32>::new(),
             redraw : true,
         };
-        procbox.parent.x = 1;
-        procbox.parent.y = 1;
-        procbox.parent.height_p = 68;
-        procbox.parent.width_p = 55;
-        procbox.parent.resized = true;
+        procbox.parent.set_x(1);
+        procbox.parent.set_y(1);
+        procbox.parent.set_height_p(68);
+        procbox.parent.set_width_p(55);
+        procbox.parent.set_resized(true);
         procbox
     }
 
-    pub fn calc_size(&mut self, term: &mut Term, brshtop_box: &mut BrshtopBox) {
-        let (width_p, height_p) = (self.parent.width_p, self.parent.height_p);
+    pub fn calc_size(&mut self, term: &Term, brshtop_box: &BrshtopBox) {
+        let (width_p, height_p) = (self.parent.get_width_p(), self.parent.get_height_p());
 
-        if self.parent.proc_mode {
+        if self.parent.get_proc_mode() {
             width_p = 100;
             height_p = 80;
         }
 
-        self.parent.width = (term.width as f64 * width_p as f64 / 100.0).round() as u32;
-        self.parent.width = (term.height as f64 * height_p as f64 / 100.0).round() as u32;
-        if self.parent.height + brshtop_box._b_cpu_h as u32 > term.height as u32 {
-            self.parent.height = term.height as u32 - brshtop_box._b_cpu_h as u32;
+        self.parent.set_width((term.width as f64 * width_p as f64 / 100.0).round() as u32);
+        self.parent.set_width((term.height as f64 * height_p as f64 / 100.0).round() as u32);
+        if self.parent.get_height() + brshtop_box.get_b_cpu_h() as u32 > term.height as u32 {
+            self.parent.set_height(u32::try_from(term.height as i32 - brshtop_box.get_b_cpu_h() as i32).unwrap_or(0));
         }
-        self.parent.x = term.width as u32 - self.parent.width + 1;
-        self.parent.y = brshtop_box._b_cpu_h as u32 + 1;
-        self.select_max = self.parent.height as usize - 3;
+        self.parent.set_x(u32::try_from(term.width as i32 - self.parent.get_width() as i32 + 1).unwrap_or(0));
+        self.parent.set_y(brshtop_box.get_b_cpu_h() as u32 + 1);
+        self.select_max = usize::try_from(self.parent.get_height() as i32 - 3).unwrap_or(0);
         self.redraw = true;
-        self.parent.resized = true;
+        self.parent.set_resized(true);
     }
 
-    pub fn draw_bg(&mut self, theme: &mut Theme, term : &mut Term) -> String {
-        if self.parent.stat_mode {
+    pub fn draw_bg(&mut self, theme: &Theme, term : &Term) -> String {
+        if self.parent.get_stat_mode() {
             return String::default();
         }
         return create_box(
@@ -139,10 +140,10 @@ impl<'a> ProcBox {
         &mut self,
         key: String,
         mouse_pos: (i32, i32),
-        proc_collector: &'a mut ProcCollector,
-        key_class: &mut Key,
-        collector: &'a mut Collector<'a>,
-        CONFIG: &mut Config,
+        proc_collector: &'a ProcCollector,
+        key_class: &Key,
+        collector: &'a Collector<'a>,
+        CONFIG: &Config,
     ) {
         let old = (self.start, self.selected);
 
@@ -193,7 +194,7 @@ impl<'a> ProcBox {
                 self.selected = self.select_max;
             }
         } else if key == "mouse_click".to_owned() {
-            if mouse_pos.0 > (self.parent.x + self.parent.width - 4) as i32
+            if mouse_pos.0 > self.parent.get_x() as i32 + self.parent.get_width() as i32 - 4
                 && self.current_y as i32 + 1 < mouse_pos.1
                 && mouse_pos.1 < self.current_y as i32 + 1 + self.select_max as i32 + 1
             {
@@ -267,34 +268,34 @@ impl<'a> ProcBox {
 
     pub fn draw_fg(
         &mut self,
-        CONFIG: &mut Config,
-        key: &mut Key,
-        THEME: &mut Theme,
-        graphs: &mut Graphs,
-        term: &mut Term,
-        draw : &mut Draw,
-        proc : &mut ProcCollector,
-        menu : &mut Menu,
+        CONFIG: & Config,
+        key: & Key,
+        THEME: & Theme,
+        graphs: & Graphs,
+        term: & Term,
+        draw : & Draw,
+        proc : & ProcCollector,
+        menu : & Menu,
     ) {
-        if self.parent.stat_mode {
+        if self.parent.get_stat_mode() {
             return;
         }
 
-        if proc.parent.proc_interrupt {
+        if proc.parent.get_proc_interrupt() {
             return;
         }
 
-        if proc.parent.redraw {
+        if proc.parent.get_redraw() {
             self.redraw = true;
         }
 
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
         let mut n: u32 = 0;
-        let mut x: u32 = self.parent.x + 1;
+        let mut x: u32 = self.parent.get_x() + 1;
         let mut y: u32 = self.current_y + 1;
-        let mut w: u32 = self.parent.width - 2;
-        let mut h: u32 = self.current_h - 2;
+        let mut w: u32 = u32::try_from(self.parent.get_width() as i32 - 2).unwrap_or(0);
+        let mut h: u32 = u32::try_from(self.current_h as i32 - 2).unwrap_or(0);
         let mut prog_len: usize = 0;
         let mut arg_len: usize = 0;
         let mut val: u64 = 0;
@@ -341,7 +342,7 @@ impl<'a> ProcBox {
                 dgw = w - 121;
             }
             dx = x + dgw + 2;
-            dy = self.parent.y + 1;
+            dy = self.parent.get_y() + 1;
         }
 
         if w > 67 {
@@ -379,9 +380,9 @@ impl<'a> ProcBox {
         }
 
         // * Buttons and titles only redrawn if needed
-        if self.parent.resized || self.redraw {
+        if self.parent.get_resized() || self.redraw {
             s_len += CONFIG.proc_sorting.to_string().len();
-            if self.parent.resized || s_len != self.s_len || proc.detailed {
+            if self.parent.get_resized() || s_len != self.s_len || proc.detailed {
                 self.s_len = s_len;
                 for k in [
                     "e", "r", "c", "t", "k", "i", "enter", "left", " ", "f", "delete",
@@ -418,12 +419,12 @@ impl<'a> ProcBox {
                 } else {
                     THEME.colors.inactive_fg
                 };
-                if self.current_y != self.parent.y + 8
-                    || self.parent.resized
+                if self.current_y != self.parent.get_y() + 8
+                    || self.parent.get_resized()
                     || graphs.detailed_cpu.NotImplemented
                 {
-                    self.current_y = self.parent.y + 8;
-                    self.current_h = self.parent.height - 8;
+                    self.current_y = self.parent.get_y() + 8;
+                    self.current_h = u32::try_from(self.parent.get_height() as i32 - 8).unwrap_or(0);
                     for i in 0..7 as u32 {
                         out_misc.push_str(
                             format!("{}{}", mv::to(dy + i, x), " ".repeat(w as usize)).as_str(),
@@ -637,7 +638,7 @@ impl<'a> ProcBox {
                     );
                 }
 
-                if graphs.detailed_cpu.NotImplemented || self.parent.resized {
+                if graphs.detailed_cpu.NotImplemented || self.parent.get_resized() {
                     graphs.detailed_cpu = Graph::new(
                         (dgw + 1) as i32,
                         7,
@@ -661,15 +662,15 @@ impl<'a> ProcBox {
                         None
                     );
                 }
-                self.select_max = self.parent.height as usize - 11;
-                y = self.parent.y + 9;
-                h = self.parent.height - 10;
+                self.select_max = usize::try_from(self.parent.get_height() as i32 - 11).unwrap_or(0);
+                y = u32::try_from(self.parent.get_y() as i32 + 9).unwrap_or(0);
+                h = u32::try_from(self.parent.get_height() as i32 - 10).unwrap_or(0);
             } else {
-                if self.current_y != self.parent.y || self.parent.resized {
-                    self.current_y = self.parent.y;
-                    self.current_h = self.parent.height;
-                    y = self.parent.y + 1;
-                    h = self.parent.height - 2;
+                if self.current_y != self.parent.get_y() || self.parent.get_resized() {
+                    self.current_y = self.parent.get_y();
+                    self.current_h = self.parent.get_height();
+                    y = self.parent.get_y() + 1;
+                    h = u32::try_from(self.parent.get_height() as i32 - 2).unwrap_or(0);
                     out_misc.push_str(format!("{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
                             mv::to(y - 1, x - 1),
                             THEME.colors.proc_box,
@@ -690,7 +691,7 @@ impl<'a> ProcBox {
                         .as_str()
                     );
                 }
-                self.select_max = self.parent.height as usize - 3;
+                self.select_max = usize::try_from(self.parent.get_height() as i32 - 3).unwrap_or(0);
             }
 
             sort_pos = (x + w) as usize - CONFIG.proc_sorting.to_string().len() - 7;
@@ -832,7 +833,7 @@ impl<'a> ProcBox {
                 );
             }
 
-            if !key.mouse.contains_key(&"f".to_owned()) || self.parent.resized {
+            if !key.mouse.contains_key(&"f".to_owned()) || self.parent.get_resized() {
                 let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0.. if proc.search_filter.len() == 0 {6} else {2 + proc.search_filter[(proc.search_filter.len() - 11)..].len()} {
@@ -1758,7 +1759,7 @@ impl<'a> ProcBox {
 
         // * Draw scrollbar if needed
         if proc.num_procs > self.select_max as u32 {
-            if self.parent.resized {
+            if self.parent.get_resized() {
                 match key.mouse.get_mut(&"mouse_scroll_up".to_owned()) {
                     Some(v) => {
                         let mut top = Vec::<Vec<i32>>::new();
@@ -1839,7 +1840,7 @@ impl<'a> ProcBox {
 
         draw.buffer(self.buffer, vec![format!("{}{}{}", out_misc, out, term.fg)], false, false, 100, menu.active, false, false, key);
         self.redraw = false;
-        self.parent.resized = false;
+        self.parent.set_resized(false);
         self.moved = false;
     }
 }

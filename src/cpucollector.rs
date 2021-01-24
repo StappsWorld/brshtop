@@ -12,8 +12,7 @@ use {
         meter::Meters,
         term::Term,
         theme::Theme,
-        CONFIG_DIR, CORES, CORE_MAP, SYSTEM,
-        THREADS,
+        CONFIG_DIR, CORES, CORE_MAP, SYSTEM, THREADS,
     },
     hhmmss::Hhmmss,
     psutil::sensors::*,
@@ -71,10 +70,10 @@ impl<'a> CpuCollector<'a> {
     }
     pub fn collect(
         &mut self,
-        CONFIG: &mut Config,
-        term: &mut Term,
-        cpu_box: &mut CpuBox,
-        brshtop_box: &mut BrshtopBox,
+        CONFIG: &Config,
+        term: &Term,
+        cpu_box: &CpuBox,
+        brshtop_box: &BrshtopBox,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -159,23 +158,23 @@ impl<'a> CpuCollector<'a> {
 
     pub fn draw(
         &mut self,
-        cpu_box: &mut CpuBox,
-        CONFIG: &mut Config,
-        key: &mut Key,
-        THEME: &mut Theme,
-        term: &mut Term,
-        draw: &mut Draw,
+        cpu_box: &CpuBox,
+        CONFIG: &Config,
+        key: &Key,
+        THEME: &Theme,
+        term: &Term,
+        draw: &Draw,
         ARG_MODE: ViewMode,
-        graphs: &mut Graphs,
-        meters: &mut Meters,
-        menu: &mut Menu,
+        graphs: &Graphs,
+        meters: &Meters,
+        menu: &Menu,
     ) {
         cpu_box.draw_fg(
             self, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu, THEME,
         );
     }
 
-    pub fn get_sensors(&mut self, CONFIG: &mut Config) {
+    pub fn get_sensors(&mut self, CONFIG: &Config) {
         self.sensor_method = String::from("");
 
         if SYSTEM.to_owned() == "MacOS".to_owned() {
@@ -261,10 +260,10 @@ impl<'a> CpuCollector<'a> {
 
     pub fn collect_temps(
         &mut self,
-        CONFIG: &mut Config,
-        cpu_box: &mut CpuBox,
-        brshtop_box: &mut BrshtopBox,
-        term: &mut Term,
+        CONFIG: &Config,
+        cpu_box: &CpuBox,
+        brshtop_box: &BrshtopBox,
+        term: &Term,
     ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
@@ -601,7 +600,7 @@ impl<'a> CpuCollector<'a> {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.calc_size(term, brshtop_box ,self);
+                            cpu_box.calc_size(term, brshtop_box, self);
                             return;
                         }
                     };
@@ -627,7 +626,7 @@ impl<'a> CpuCollector<'a> {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.calc_size(term, brshtop_box ,self);
+                            cpu_box.calc_size(term, brshtop_box, self);
                             return;
                         }
                     };

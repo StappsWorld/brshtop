@@ -3,19 +3,19 @@ use {
         config::{Config, ViewMode},
         cpubox::CpuBox,
         cpucollector::CpuCollector,
-        CPU_NAME,
         draw::Draw,
         error::*,
         fx,
         key::Key,
         membox::MemBox,
-        netbox::NetBox,
         menu::Menu,
-        mv, 
+        mv,
+        netbox::NetBox,
         procbox::ProcBox,
         symbol,
         term::Term,
         theme::Theme,
+        CPU_NAME,
     },
     battery::Manager,
     chrono::{offset::Local, DateTime},
@@ -24,15 +24,16 @@ use {
 };
 
 pub enum Boxes<'a> {
-    BrshtopBox(&'a mut BrshtopBox),
-    CpuBox(&'a mut CpuBox),
-    MemBox(&'a mut MemBox),
-    NetBox(&'a mut NetBox),
-    ProcBox(&'a mut ProcBox),
+    BrshtopBox(&'a BrshtopBox),
+    CpuBox(&'a CpuBox),
+    MemBox(&'a MemBox),
+    NetBox(&'a NetBox),
+    ProcBox(&'a ProcBox),
 }
 
 pub enum SubBoxes<'a> {
-    CpuBox(&'a mut CpuBox),
+    CpuBox(&'a CpuBox),
+    NetBox(&'a NetBox),
 }
 
 #[derive(Clone)]
@@ -59,7 +60,7 @@ pub struct BrshtopBox {
     clock_custom_format: HashMap<String, String>,
 }
 impl BrshtopBox {
-    pub fn new(config: &mut Config, ARG_MODE: ViewMode) -> Self {
+    pub fn new(config: &Config, ARG_MODE: ViewMode) -> Self {
         let proc_mode_mut = (config.view_mode == ViewMode::Proc && ARG_MODE == ViewMode::None)
             || ARG_MODE == ViewMode::Proc;
         let stat_mode_mut = (config.view_mode == ViewMode::Stat && ARG_MODE == ViewMode::None)
@@ -110,22 +111,28 @@ impl BrshtopBox {
         }
     }
 
-    pub fn calc_sizes(&mut self, boxes: Vec<Boxes>, term: &mut Term, CONFIG : &mut Config, cpu : &mut CpuCollector) {
+    pub fn calc_sizes(
+        &mut self,
+        boxes: Vec<Boxes>,
+        term: &Term,
+        CONFIG: &Config,
+        cpu: &CpuCollector,
+    ) {
         for sub in boxes {
             match sub {
                 Boxes::BrshtopBox(b) => (),
                 Boxes::CpuBox(b) => {
                     b.calc_size(term, self, cpu);
                     b.set_parent_resized(true);
-                },
+                }
                 Boxes::MemBox(b) => {
                     b.calc_size(term, self, CONFIG);
                     b.set_parent_resized(true);
-                },
+                }
                 Boxes::NetBox(n) => {
                     n.calc_size(term, self);
-                    n.parent.resized = true;
-                },
+                    n.set_parent_resized(true);
+                }
                 Boxes::ProcBox(p) => {
                     p.calc_size(term, self);
                     p.parent.resized = true;
@@ -138,16 +145,18 @@ impl BrshtopBox {
     pub fn draw_update_ms(
         &mut self,
         now: bool,
-        config: &mut Config,
-        cpu_box: &mut CpuBox,
-        key: &mut Key,
-        draw: &mut Draw,
-        menu: &mut Menu,
-        theme: &mut Theme,
-        term: &mut Term,
+        config: &Config,
+        cpu_box: &CpuBox,
+        key: &Key,
+        draw: &Draw,
+        menu: &Menu,
+        theme: &Theme,
+        term: &Term,
     ) {
         let mut update_string: String = format!("{}ms", config.update_ms);
-        let xpos: u32 = cpu_box.get_parent().get_x() + cpu_box.get_parent().get_width() - (update_string.len() as u32) - 15;
+        let xpos: u32 = cpu_box.get_parent().get_x() + cpu_box.get_parent().get_width()
+            - (update_string.len() as u32)
+            - 15;
 
         if !key.mouse.contains_key(&"+".to_owned()) {
             let mut add_for_mouse_parent = Vec::<Vec<i32>>::new();
@@ -161,7 +170,10 @@ impl BrshtopBox {
             let mut sub_for_mouse_parent = Vec::<Vec<i32>>::new();
             let mut sub_for_mouse = Vec::<i32>::new();
             for i in 0..3 {
-                sub_for_mouse.push((cpu_box.get_parent().get_x() + cpu_box.get_parent().get_width() - 4 + i) as i32);
+                sub_for_mouse.push(
+                    (cpu_box.get_parent().get_x() + cpu_box.get_parent().get_width() - 4 + i)
+                        as i32,
+                );
                 sub_for_mouse.push(cpu_box.get_parent().get_y() as i32);
             }
             sub_for_mouse_parent.push(sub_for_mouse);
@@ -190,7 +202,10 @@ impl BrshtopBox {
                     theme.colors.title.call(update_string, term),
                     theme.colors.hi_fg.call("-".to_owned(), term),
                     fx::ub,
-                    theme.colors.cpu_box.call(symbol::title_right.to_owned(), term)
+                    theme
+                        .colors
+                        .cpu_box
+                        .call(symbol::title_right.to_owned(), term)
                 ),
             ],
             false,
@@ -223,13 +238,13 @@ impl BrshtopBox {
     pub fn draw_clock(
         &mut self,
         force: bool,
-        term: &mut Term,
-        config: &mut Config,
-        theme: &mut Theme,
-        menu: &mut Menu,
-        cpu_box: &mut CpuBox,
-        draw: &mut Draw,
-        key : &mut Key,
+        term: &Term,
+        config: &Config,
+        theme: &Theme,
+        menu: &Menu,
+        cpu_box: &CpuBox,
+        draw: &Draw,
+        key: &Key,
     ) {
         let mut out: String = String::default();
 
@@ -287,7 +302,8 @@ impl BrshtopBox {
                 symbol::title_left,
                 fx::b,
                 theme
-                    .colors.title
+                    .colors
+                    .title
                     .call(clock_string[..clock_len as usize].to_string(), term),
                 fx::ub,
                 theme.colors.cpu_box,
@@ -327,14 +343,14 @@ impl BrshtopBox {
     pub fn draw_bg(
         &mut self,
         now: bool,
-        draw: &mut Draw,
+        draw: &Draw,
         subclasses: Vec<Boxes>,
-        menu: &mut Menu,
-        config: &mut Config,
-        cpu_box: &mut CpuBox,
-        key: &mut Key,
-        theme: &mut Theme,
-        term: &mut Term,
+        menu: &Menu,
+        config: &Config,
+        cpu_box: &CpuBox,
+        key: &Key,
+        theme: &Theme,
+        term: &Term,
     ) {
         draw.buffer(
             "bg".to_owned(),
@@ -368,7 +384,7 @@ impl BrshtopBox {
         self.name.clone()
     }
 
-    pub fn set_name(&mut self, name : String) {
+    pub fn set_name(&mut self, name: String) {
         self.name = name.clone()
     }
 
@@ -376,7 +392,7 @@ impl BrshtopBox {
         self.height_p.clone()
     }
 
-    pub fn set_height_p(&mut self, height_p : u32) {
+    pub fn set_height_p(&mut self, height_p: u32) {
         self.height_p = height_p.clone()
     }
 
@@ -384,7 +400,7 @@ impl BrshtopBox {
         self.width_p.clone()
     }
 
-    pub fn set_width_p(&mut self, width_p : u32) {
+    pub fn set_width_p(&mut self, width_p: u32) {
         self.width_p = width_p
     }
 
@@ -392,7 +408,7 @@ impl BrshtopBox {
         self.x.clone()
     }
 
-    pub fn set_x(&mut self, x : u32) {
+    pub fn set_x(&mut self, x: u32) {
         self.x = x.clone()
     }
 
@@ -400,7 +416,7 @@ impl BrshtopBox {
         self.y.clone()
     }
 
-    pub fn set_y(&mut self, y : u32) {
+    pub fn set_y(&mut self, y: u32) {
         self.y = y.clone()
     }
 
@@ -408,7 +424,7 @@ impl BrshtopBox {
         self.width.clone()
     }
 
-    pub fn set_width(&mut self, width : u32) {
+    pub fn set_width(&mut self, width: u32) {
         self.width = width.clone()
     }
 
@@ -416,7 +432,7 @@ impl BrshtopBox {
         self.height.clone()
     }
 
-    pub fn set_height(&mut self, height : u32) {
+    pub fn set_height(&mut self, height: u32) {
         self.height = height.clone()
     }
 
@@ -424,7 +440,7 @@ impl BrshtopBox {
         self.proc_mode.clone()
     }
 
-    pub fn set_proc_mode(&mut self, proc_mode : bool) {
+    pub fn set_proc_mode(&mut self, proc_mode: bool) {
         self.proc_mode = proc_mode.clone()
     }
 
@@ -432,7 +448,7 @@ impl BrshtopBox {
         self.stat_mode.clone()
     }
 
-    pub fn set_stat_mode(&mut self, stat_mode : bool) {
+    pub fn set_stat_mode(&mut self, stat_mode: bool) {
         self.stat_mode = stat_mode.clone()
     }
 
@@ -440,7 +456,7 @@ impl BrshtopBox {
         self.out.clone()
     }
 
-    pub fn set_out(&mut self, out : String) {
+    pub fn set_out(&mut self, out: String) {
         self.out = out.clone()
     }
 
@@ -448,7 +464,7 @@ impl BrshtopBox {
         self.bg.clone()
     }
 
-    pub fn set_bg(&mut self, bg : String) {
+    pub fn set_bg(&mut self, bg: String) {
         self.bg = bg.clone()
     }
 
@@ -456,7 +472,7 @@ impl BrshtopBox {
         self._b_cpu_h.clone()
     }
 
-    pub fn set_b_cpu_h(&mut self, _b_cpu_h : i32) {
+    pub fn set_b_cpu_h(&mut self, _b_cpu_h: i32) {
         self._b_cpu_h = _b_cpu_h.clone()
     }
 
@@ -464,7 +480,7 @@ impl BrshtopBox {
         self._b_mem_h.clone()
     }
 
-    pub fn set_b_mem_h(&mut self, _b_mem_h : i32) {
+    pub fn set_b_mem_h(&mut self, _b_mem_h: i32) {
         self._b_mem_h = _b_mem_h.clone()
     }
 
@@ -472,7 +488,7 @@ impl BrshtopBox {
         self.redraw_all.clone()
     }
 
-    pub fn set_redraw_all(&mut self, redraw_all : bool) {
+    pub fn set_redraw_all(&mut self, redraw_all: bool) {
         self.redraw_all = redraw_all.clone()
     }
 
@@ -480,22 +496,22 @@ impl BrshtopBox {
         self.buffers.clone()
     }
 
-    pub fn set_buffers(&mut self, buffers : Vec<String>) {
+    pub fn set_buffers(&mut self, buffers: Vec<String>) {
         self.buffers = buffers.clone()
     }
 
-    pub fn push_buffers(&mut self, element : String) {
+    pub fn push_buffers(&mut self, element: String) {
         self.buffers.push(element.clone())
     }
 
-    pub fn get_buffers_index(&self, index : usize) -> Option<String> {
+    pub fn get_buffers_index(&self, index: usize) -> Option<String> {
         match self.buffers.get(index) {
             Some(s) => Some(s.to_owned().clone()),
-            None => None
+            None => None,
         }
     }
 
-    pub fn set_buffers_index(&mut self, index : usize, element : String) {
+    pub fn set_buffers_index(&mut self, index: usize, element: String) {
         self.buffers.insert(index, element.clone())
     }
 
@@ -503,7 +519,7 @@ impl BrshtopBox {
         self.clock_on.clone()
     }
 
-    pub fn set_clock_on(&mut self, clock_on : bool) {
+    pub fn set_clock_on(&mut self, clock_on: bool) {
         self.clock_on = clock_on.clone()
     }
 
@@ -511,7 +527,7 @@ impl BrshtopBox {
         self.clock.clone()
     }
 
-    pub fn set_clock(&mut self, clock : String) {
+    pub fn set_clock(&mut self, clock: String) {
         self.clock = clock.clone()
     }
 
@@ -519,7 +535,7 @@ impl BrshtopBox {
         self.clock_len.clone()
     }
 
-    pub fn set_clock_len(&mut self, clock_len : u32) {
+    pub fn set_clock_len(&mut self, clock_len: u32) {
         self.clock_len = clock_len.clone()
     }
 
@@ -527,7 +543,7 @@ impl BrshtopBox {
         self.resized.clone()
     }
 
-    pub fn set_resized(&mut self, resized : bool) {
+    pub fn set_resized(&mut self, resized: bool) {
         self.resized = resized.clone()
     }
 
@@ -535,19 +551,19 @@ impl BrshtopBox {
         self.clock_custom_format.clone()
     }
 
-    pub fn set_clock_custom_format(&mut self, clock_custom_format : HashMap<String, String>) {
+    pub fn set_clock_custom_format(&mut self, clock_custom_format: HashMap<String, String>) {
         self.clock_custom_format = clock_custom_format.clone()
     }
 
-    pub fn get_clock_custom_format_index(&self, index : String) -> Option<String> {
+    pub fn get_clock_custom_format_index(&self, index: String) -> Option<String> {
         match self.clock_custom_format.get(&index) {
             Some(s) => Some(s.to_owned().clone()),
             None => None,
         }
     }
 
-    pub fn set_clock_custom_format_index(&mut self, index : String, element : String) {
-        self.clock_custom_format.insert(index.clone(), element.clone());
+    pub fn set_clock_custom_format_index(&mut self, index: String, element: String) {
+        self.clock_custom_format
+            .insert(index.clone(), element.clone());
     }
-
 }

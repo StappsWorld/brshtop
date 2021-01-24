@@ -1,9 +1,5 @@
-
 use {
-    crate::{
-        event::Event,
-        key::Key,
-    },
+    crate::{event::Event, key::Key},
     std::{
         collections::HashMap,
         io::{self, Write},
@@ -11,28 +7,27 @@ use {
 };
 
 pub struct Draw {
-    pub strings : HashMap<String, String>,
-    pub z_order : HashMap<String, i32>,
-    pub saved : HashMap<String, String>,
-    pub save : HashMap<String, bool>,
-    pub once : HashMap<String, bool>,
-    pub idle : Event,
+    pub strings: HashMap<String, String>,
+    pub z_order: HashMap<String, i32>,
+    pub saved: HashMap<String, String>,
+    pub save: HashMap<String, bool>,
+    pub once: HashMap<String, bool>,
+    pub idle: Event,
 }
 impl Draw {
-
     pub fn new() -> Self {
         Draw {
-            strings : HashMap::<String, String>::new(),
-            z_order : HashMap::<String, i32>::new(),
-            saved : HashMap::<String, String>::new(),
-            save : HashMap::<String, bool>::new(),
-            once : HashMap::<String, bool>::new(),
-            idle : Event::Flag(true),
+            strings: HashMap::<String, String>::new(),
+            z_order: HashMap::<String, i32>::new(),
+            saved: HashMap::<String, String>::new(),
+            save: HashMap::<String, bool>::new(),
+            once: HashMap::<String, bool>::new(),
+            idle: Event::Flag(true),
         }
     }
 
     /// Wait for input reader and self to be idle then print to screen
-    pub fn now(&mut self, args : Vec<String>, key : &mut Key) {
+    pub fn now(&mut self, args: Vec<String>, key: &Key) {
         key.idle = Event::Wait;
         key.idle.wait(-1.0);
         key.idle = Event::Flag(false);
@@ -45,16 +40,26 @@ impl Draw {
         key.idle = Event::Flag(true);
     }
 
-
     /// Defaults append: bool = False, now: bool = False, z: int = 100, only_save: bool = False, no_save: bool = False, once: bool = False
-    pub fn buffer(&mut self, name : String, args : Vec<String>, append : bool, now : bool, z : i32, only_save : bool, no_save : bool, once : bool, key : &mut Key) {
-        let string : String = String::default();
-        let mut append_mut : bool = append.clone();
+    pub fn buffer(
+        &mut self,
+        name: String,
+        args: Vec<String>,
+        append: bool,
+        now: bool,
+        z: i32,
+        only_save: bool,
+        no_save: bool,
+        once: bool,
+        key: &Key,
+    ) {
+        let string: String = String::default();
+        let mut append_mut: bool = append.clone();
         if name.starts_with("+") {
             name = name.strip_prefix("+").unwrap().to_owned();
             append_mut = true;
         }
-        let mut now_mut : bool = now.clone();
+        let mut now_mut: bool = now.clone();
         if name.ends_with("!") {
             name = name.strip_suffix("!").unwrap().to_owned();
             now_mut = true;
@@ -85,13 +90,13 @@ impl Draw {
     }
 
     /// Defaults clear = false
-    pub fn out(&mut self, names : Vec<String>, clear : bool, key : &mut Key) {
-        let mut out : String = String::default();
+    pub fn out(&mut self, names: Vec<String>, clear: bool, key: &Key) {
+        let mut out: String = String::default();
         if self.strings.len() == 0 {
             return;
         }
         if names.len() > 0 {
-            let mut z_order_sort : Vec<(&String, &i32)> = self.z_order.iter().collect();
+            let mut z_order_sort: Vec<(&String, &i32)> = self.z_order.iter().collect();
             z_order_sort.sort_by(|a, b| b.1.cmp(a.1));
             for (name, value) in z_order_sort {
                 if names.contains(name) && self.strings.contains_key(name) {
@@ -113,9 +118,9 @@ impl Draw {
     }
 
     pub fn saved_buffer(&mut self) -> String {
-        let mut out : String = String::default();
+        let mut out: String = String::default();
 
-        let mut z_order_sort : Vec<(&String, &i32)> = self.z_order.iter().collect();
+        let mut z_order_sort: Vec<(&String, &i32)> = self.z_order.iter().collect();
         z_order_sort.sort_by(|a, b| b.1.cmp(a.1));
         for (name, value) in z_order_sort {
             if self.saved.contains_key(name) {
@@ -126,12 +131,12 @@ impl Draw {
     }
 
     /// Defaults saved = false
-    pub fn clear(&mut self, names : Vec<String>, saved : bool) {
+    pub fn clear(&mut self, names: Vec<String>, saved: bool) {
         if names.len() > 0 {
             for name in names {
                 if self.strings.contains_key(&name) {
                     self.strings.remove(&name);
-                } 
+                }
                 if self.save.contains_key(&name) {
                     self.save.remove(&name);
                 }

@@ -63,9 +63,9 @@ pub fn draw_banner(
     mut col: u32, /*TODO: Same*/
     center: bool,
     now: bool,
-    term : &mut Term,
-    draw : &mut Draw,
-    key : &mut Key,
+    term : & Term,
+    draw : & Draw,
+    key : & Key,
 ) -> String {
     let mut out = String::new();
     if center {

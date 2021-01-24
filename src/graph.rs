@@ -29,7 +29,7 @@ pub enum ColorSwitch {
 // FIXME
 // REMINDER: i store Colors, py stores Strings, convert them to escapes when used :)
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Graph {
     pub out: String,
     pub width: u32,
@@ -53,7 +53,7 @@ impl Graph {
         height: i32,
         color: Option<ColorSwitch>,
         data: Vec<i32>,
-        term: &mut Term,
+        term: &Term,
         invert: bool,
         max_value: i32,
         offset: i32,
@@ -171,7 +171,7 @@ impl Graph {
         height: u32,
         color: Vec<String>,
         data: Vec<i32>, // TODO: Data type
-        term: &mut Term,
+        term: &Term,
         invert: bool,
         max_value: i32,
         offset: i32,
@@ -293,7 +293,7 @@ impl Graph {
         self
     }
 
-    fn _refresh_data(&mut self, term: &mut Term) {
+    fn _refresh_data(&mut self, term: &Term) {
         let value_width = (self._data.len() as f32 / 2.).ceil() as i32;
 
         self._data = if self._data.is_empty() {
@@ -327,7 +327,7 @@ impl Graph {
         self._create(true, term);
     }
 
-    fn _create(&mut self, new: bool, term: &mut Term) {
+    fn _create(&mut self, new: bool, term: &Term) {
         let mut value = hashmap! {
             "left" => 0,
             "right" => 0,
@@ -454,7 +454,7 @@ impl Graph {
         }
     }
 
-    pub fn call(&mut self, value: Option<i32>, term: &mut Term) -> String {
+    pub fn call(&mut self, value: Option<i32>, term: &Term) -> String {
         if let Some(value) = value {
             self.current = !self.current;
 
@@ -504,7 +504,7 @@ impl Graph {
         self.out.clone()
     }
 
-    pub fn add(&mut self, value: Option<i32>, term: &mut Term) -> String {
+    pub fn add(&mut self, value: Option<i32>, term: &Term) -> String {
         self.call(value, term)
     }
 }

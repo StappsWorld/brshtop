@@ -20,7 +20,7 @@ use {
         process::{os::unix::ProcessExt, *},
         Bytes, Count, Pid,
     },
-    std::{cmp::Ordering, collections::HashMap, convert::TryInto, fmt::Display},
+    std::{cmp::Ordering, collections::HashMap, convert::TryFrom, fmt::Display},
 };
 
 #[derive(Clone)]
@@ -130,7 +130,7 @@ pub struct ProcCollector<'a> {
     pub p_values: Vec<String>,
 }
 impl<'a> ProcCollector<'a> {
-    pub fn new(procbox : &mut ProcBox) -> Self {
+    pub fn new(procbox: &ProcBox) -> Self {
         let mut proc = ProcCollector {
             parent: Collector::new(),
             buffer: procbox.buffer.clone(),
@@ -166,13 +166,8 @@ impl<'a> ProcCollector<'a> {
     }
 
     /// List all processess with pid, name, arguments, threads, username, memory percent and cpu percent
-    pub fn collect(
-        &mut self,
-        brshtop_box: &mut BrshtopBox,
-        CONFIG: &mut Config,
-        procbox: &mut ProcBox,
-    ) {
-        if brshtop_box.stat_mode {
+    pub fn collect(&mut self, brshtop_box: &BrshtopBox, CONFIG: &Config, procbox: &ProcBox) {
+        if brshtop_box.get_stat_mode() {
             return;
         }
 
@@ -196,7 +191,7 @@ impl<'a> ProcCollector<'a> {
             let processes = ProcCollector::get_sorted_processes(sorting, reverse);
 
             for p in processes {
-                if self.parent.collect_interrupt || self.parent.proc_interrupt {
+                if self.parent.get_collect_interrupt() || self.parent.get_proc_interrupt() {
                     return;
                 }
                 let name: String = match p.name() {
@@ -330,7 +325,13 @@ impl<'a> ProcCollector<'a> {
         }
 
         if self.detailed {
-            self.expand = ((procbox.parent.width - 2) - ((procbox.parent.width - 2) / 3) - 40) / 10;
+            self.expand = u32::try_from(
+                ((procbox.parent.get_width() as i32 - 2)
+                    - ((procbox.parent.get_width() as i32 - 2) / 3)
+                    - 40)
+                    / 10,
+            )
+            .unwrap_or(0);
             if self.expand > 5 {
                 self.expand = 5;
             }
@@ -674,10 +675,10 @@ impl<'a> ProcCollector<'a> {
                     20.0
                 },
             ) as u32);
-            if self.details_cpu.len() as u32 > procbox.parent.width {
+            if self.details_cpu.len() as u32 > procbox.parent.get_width() {
                 self.details_cpu.remove(0);
             }
-            if self.details_mem.len() as u32 > procbox.parent.width {
+            if self.details_mem.len() as u32 > procbox.parent.get_width() {
                 self.details_mem.remove(0);
             }
         }
@@ -764,7 +765,7 @@ impl<'a> ProcCollector<'a> {
         reverse: bool,
         proc_per_cpu: bool,
         search: String,
-        CONFIG: &mut Config,
+        CONFIG: &Config,
     ) {
         let mut out: HashMap<Pid, HashMap<String, ProcCollectorDetails>> =
             HashMap::<Pid, HashMap<String, ProcCollectorDetails>>::new();
@@ -777,7 +778,7 @@ impl<'a> ProcCollector<'a> {
         let mut n: usize = 0;
 
         for p in ProcCollector::get_sorted_processes(sort_type, reverse) {
-            if self.parent.collect_interrupt {
+            if self.parent.get_collect_interrupt() {
                 return;
             }
             match p.ppid() {
@@ -902,7 +903,7 @@ impl<'a> ProcCollector<'a> {
         }
         self.det_cpu = det_cpu;
 
-        if self.parent.collect_interrupt {
+        if self.parent.get_collect_interrupt() {
             return;
         }
         if self.tree_counter >= 100 {
@@ -922,7 +923,7 @@ impl<'a> ProcCollector<'a> {
                     s1.to_owned(),
                     h.iter()
                         .map(|(s, p)| (s.clone(), ProcessInfo::from(p.to_owned())))
-                        .collect::<HashMap<String, ProcessInfo>>()
+                        .collect::<HashMap<String, ProcessInfo>>(),
                 )
             })
             .collect::<HashMap<u32, HashMap<String, ProcessInfo>>>();
@@ -938,12 +939,12 @@ impl<'a> ProcCollector<'a> {
         found: bool,
         depth: u32,
         collapse_to: Option<Pid>,
-        infolist: &mut HashMap<Pid, HashMap<String, ProcCollectorDetails>>,
-        proc_per_cpu: &mut bool,
-        search: &mut String,
-        out: &mut HashMap<Pid, HashMap<String, ProcCollectorDetails>>,
-        det_cpu: &mut f64,
-        CONFIG: &mut Config,
+        infolist: &HashMap<Pid, HashMap<String, ProcCollectorDetails>>,
+        proc_per_cpu: &bool,
+        search: &String,
+        out: &HashMap<Pid, HashMap<String, ProcCollectorDetails>>,
+        det_cpu: &f64,
+        CONFIG: &Config,
     ) {
         let mut name: String = String::default();
         let mut threads: u64 = 0;
@@ -956,7 +957,7 @@ impl<'a> ProcCollector<'a> {
             HashMap::<String, ProcCollectorDetails>::new();
         let mut mem_b: Bytes = 0;
         let mut cmd: String = String::default();
-        if self.parent.collect_interrupt {
+        if self.parent.get_collect_interrupt() {
             return;
         }
         let name: String = match psutil::process::Process::new(pid) {
@@ -1060,7 +1061,9 @@ impl<'a> ProcCollector<'a> {
                             if proc_per_cpu.to_owned() {
                                 f.to_owned()
                             } else {
-                                format!("{:.2}", f / THREADS.to_owned() as f32).parse::<f32>().unwrap_or(0.0)
+                                format!("{:.2}", f / THREADS.to_owned() as f32)
+                                    .parse::<f32>()
+                                    .unwrap_or(0.0)
                             }
                         }
                         _ => {
@@ -1092,7 +1095,9 @@ impl<'a> ProcCollector<'a> {
                                         Some(p) => match p {
                                             ProcCollectorDetails::String(s) => s.clone().as_str(),
                                             _ => {
-                                                errlog("Malformed type in getinfo['name']".to_owned());
+                                                errlog(
+                                                    "Malformed type in getinfo['name']".to_owned(),
+                                                );
                                                 ""
                                             }
                                         },
@@ -1143,34 +1148,28 @@ impl<'a> ProcCollector<'a> {
             match collapse_to {
                 Some(u) => {
                     if search.len() == 0 {
-                        out[&u][&"threads".to_owned()] = match out[&u]
-                            [&"threads".to_owned()]
-                        {
+                        out[&u][&"threads".to_owned()] = match out[&u][&"threads".to_owned()] {
                             ProcCollectorDetails::U64(n) => ProcCollectorDetails::U64(n + threads),
                             _ => {
                                 errlog(format!("Malformed type in out[{}]['threads']", u));
                                 ProcCollectorDetails::U64(0)
                             }
                         };
-                        out[&u][&"mem".to_owned()] = match out[&u][&"mem".to_owned()]
-                        {
+                        out[&u][&"mem".to_owned()] = match out[&u][&"mem".to_owned()] {
                             ProcCollectorDetails::F32(f) => ProcCollectorDetails::F32(f + mem),
                             _ => {
                                 errlog(format!("Malformed type in out[{}]['mem']", u));
                                 ProcCollectorDetails::F32(0.0)
                             }
                         };
-                        out[&u][&"mem_b".to_owned()] = match out[&u]
-                            [&"mem_b".to_owned()]
-                        {
+                        out[&u][&"mem_b".to_owned()] = match out[&u][&"mem_b".to_owned()] {
                             ProcCollectorDetails::U64(n) => ProcCollectorDetails::U64(n + mem_b),
                             _ => {
                                 errlog(format!("Malformed type in out[{}]['mem_b']", u));
                                 ProcCollectorDetails::U64(0)
                             }
                         };
-                        out[&u][&"cpu".to_owned()] = match out[&u][&"cpu".to_owned()]
-                        {
+                        out[&u][&"cpu".to_owned()] = match out[&u][&"cpu".to_owned()] {
                             ProcCollectorDetails::F32(f) => ProcCollectorDetails::F32(f + cpu),
                             _ => {
                                 errlog(format!("Malformed type in out[{}]['cpu']", u));
@@ -1229,7 +1228,10 @@ impl<'a> ProcCollector<'a> {
         if !tree.contains_key(&pid) {
             return;
         }
-        let children: Vec<u32> = tree[&pid][..tree[&pid].len() - 2].iter().map(|u| u.to_owned()).collect::<Vec<u32>>();
+        let children: Vec<u32> = tree[&pid][..tree[&pid].len() - 2]
+            .iter()
+            .map(|u| u.to_owned())
+            .collect::<Vec<u32>>();
 
         for child in children {
             ProcCollector::create_tree(
@@ -1270,14 +1272,14 @@ impl<'a> ProcCollector<'a> {
     /// JUST CALL ProcBox.draw_fg()
     pub fn draw(
         &mut self,
-        procbox: &mut ProcBox,
-        CONFIG: &mut Config,
-        key: &mut Key,
-        THEME: &mut Theme,
-        graphs: &mut Graphs,
-        term: &mut Term,
-        draw: &mut Draw,
-        menu: &mut Menu,
+        procbox: &ProcBox,
+        CONFIG: &Config,
+        key: &Key,
+        THEME: &Theme,
+        graphs: &Graphs,
+        term: &Term,
+        draw: &Draw,
+        menu: &Menu,
     ) {
         procbox.draw_fg(CONFIG, key, THEME, graphs, term, draw, self, menu)
     }

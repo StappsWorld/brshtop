@@ -71,10 +71,10 @@ pub struct NetCollector<'a> {
     pub sync_string: String,
 }
 impl<'a> NetCollector<'a> {
-    pub fn new(netbox: &mut NetBox, CONFIG: &mut Config) -> Self {
+    pub fn new(netbox: &NetBox, CONFIG: &Config) -> Self {
         NetCollector {
             parent: Collector::new(),
-            buffer: netbox.buffer.clone(),
+            buffer: netbox.get_buffer().clone(),
             nics: Vec::<&'a Nic>::new(),
             nic_i: 0,
             nic: None,
@@ -162,12 +162,7 @@ impl<'a> NetCollector<'a> {
         self.nic = Some(self.nics[self.nic_i as usize]);
     }
 
-    pub fn switch(
-        &'a mut self,
-        key: String,
-        collector: &'a mut Collector<'a>,
-        CONFIG: &mut Config,
-    ) {
+    pub fn switch(&'a mut self, key: String, collector: &'a Collector<'a>, CONFIG: &Config) {
         if self.nics.len() < 2 {
             return;
         }
@@ -193,7 +188,7 @@ impl<'a> NetCollector<'a> {
         }
     }
 
-    pub fn collect(&mut self, CONFIG: &mut Config, netbox: &mut NetBox) {
+    pub fn collect(&mut self, CONFIG: &Config, netbox: &NetBox) {
         let mut speed: i32 = 0;
         let mut stat: HashMap<String, NetCollectorStat> =
             HashMap::<String, NetCollectorStat>::new();
@@ -447,11 +442,11 @@ impl<'a> NetCollector<'a> {
                         }
                         if direction == "upload".to_owned() {
                             self.reset = false;
-                            netbox.redraw = true;
+                            netbox.set_redraw(true);
                         }
                     }
 
-                    if speed_vec.len() as u32 > netbox.parent.width * 2 {
+                    if speed_vec.len() as u32 > netbox.get_parent().get_width() * 2 {
                         speed_vec.remove(0);
                     }
 
@@ -644,7 +639,7 @@ impl<'a> NetCollector<'a> {
                         self.sync_top = c_max;
                         self.sync_string =
                             floating_humanizer(self.sync_top as f64, false, false, 0, false);
-                        netbox.redraw = true;
+                        netbox.set_redraw(true);
                     }
                 }
             }
@@ -658,15 +653,15 @@ impl<'a> NetCollector<'a> {
     /// JUST CALL NETBOX.draw_fg()
     pub fn draw(
         &mut self,
-        netbox: &mut NetBox,
-        theme: &mut Theme,
-        key: &mut Key,
-        term: &mut Term,
-        CONFIG: &mut Config,
-        draw: &mut Draw,
-        graphs: &mut Graphs,
-        menu: &mut Menu,
+        netbox: &NetBox,
+        theme: &Theme,
+        key: &Key,
+        term: &Term,
+        CONFIG: &Config,
+        draw: &Draw,
+        graphs: &Graphs,
+        menu: &Menu,
     ) {
-        netbox.draw_fg(theme, key, term, CONFIG, draw, graphs, menu)
+        netbox.draw_fg(theme, key, term, CONFIG, draw, graphs, menu, self)
     }
 }

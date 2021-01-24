@@ -29,7 +29,7 @@ impl Init {
         }
     }
 
-    pub fn start(&mut self, draw: &mut Draw, key: &mut Key, term: &mut Term) {
+    pub fn start(&mut self, draw: &Draw, key: &Key, term: &Term) {
         draw.buffer(
             "init".to_owned(),
             vec![],
@@ -155,7 +155,7 @@ impl Init {
         );
     }
 
-    pub fn success(&mut self, CONFIG: &mut Config, draw: &mut Draw, term: &mut Term, key : &mut Key) {
+    pub fn success(&mut self, CONFIG: &Config, draw: &Draw, term: &Term, key : &Key) {
         if !CONFIG.show_init || self.resized {
             return;
         }
@@ -181,11 +181,11 @@ impl Init {
 
     pub fn fail(
         err: String,
-        CONFIG: &mut Config,
-        draw: &mut Draw,
-        collector: &mut Collector,
-        key: &mut Key,
-        term : &mut Term,
+        CONFIG: & Config,
+        draw: & Draw,
+        collector: &Collector,
+        key: & Key,
+        term : & Term,
     ) {
         if CONFIG.show_init {
             draw.buffer(
@@ -218,7 +218,7 @@ impl Init {
     }
 
     /// Defaults times : 5
-    pub fn draw_bg(&mut self, times: u32, draw: &mut Draw, term: &mut Term, key: &mut Key) {
+    pub fn draw_bg(&mut self, times: u32, draw: & Draw, term: & Term, key: & Key) {
         for _ in 0..times {
             thread::sleep(time::Duration::from_secs_f32(0.05));
             let mut rng = rand::thread_rng();
@@ -252,7 +252,7 @@ impl Init {
         }
     }
 
-    pub fn done(&mut self, CONFIG: &mut Config, draw: &mut Draw, term: &mut Term, key: &mut Key) {
+    pub fn done(&mut self, CONFIG: & Config, draw: & Draw, term: & Term, key: & Key) {
         self.running = false;
         if !CONFIG.show_init {
             return;

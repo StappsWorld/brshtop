@@ -129,7 +129,7 @@ impl Color {
         }
     }
 
-    pub fn call(&mut self, adder: String, term: &mut Term) -> Color {
+    pub fn call(&mut self, adder: String, term: &Term) -> Color {
         if adder.len() < 1 {
             return Color::default();
         }
@@ -459,6 +459,14 @@ pub struct Theme {
         }
 
         Ok(new_theme)
+    }
+
+    pub fn replace_self(&mut self, theme : Theme) {
+        self.themes = theme.themes.clone();
+        self.cached = theme.cached.clone();
+        self.current = theme.current.clone();
+        self.gradient = theme.gradient.clone();
+        self.colors = theme.colors.clone();
     }
     
 }

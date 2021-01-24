@@ -260,7 +260,7 @@ pub fn main() {
         )
         .get_matches();
 
-    let mut ARG_MODE: &mut ViewMode = &mut ViewMode::None;
+    let mut ARG_MODE: ViewMode = ViewMode::None;
     let arg_full = matches.value_of("Full Mode");
     let arg_proc = matches.value_of("Minimal Mode (proc)");
     let arg_stat = matches.value_of("Minimal Mode (stat)");
@@ -268,11 +268,11 @@ pub fn main() {
     let arg_debug = matches.value_of("Debug");
 
     if arg_full.is_some() {
-        ARG_MODE = &mut ViewMode::Full;
+        ARG_MODE = ViewMode::Full;
     } else if arg_proc.is_some() {
-        ARG_MODE = &mut ViewMode::Proc
+        ARG_MODE = ViewMode::Proc
     } else if arg_stat.is_some() {
-        ARG_MODE = &mut ViewMode::Stat;
+        ARG_MODE = ViewMode::Stat;
     }
 
     let DEBUG = arg_debug.is_some();
@@ -380,11 +380,11 @@ pub fn main() {
             .collect::<Vec<String>>(),
     );
 
-    let CONFIG: &mut Config = match Config::new(CONFIG_FILE.clone()) {
-        Ok(c) => &mut c,
+    let mut CONFIG: Config = match Config::new(CONFIG_FILE.clone()) {
+        Ok(c) => c,
         Err(e) => {
             throw_error(e);
-            &mut Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
+            Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
         }
     };
 
@@ -407,16 +407,16 @@ pub fn main() {
     let mut b = brshtop::Brshtop::new();
     b._init();
 
-    let mut THEME: &mut Theme = match Theme::from_file(THEME_DIR.to_owned().as_path()) {
+    let mut THEME: Theme = match Theme::from_file(THEME_DIR.to_owned().as_path()) {
         Ok(r) => match r {
-            Ok(t) => &mut t,
+            Ok(t) => t,
             Err(e) => {
                 errlog(format!(
                     "Unable to read Theme in directory '{}' (error {}), falling back to default",
                     THEME_DIR.to_owned().to_str().unwrap(),
                     e
                 ));
-                &mut Theme::default()
+                Theme::default()
             }
         },
         Err(e) => {
@@ -425,64 +425,64 @@ pub fn main() {
                 THEME_DIR.to_owned().to_str().unwrap(),
                 e
             ));
-            &mut Theme::default()
+            Theme::default()
         }
     };
 
     // Pre main ---------------------------------------------------------------------------------------------
-    let mut term: &mut Term = &mut Term::new();
+    let mut term: Term = Term::new();
 
-    let mut key: &mut Key = &mut Key::new();
+    let mut key: Key = Key::new();
 
-    let mut draw: &mut Draw = &mut Draw::new();
+    let mut draw: Draw = Draw::new();
 
-    let mut brshtop_box: &mut BrshtopBox = &mut BrshtopBox::new(&mut CONFIG, *ARG_MODE);
+    let mut brshtop_box: BrshtopBox = BrshtopBox::new(&CONFIG, ARG_MODE);
 
-    let mut cpu_box: &mut CpuBox = &mut CpuBox::new(&mut brshtop_box, &mut CONFIG, *ARG_MODE);
+    let mut cpu_box: CpuBox = CpuBox::new(&brshtop_box, &CONFIG, ARG_MODE);
 
-    let mut mem_box: &mut MemBox = &mut MemBox::new(&mut brshtop_box, &mut CONFIG, *ARG_MODE);
+    let mut mem_box: MemBox = MemBox::new(&brshtop_box, &CONFIG, ARG_MODE);
 
-    let mut net_box: &mut NetBox = &mut NetBox::new(&mut CONFIG, *ARG_MODE, &mut brshtop_box);
+    let mut net_box: NetBox = NetBox::new(&CONFIG, ARG_MODE, &brshtop_box);
 
-    let mut proc_box: &mut ProcBox = &mut ProcBox::new(&mut brshtop_box, &mut CONFIG, *ARG_MODE);
+    let mut proc_box: ProcBox = ProcBox::new(&brshtop_box, &CONFIG, ARG_MODE);
 
-    let mut collector: &mut Collector = &mut Collector::new();
+    let mut collector: Collector = Collector::new();
 
-    let mut cpu_collector: &mut CpuCollector = &mut CpuCollector::new();
+    let mut cpu_collector: CpuCollector = CpuCollector::new();
 
-    let mut mem_collector: &mut MemCollector = &mut MemCollector::new(&mut mem_box);
+    let mut mem_collector: MemCollector = MemCollector::new(&mem_box);
 
-    let mut net_collector: &mut NetCollector = &mut NetCollector::new(&mut net_box, &mut CONFIG);
+    let mut net_collector: NetCollector = NetCollector::new(&net_box, &CONFIG);
 
-    let mut proc_collector: &mut ProcCollector = &mut ProcCollector::new(&mut proc_box);
+    let mut proc_collector: ProcCollector = ProcCollector::new(&proc_box);
 
-    let mut menu: &mut Menu = &mut Menu::new(MENUS, MENU_COLORS);
+    let mut menu: Menu = Menu::new(MENUS, MENU_COLORS);
 
-    let mut timer: &mut Timer = &mut Timer::new();
+    let mut timer: Timer = Timer::new();
 
-    let mut timeit: &mut TimeIt = &mut TimeIt::new();
+    let mut timeit: TimeIt = TimeIt::new();
 
-    let mut init: &mut Init = &mut Init::new();
+    let mut init: Init = Init::new();
 
-    let mut updatechecker: &mut UpdateChecker = &mut UpdateChecker::new();
+    let mut updatechecker: UpdateChecker = UpdateChecker::new();
 
     let mut collectors: Vec<Collectors> = vec![
-        Collectors::MemCollector(mem_collector),
-        Collectors::NetCollector(net_collector),
-        Collectors::ProcCollector(proc_collector),
-        Collectors::CpuCollector(cpu_collector),
+        Collectors::MemCollector(&mem_collector),
+        Collectors::NetCollector(&net_collector),
+        Collectors::ProcCollector(&proc_collector),
+        Collectors::CpuCollector(&cpu_collector),
     ];
 
     let mut boxes: Vec<Boxes> = vec![
-        Boxes::CpuBox(&mut cpu_box),
-        Boxes::MemBox(&mut mem_box),
-        Boxes::NetBox(&mut net_box),
-        Boxes::ProcBox(&mut proc_box),
+        Boxes::CpuBox(&cpu_box),
+        Boxes::MemBox(&mem_box),
+        Boxes::NetBox(&net_box),
+        Boxes::ProcBox(&proc_box),
     ];
 
-    let mut graphs: &mut Graphs = &mut Graphs::default();
+    let mut graphs: Graphs = Graphs::default();
 
-    let mut meters: &mut Meters = &mut Meters::default();
+    let mut meters: Meters = Meters::default();
 
     // Main -----------------------------------------------------------------------------------------------
 
@@ -510,23 +510,24 @@ pub fn main() {
             term.mouse_on,
             Term::title("BRShtop".to_owned()),
         ],
-        key,
+        &key,
     );
     Term::echo(false);
     term.refresh(
         vec![],
         boxes,
-        collector,
-        init,
-        cpu_box,
-        draw,
+        &collector,
+        &init,
+        &cpu_box,
+        &draw,
         true,
-        key,
-        menu,
-        brshtop_box,
-        timer,
-        CONFIG,
-        THEME,
+        &key,
+        &menu,
+        &brshtop_box,
+        &timer,
+        &CONFIG,
+        &THEME,
+        &cpu_collector,
     );
 
     // Start a thread checking for updates while running init
@@ -536,7 +537,7 @@ pub fn main() {
 
     // Draw banner and init status
     if CONFIG.show_init && !init.resized {
-        init.start(draw, key, term);
+        init.start(&draw, &key, &term);
     }
 
     // Load theme
@@ -555,17 +556,17 @@ pub fn main() {
             false,
             false,
             false,
-            key,
+            &key,
         );
     }
-    THEME = &mut match Theme::from_str(CONFIG.color_theme) {
+    THEME = match Theme::from_str(CONFIG.color_theme) {
         Ok(t) => {
-            init.success(CONFIG, draw, term, key);
+            init.success(&CONFIG, &draw, &term, &key);
             t
         }
         Err(e) => {
             errlog(format!("Unable to read theme from config (error {})...", e));
-            Init::fail(e, CONFIG, draw, collector, key, term);
+            Init::fail(e, &CONFIG, &draw, &collector, &key, &term);
             Theme::default()
         }
     };
@@ -586,14 +587,16 @@ pub fn main() {
             false,
             false,
             false,
-            key,
+            &key,
         );
         if CONFIG.check_temp {
-            cpu_collector.get_sensors(CONFIG);
+            cpu_collector.get_sensors(&CONFIG);
         }
-        brshtop_box.calc_sizes(boxes, term, CONFIG, cpu_collector);
-        brshtop_box.draw_bg(false, draw, boxes, menu, CONFIG, cpu_box, key, THEME, term);
-        init.success(CONFIG, draw, term, key);
+        brshtop_box.calc_sizes(boxes, &term, &CONFIG, &cpu_collector);
+        brshtop_box.draw_bg(
+            false, &draw, boxes, &menu, &CONFIG, &cpu_box, &key, &THEME, &term,
+        );
+        init.success(&CONFIG, &draw, &term, &key);
     }
 
     // Setup signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH
@@ -613,7 +616,7 @@ pub fn main() {
             false,
             false,
             false,
-            key,
+            &key,
         );
     }
 
@@ -621,70 +624,72 @@ pub fn main() {
         //Handling ctrl-z, resume, ctrl-c, terminal resized
         Ok(s) => s,
         Err(e) => {
-            Init::fail(e.to_string(), CONFIG, draw, collector, key, term);
+            Init::fail(e.to_string(), &CONFIG, &draw, &collector, &key, &term);
             return;
         }
     };
     thread::spawn(move || {
         for sig in signals.forever() {
             match sig {
-                SIGTSTP => match now_sleeping(key, collector, draw, term) {
+                SIGTSTP => match now_sleeping(&key, &collector, &draw, &term) {
                     Some(_) => (),
                     None => clean_quit(
                         None,
                         Some("Failed to pause program".to_owned()),
-                        key,
-                        collector,
-                        draw,
-                        term,
-                        CONFIG,
+                        &key,
+                        &collector,
+                        &draw,
+                        &term,
+                        &CONFIG,
                         None,
                     ),
                 },
                 SIGCONT => now_awake(
-                    draw,
-                    term,
-                    key,
-                    brshtop_box,
-                    collector,
+                    &draw,
+                    &term,
+                    &key,
+                    &brshtop_box,
+                    &collector,
                     boxes,
-                    init,
-                    cpu_box,
-                    menu,
-                    timer,
-                    CONFIG,
-                    THEME,
+                    &init,
+                    &cpu_box,
+                    &menu,
+                    &timer,
+                    &CONFIG,
+                    &THEME,
                     DEBUG,
                     collectors,
-                    timeit,
+                    &timeit,
                     ARG_MODE,
-                    graphs,
-                    meters,
-                    net_box,
-                    proc_box,
-                    mem_box,
+                    &graphs,
+                    &meters,
+                    &net_box,
+                    &proc_box,
+                    &mem_box,
+                    &cpu_collector,
                 ),
-                SIGINT => clean_quit(None, None, key, collector, draw, term, CONFIG, None),
+                SIGINT => clean_quit(None, None, &key, &collector, &draw, &term, &CONFIG, None),
                 SIGWINCH => term.refresh(
                     vec![],
                     boxes,
-                    collector,
-                    init,
-                    cpu_box,
-                    draw,
+                    &collector,
+                    &init,
+                    &cpu_box,
+                    &draw,
                     true,
-                    key,
-                    menu,
-                    brshtop_box,
-                    timer,
-                    CONFIG,
-                    THEME,
+                    &key,
+                    &menu,
+                    &brshtop_box,
+                    &timer,
+                    &CONFIG,
+                    &THEME,
+                    &cpu_collector,
                 ),
                 _ => unreachable!(),
             }
         }
     });
-    init.success(CONFIG, draw, term, key);
+    init.success(&CONFIG, &draw, &term, &key);
 
     // Start a separate thread for reading keyboard input
     if CONFIG.show_init {
@@ -702,11 +707,11 @@ pub fn main() {
             false,
             false,
             false,
-            key,
+            &key,
         );
     }
-    key.start(draw, menu);
-    init.success(CONFIG, draw, term, key);
+    key.start(&draw, &menu);
+    init.success(&CONFIG, &draw, &term, &key);
 
     // Start a separate thread for data collection and drawing
     if CONFIG.show_init {
@@ -724,29 +729,29 @@ pub fn main() {
             false,
             false,
             false,
-            key,
+            &key,
         );
     }
     collector.start(
-        CONFIG,
+        &CONFIG,
         DEBUG,
         collectors,
-        brshtop_box,
-        timeit,
-        menu,
-        draw,
-        term,
-        cpu_box,
-        key,
-        THEME,
+        &brshtop_box,
+        &timeit,
+        &menu,
+        &draw,
+        &term,
+        &cpu_box,
+        &key,
+        &THEME,
         ARG_MODE,
-        graphs,
-        meters,
-        net_box,
-        proc_box,
-        mem_box,
+        &graphs,
+        &meters,
+        &net_box,
+        &proc_box,
+        &mem_box,
     );
-    init.success(CONFIG, draw, term, key);
+    init.success(&CONFIG, &draw, &term, &key);
 
     // Collect data and draw to buffer
     if CONFIG.show_init {
@@ -764,11 +769,11 @@ pub fn main() {
             false,
             false,
             false,
-            key,
+            &key,
         );
     }
-    collector.collect(collectors, CONFIG, false, false, false, false, false);
-    init.success(CONFIG, draw, term, key);
+    collector.collect(collectors, &CONFIG, false, false, false, false, false);
+    init.success(&CONFIG, &draw, &term, &key);
 
     // Draw to screen
     if CONFIG.show_init {
@@ -786,30 +791,31 @@ pub fn main() {
             false,
             false,
             false,
-            key,
+            &key,
         );
     }
-    collector.collect_done = Event::Wait;
-    collector.collect_done.wait(-1.0);
-    init.success(CONFIG, draw, term, key);
+    collector.set_collect_done(Event::Wait);
+    collector.get_collect_done_reference().wait(-1.0);
+    init.success(&CONFIG, &draw, &term, &key);
 
-    init.done(CONFIG, draw, term, key);
+    init.done(&CONFIG, &draw, &term, &key);
     term.refresh(
         vec![],
         boxes,
-        collector,
-        init,
-        cpu_box,
-        draw,
+        &collector,
+        &init,
+        &cpu_box,
+        &draw,
         false,
-        key,
-        menu,
-        brshtop_box,
-        timer,
-        CONFIG,
-        THEME,
+        &key,
+        &menu,
+        &brshtop_box,
+        &timer,
+        &CONFIG,
+        &THEME,
+        &cpu_collector,
     );
-    draw.out(vec![], true, key);
+    draw.out(vec![], true, &key);
     if CONFIG.draw_clock.len() > 0 {
         brshtop_box.set_clock_on(true);
     }
@@ -819,54 +825,54 @@ pub fn main() {
 
     // Main loop ------------------------------------------------------------------------------------->
     run(
-        term,
-        key,
-        timer,
-        collector,
+        &term,
+        &key,
+        &timer,
+        &collector,
         boxes,
-        init,
-        cpu_box,
-        draw,
-        menu,
-        brshtop_box,
-        CONFIG,
-        THEME,
-        &mut ARG_MODE,
-        proc_box,
-        proc_collector,
-        net_collector,
-        cpu_collector,
-        net_box,
-        updatechecker,
+        &init,
+        &cpu_box,
+        &draw,
+        &menu,
+        &brshtop_box,
+        &CONFIG,
+        &THEME,
+        ARG_MODE,
+        &proc_box,
+        &proc_collector,
+        &net_collector,
+        &cpu_collector,
+        &net_box,
+        &updatechecker,
         collectors,
-        mem_collector,
-        graphs,
+        &mem_collector,
+        &graphs,
     );
 }
 
 pub fn run<'a>(
-    term: &mut Term,
-    key: &mut Key,
-    timer: &mut Timer,
-    collector: &'a mut Collector<'a>,
+    term: &Term,
+    key: &Key,
+    timer: &Timer,
+    collector: &'a Collector<'a>,
     boxes: Vec<Boxes>,
-    init: &mut Init,
-    cpu_box: &mut CpuBox,
-    draw: &mut Draw,
-    menu: &mut Menu,
-    brshtop_box: &mut BrshtopBox,
-    CONFIG: &mut Config,
-    THEME: &mut Theme,
-    ARG_MODE: &mut ViewMode,
-    procbox: &mut ProcBox,
-    proccollector: &'a mut ProcCollector<'a>,
-    netcollector: &'a mut NetCollector<'a>,
-    cpucollector: &mut CpuCollector,
-    netbox: &mut NetBox,
-    update_checker: &mut UpdateChecker,
+    init: &Init,
+    cpu_box: &CpuBox,
+    draw: &Draw,
+    menu: &Menu,
+    brshtop_box: &BrshtopBox,
+    CONFIG: &Config,
+    THEME: &Theme,
+    ARG_MODE: ViewMode,
+    procbox: &ProcBox,
+    proccollector: &'a ProcCollector<'a>,
+    netcollector: &'a NetCollector<'a>,
+    cpucollector: &CpuCollector,
+    netbox: &NetBox,
+    update_checker: &UpdateChecker,
     collectors: Vec<Collectors<'a>>,
-    memcollector: &'a mut MemCollector<'a>,
-    graphs: &mut Graphs,
+    memcollector: &'a MemCollector<'a>,
+    graphs: &Graphs,
 ) {
     loop {
         term.refresh(
@@ -883,10 +889,11 @@ pub fn run<'a>(
             timer,
             CONFIG,
             THEME,
+            cpucollector,
         );
         timer.stamp();
 
-        while timer.not_zero(CONFIG) {
+        while timer.not_zero(&CONFIG) {
             if key.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
                 process_keys(
                     ARG_MODE,
@@ -931,8 +938,8 @@ pub fn create_box(
     title_color: Option<Color>,
     fill: bool,
     box_to_use: Option<Boxes>,
-    term: &mut Term,
-    THEME: &mut Theme,
+    term: &Term,
+    THEME: &Theme,
 ) -> String {
     let mut out: String = format!("{}{}", term.fg, term.bg);
     let mut lc: Color = match line_color {
@@ -979,18 +986,20 @@ pub fn create_box(
                 wt = parent_box.get_name();
             }
             Boxes::NetBox(b) => {
-                wx = b.get_x() as u32;
-                wy = b.get_y() as u32;
-                ww = b.get_parent().get_width();
-                wh = b.get_parent().get_height();
-                wt = b.get_name();
+                let parent_box = b.get_parent();
+                wx = parent_box.get_x();
+                wy = parent_box.get_y();
+                ww = parent_box.get_width();
+                wh = parent_box.get_height();
+                wt = parent_box.get_name();
             }
             Boxes::ProcBox(b) => {
-                wx = b.get_parent().get_x();
-                wy = b.get_parent().get_y();
-                ww = b.get_parent().get_width();
-                wh = b.get_parent().get_height();
-                wt = b.get_name();
+                let parent_box = b.parent;
+                wx = parent_box.get_x();
+                wy = parent_box.get_y();
+                ww = parent_box.get_width();
+                wh = parent_box.get_height();
+                wt = parent_box.get_name();
             }
         },
         None => (),
@@ -1120,11 +1129,11 @@ pub fn min_max(value: i32, min_value: i32, max_value: i32) -> i32 {
 pub fn clean_quit(
     errcode: Option<i32>,
     errmsg: Option<String>,
-    key: &mut Key,
-    collector: &mut Collector,
-    draw: &mut Draw,
-    term: &mut Term,
-    CONFIG: &mut Config,
+    key: &Key,
+    collector: &Collector,
+    draw: &Draw,
+    term: &Term,
+    CONFIG: &Config,
     SELF_START: Option<SystemTime>,
 ) {
     key.stop();
@@ -1327,28 +1336,28 @@ pub fn units_to_bytes(value: String) -> u64 {
 }
 
 pub fn process_keys<'a>(
-    ARG_MODE: &mut ViewMode,
-    key_class: &mut Key,
-    procbox: &mut ProcBox,
-    collector: &'a mut Collector<'a>,
-    proccollector: &'a mut ProcCollector,
-    CONFIG: &mut Config,
-    draw: &mut Draw,
-    term: &mut Term,
-    brshtop_box: &mut BrshtopBox,
-    cpu_box: &mut CpuBox,
-    menu: &mut Menu,
-    THEME: &mut Theme,
-    netcollector: &'a mut NetCollector<'a>,
-    init: &mut Init,
-    cpucollector: &mut CpuCollector,
+    ARG_MODE: ViewMode,
+    key_class: &Key,
+    procbox: &ProcBox,
+    collector: &'a Collector<'a>,
+    proccollector: &'a ProcCollector,
+    CONFIG: &Config,
+    draw: &Draw,
+    term: &Term,
+    brshtop_box: &BrshtopBox,
+    cpu_box: &CpuBox,
+    menu: &Menu,
+    THEME: &Theme,
+    netcollector: &'a NetCollector<'a>,
+    init: &Init,
+    cpucollector: &CpuCollector,
     boxes: Vec<Boxes>,
-    netbox: &mut NetBox,
-    update_checker: &mut UpdateChecker,
+    netbox: &NetBox,
+    update_checker: &UpdateChecker,
     collectors: Vec<Collectors<'a>>,
-    timer: &mut Timer,
-    memcollector: &'a mut MemCollector,
-    graphs: &mut Graphs,
+    timer: &Timer,
+    memcollector: &'a MemCollector,
+    graphs: &Graphs,
 ) {
     let mut mouse_pos: (i32, i32) = (0, 0);
     let mut filtered: bool = false;
@@ -1364,7 +1373,7 @@ pub fn process_keys<'a>(
             .contains(&key)
         {
             mouse_pos = key_class.get_mouse();
-            if mouse_pos.0 >= procbox.get_parent().get_x() as i32
+            if mouse_pos.0 >= procbox.parent.get_x() as i32
                 && procbox.current_y as i32 + 1 <= mouse_pos.1
                 && mouse_pos.1 < (procbox.current_y + procbox.current_h - 1) as i32
             {
@@ -1419,9 +1428,9 @@ pub fn process_keys<'a>(
                 false,
             );
             if filtered {
-                collector.collect_done = Event::Wait;
-                collector.collect_done.wait(0.1);
-                collector.collect_done = Event::Flag(false);
+                collector.set_collect_done(Event::Wait);
+                collector.get_collect_done_reference().wait(0.1);
+                collector.set_collect_done(Event::Flag(false));
             }
             filtered = true;
             continue;
@@ -1451,25 +1460,25 @@ pub fn process_keys<'a>(
             .contains(&key)
         {
             menu.main(
-                THEME,
-                draw,
-                term,
-                update_checker,
-                THEME,
-                key_class,
-                timer,
-                collector,
+                &THEME,
+                &draw,
+                &term,
+                &update_checker,
+                &THEME,
+                &key_class,
+                &timer,
+                &collector,
                 collectors,
-                CONFIG,
+                &CONFIG,
                 ARG_MODE,
-                netcollector,
-                brshtop_box,
-                init,
-                cpu_box,
-                cpucollector,
+                &netcollector,
+                &brshtop_box,
+                &init,
+                &cpu_box,
+                &cpucollector,
                 boxes,
-                netbox,
-                proccollector,
+                &netbox,
+                &proccollector,
             );
         } else if vec!["o", "f2"]
             .iter()
@@ -1610,8 +1619,8 @@ pub fn process_keys<'a>(
                 false,
             );
         } else if key == "s".to_owned() {
-            collector.collect_idle = Event::Wait;
-            collector.collect_idle.wait(-1.0);
+            collector.set_collect_idle(Event::Wait);
+            collector.get_collect_idle_reference().wait(-1.0);
             CONFIG.swap_disk = !CONFIG.swap_disk;
             collector.collect(
                 vec![Collectors::<'a>::MemCollector(memcollector)],
@@ -1637,8 +1646,8 @@ pub fn process_keys<'a>(
                 true,
             );
         } else if key == "m".to_owned() {
-            if *ARG_MODE != ViewMode::None {
-                ARG_MODE = &mut ViewMode::None;
+            if ARG_MODE != ViewMode::None {
+                ARG_MODE = ViewMode::None;
             } else if CONFIG
                 .view_modes
                 .iter()
@@ -1673,6 +1682,7 @@ pub fn process_keys<'a>(
                 timer,
                 CONFIG,
                 THEME,
+                cpucollector,
             );
         } else if vec!["t", "k", "i"]
             .iter()
@@ -1722,13 +1732,13 @@ pub fn process_keys<'a>(
                 procbox.last_selection = procbox.selected;
                 procbox.selected = 0;
                 proccollector.detailed_pid = Some(procbox.selected_pid);
-                procbox.get_parent().set_resized(true);
+                procbox.parent.set_resized(true);
             } else if proccollector.detailed {
                 procbox.selected = procbox.last_selection;
                 procbox.last_selection = 0;
                 proccollector.detailed = false;
                 proccollector.detailed_pid = None;
-                procbox.get_parent().set_resized(true);
+                procbox.parent.set_resized(true);
             } else {
                 continue;
             }
@@ -1819,12 +1829,7 @@ fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader
 }
 
 /// Reset terminal settings and stop background input read before putting to sleep
-pub fn now_sleeping(
-    key: &mut Key,
-    collector: &mut Collector,
-    draw: &mut Draw,
-    term: &mut Term,
-) -> Option<()> {
+pub fn now_sleeping(key: &Key, collector: &Collector, draw: &Draw, term: &Term) -> Option<()> {
     match key.stop() {
         Some(b) => {
             if b {
@@ -1859,27 +1864,28 @@ pub fn now_sleeping(
 
 /// Set terminal settings and restart background input read
 pub fn now_awake<'a>(
-    draw: &'static mut Draw,
-    term: &'static mut Term,
-    key: &'static mut Key,
-    brshtop_box: &'static mut BrshtopBox,
-    collector: &'static mut Collector,
+    draw: &'static Draw,
+    term: &'static Term,
+    key: &'static Key,
+    brshtop_box: &'static BrshtopBox,
+    collector: &'static Collector,
     boxes: Vec<Boxes>,
-    init: &mut Init,
-    cpu_box: &'static mut CpuBox,
-    menu: &'static mut Menu,
-    timer: &mut Timer,
-    CONFIG: &'static mut Config,
-    THEME: &'static mut Theme,
+    init: &Init,
+    cpu_box: &'static CpuBox,
+    menu: &'static Menu,
+    timer: &Timer,
+    CONFIG: &'static Config,
+    THEME: &'static Theme,
     DEBUG: bool,
     collectors: Vec<Collectors<'static>>,
-    timeit: &'static mut TimeIt,
-    ARG_MODE: &'static mut ViewMode,
-    graphs: &'static mut Graphs,
-    meters: &'static mut Meters,
-    netbox: &'static mut NetBox,
-    procbox: &'static mut ProcBox,
-    membox: &'static mut MemBox,
+    timeit: &'static TimeIt,
+    ARG_MODE: ViewMode,
+    graphs: &'static Graphs,
+    meters: &'static Meters,
+    netbox: &'static NetBox,
+    procbox: &'static ProcBox,
+    membox: &'static MemBox,
+    cpu_collector: &'static CpuCollector,
 ) {
     draw.now(
         vec![
@@ -1907,8 +1913,9 @@ pub fn now_awake<'a>(
         timer,
         CONFIG,
         THEME,
+        cpu_collector,
     );
-    brshtop_box.calc_sizes(boxes, term, CONFIG);
+    brshtop_box.calc_sizes(boxes, term, CONFIG, cpu_collector);
     brshtop_box.draw_bg(true, draw, boxes, menu, CONFIG, cpu_box, key, THEME, term);
     collector.start(
         CONFIG,

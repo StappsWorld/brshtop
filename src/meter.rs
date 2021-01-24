@@ -11,6 +11,7 @@ use {
     },
 };
 
+#[derive(Clone)]
 pub enum MeterUnion {
     Meter(Meter),
     Graph(Graph),
@@ -18,15 +19,108 @@ pub enum MeterUnion {
 
 #[derive(Default)]
 pub struct Meters {
-    pub cpu : Meter,
-    pub battery : Meter,
-    pub mem : HashMap<String, MeterUnion>,
-    pub swap : HashMap<String, MeterUnion>,
-    pub disks_used : HashMap<String, Meter>,
-    pub disks_free : HashMap<String, Meter>,
+    cpu : Meter,
+    battery : Meter,
+    mem : HashMap<String, MeterUnion>,
+    swap : HashMap<String, MeterUnion>,
+    disks_used : HashMap<String, Meter>,
+    disks_free : HashMap<String, Meter>,
+} impl Meters {
+    pub fn get_cpu(&self) -> Meter {
+        self.cpu.clone()
+    }
+
+    pub fn set_cpu(&mut self, cpu : Meter) {
+        self.cpu = cpu.clone()
+    }
+
+    pub fn get_battery(&self) -> Meter {
+        self.battery.clone()
+    }
+
+    pub fn set_battery(&mut self, battery : Meter) {
+        self.battery = battery.clone()
+    }
+
+    pub fn get_mem(&self) -> HashMap<String, MeterUnion> {
+        self.mem.clone()
+    }
+
+    pub fn set_mem(&mut self, mem : HashMap<String, MeterUnion>) {
+        self.mem = mem.clone()
+    }
+
+    pub fn get_mem_index(&self, index : String) -> Option<MeterUnion> {
+        match self.get_mem().get(&index.clone()) {
+            Some(m) => Some(m.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_mem_index(&mut self, index : String, element : MeterUnion) {
+        self.mem.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_swap(&self) -> HashMap<String, MeterUnion> {
+        self.swap.clone()
+    }
+
+    pub fn set_swap(&mut self, swap : HashMap<String, MeterUnion>) {
+        self.swap = swap.clone()
+    }
+
+    pub fn get_swap_index(&self, index : String) -> Option<MeterUnion> {
+        match self.get_swap().get(&index.clone()) {
+            Some(m) => Some(m.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_swap_index(&mut self, index : String, element : MeterUnion) {
+        self.swap.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_disks_used(&self) -> HashMap<String, Meter> {
+        self.disks_used.clone()
+    }
+
+    pub fn set_disks_used(&mut self, disks_used : HashMap<String, Meter>) {
+        self.disks_used = disks_used.clone()
+    }
+
+    pub fn get_disks_used_index(&self, index : String) -> Option<Meter> {
+        match self.get_disks_used().get(&index.clone()) {
+            Some(m) => Some(m.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_disks_used_index(&mut self, index : String, element : Meter) {
+        self.disks_used.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_disks_free(&self) -> HashMap<String, Meter> {
+        self.disks_free.clone()
+    }
+
+    pub fn set_disks_free(&mut self, disks_free : HashMap<String, Meter>) {
+        self.disks_free = disks_free.clone()
+    }
+
+    pub fn get_disks_free_index(&self, index : String) -> Option<Meter> {
+        match self.get_disks_free().get(&index.clone()) {
+            Some(m) => Some(m.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_disks_free_index(&mut self, index : String, element : Meter) {
+        self.disks_free.insert(index.clone(), element.clone());
+    }
+
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Meter {
     pub out : String,
     pub color_gradient : Vec<String>,
@@ -38,7 +132,7 @@ pub struct Meter {
 } impl Meter {
 
     /// Defaults invert : bool = false
-    pub fn new(value : i32, width : u32, gradient_name : String, invert : bool, THEME : &mut Theme, term : &mut Term) -> Self {
+    pub fn new(value : i32, width : u32, gradient_name : String, invert : bool, THEME : &Theme, term : &Term) -> Self {
         let meter = Meter{
             out : gradient_name,
             color_gradient : THEME.gradient[&gradient_name],
@@ -53,7 +147,7 @@ pub struct Meter {
         meter
     }
 
-    pub fn call(&mut self, value : Option<i32>, term : &mut Term) -> String {
+    pub fn call(&mut self, value : Option<i32>, term : &Term) -> String {
         match value {
             Some(i) => {
                 let mut new_val : i32 = 0;
@@ -73,7 +167,7 @@ pub struct Meter {
         }
     }
 
-    pub fn _create(&mut self, value : i32, term : &mut Term) -> String {
+    pub fn _create(&mut self, value : i32, term : &Term) -> String {
         let mut new_value : i32 = 0;
         if value > 100 {
             new_value = 100;

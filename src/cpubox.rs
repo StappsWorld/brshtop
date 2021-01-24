@@ -41,7 +41,7 @@ pub struct CpuBox {
     clock_block: bool,
 }
 impl CpuBox {
-    pub fn new(brshtop_box: &mut BrshtopBox, config: &mut Config, ARG_MODE: ViewMode) -> Self {
+    pub fn new(brshtop_box: &BrshtopBox, config: &Config, ARG_MODE: ViewMode) -> Self {
         let mut bsm: HashMap<String, String> = HashMap::<String, String>::new();
         bsm.insert("Charging".to_owned(), "▲".to_owned());
         bsm.insert("Discharging".to_owned(), "▼".to_owned());
@@ -77,10 +77,10 @@ impl CpuBox {
     }
 
     pub fn calc_size(
-        &mut self,
-        term: &mut Term,
-        brshtop_box: &mut BrshtopBox,
-        cpu: &mut CpuCollector,
+        &self,
+        term: &Term,
+        brshtop_box: &BrshtopBox,
+        cpu: &CpuCollector,
     ) {
         let mut height_p: u32 = if self.get_parent().get_proc_mode() {
             20
@@ -172,10 +172,10 @@ impl CpuBox {
 
     pub fn draw_bg(
         &mut self,
-        key: &mut Key,
-        theme: &mut Theme,
-        term: &mut Term,
-        config: &mut Config,
+        key: &Key,
+        theme: &Theme,
+        term: &Term,
+        config: &Config,
     ) -> String {
         if !key.mouse.contains_key(&"M".to_owned()) {
             let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
@@ -242,7 +242,7 @@ impl CpuBox {
         );
     }
 
-    pub fn battery_activity(&mut self, menu: &mut Menu) -> bool {
+    pub fn battery_activity(&mut self, menu: &Menu) -> bool {
         let battery_manager = match Manager::new() {
             Ok(m) => m,
             Err(_) => {
@@ -369,19 +369,19 @@ impl CpuBox {
 
     pub fn draw_fg(
         &mut self,
-        cpu: &mut CpuCollector,
-        config: &mut Config,
-        key: &mut Key,
-        theme: &mut Theme,
-        term: &mut Term,
-        draw: &mut Draw,
+        cpu: &CpuCollector,
+        config: &Config,
+        key: &Key,
+        theme: &Theme,
+        term: &Term,
+        draw: &Draw,
         ARG_MODE: ViewMode,
-        graphs: &mut Graphs,
-        meters: &mut Meters,
-        menu: &mut Menu,
-        THEME: &mut Theme,
+        graphs: &Graphs,
+        meters: &Meters,
+        menu: &Menu,
+        THEME: &Theme,
     ) {
-        if cpu.parent.redraw {
+        if cpu.parent.get_redraw() {
             self.redraw = true;
         }
 
@@ -469,14 +469,14 @@ impl CpuBox {
                     None,
                 ),
             );
-            meters.cpu = Meter::new(
+            meters.set_cpu(Meter::new(
                 cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2] as i32,
                 bw - (if cpu.got_sensors { 21 } else { 9 }),
                 "cpu".to_owned(),
                 false,
                 THEME,
                 term,
-            );
+            ));
 
             if sub.get_column_size() > 0 || ct_width > 0 {
                 for n in 0..THREADS.to_owned() as usize {
@@ -551,14 +551,14 @@ impl CpuBox {
             }
 
             if self.get_parent().get_resized() {
-                meters.battery = Meter::new(
+                meters.set_battery(Meter::new(
                     self.battery_percent as i32,
                     10,
                     "cpu".to_owned(),
                     true,
                     THEME,
                     term,
-                );
+                ));
             }
 
             let mut battery_symbol: String = self
@@ -617,7 +617,7 @@ impl CpuBox {
                             " {}{}{}",
                             fx::ub,
                             meters
-                                .battery
+                                .get_battery()
                                 .call(Some(self.get_battery_percent() as i32), term),
                             fx::b,
                         )
@@ -659,7 +659,7 @@ impl CpuBox {
             self.set_battery_clear(false);
             self.set_battery_percent(1000.0);
             self.set_battery_secs(0.0);
-            self.set_battery_status("Unkown".to_owned());
+            self.set_battery_status("Unknown".to_owned());
             self.set_old_battery_pos(0);
             self.set_old_battery_len(0);
             self.set_battery_path(None);
@@ -725,7 +725,7 @@ impl CpuBox {
                 fx::b,
                 "CPU ",
                 fx::ub,
-                meters.cpu.call(
+                meters.get_cpu().call(
                     Some(cpu.cpu_usage[0][cpu.cpu_usage[0].len() - 2] as i32),
                     term
                 ),

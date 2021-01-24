@@ -4,6 +4,7 @@ use {
         collector::*,
         config::Config,
         cpubox::CpuBox,
+        cpucollector::CpuCollector,
         create_box,
         draw::Draw,
         error,
@@ -16,11 +17,7 @@ use {
         theme::{Color, Theme},
         timer::Timer,
     },
-    std::{
-        collections::HashMap,
-        io,
-        os::unix::io::AsRawFd,
-    },
+    std::{collections::HashMap, io, os::unix::io::AsRawFd},
     terminal_size::{terminal_size, Height, Width},
     termios::*,
 };
@@ -74,17 +71,18 @@ impl Term {
         &mut self,
         args: Vec<String>,
         boxes: Vec<Boxes>,
-        collector: &mut Collector,
-        init: &mut Init,
-        cpu_box: &mut CpuBox,
-        draw: &mut Draw,
+        collector: &Collector,
+        init: &Init,
+        cpu_box: &CpuBox,
+        draw: &Draw,
         force: bool,
-        key: &mut Key,
-        menu: &mut Menu,
-        brshtop_box: &mut BrshtopBox,
-        timer: &mut Timer,
-        config : &mut Config,
-        theme : &mut Theme,
+        key: &Key,
+        menu: &Menu,
+        brshtop_box: &BrshtopBox,
+        timer: &Timer,
+        config: &Config,
+        theme: &Theme,
+        cpu: &CpuCollector,
     ) {
         if self.resized {
             self.winch = Event::Flag(true);
@@ -104,7 +102,7 @@ impl Term {
             return;
         }
         if force {
-            collector.collect_interrupt = true;
+            collector.set_collect_interrupt(true);
         }
 
         while (self._w != self.width && self._h != self.height) || (self._w < 80 || self._h < 24) {
@@ -112,9 +110,9 @@ impl Term {
                 init.resized = true;
             }
 
-            cpu_box.clock_block = true;
+            cpu_box.set_clock_block(true);
             self.resized = true;
-            collector.collect_interrupt = true;
+            collector.set_collect_interrupt(true);
             self.width = self._w;
             self.height = self._h;
             draw.now(vec![self.clear], key);
@@ -233,7 +231,7 @@ impl Term {
         }
 
         key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
-        brshtop_box.calc_sizes(boxes, self, config);
+        brshtop_box.calc_sizes(boxes, self, config, cpu);
         if init.running {
             self.resized = false;
             return;
@@ -257,9 +255,7 @@ impl Term {
         let mut termios = match Termios::from_fd(fd) {
             Ok(t) => t,
             Err(e) => {
-                error::errlog(
-                    format!("Error getting Termios data... (error {})", e),
-                );
+                error::errlog(format!("Error getting Termios data... (error {})", e));
                 return;
             }
         };
@@ -272,9 +268,7 @@ impl Term {
 
         match tcsetattr(fd, os::target::TCSANOW, &termios) {
             Ok(_) => (),
-            Err(e) => error::errlog(
-                format!("Error setting Termios data... (error {})", e),
-            ),
+            Err(e) => error::errlog(format!("Error setting Termios data... (error {})", e)),
         }
     }
 
@@ -282,9 +276,7 @@ impl Term {
         let out: String = match std::env::var("TERMINAL_TITLE") {
             Ok(o) => o,
             Err(e) => {
-                error::errlog(
-                    format!("Error setting Termios data... (error {})", e),
-                );
+                error::errlog(format!("Error setting Termios data... (error {})", e));
                 return String::default();
             }
         };

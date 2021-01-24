@@ -20,30 +20,18 @@ use {
 };
 
 pub struct NetBox {
-    pub parent: BrshtopBox,
-    pub sub: SubBox,
-    pub name: String,
-    pub height_p: u32,
-    pub width_p: u32,
-    pub x: i32,
-    pub y: i32,
-    pub resized: bool,
-    pub redraw: bool,
-    pub graph_height: HashMap<String, u32>,
-    pub symbols: HashMap<String, String>,
-    pub buffer: String,
+    parent: BrshtopBox,
+    sub: SubBox,
+    redraw: bool,
+    graph_height: HashMap<String, u32>,
+    symbols: HashMap<String, String>,
+    buffer: String,
 }
 impl NetBox {
-    pub fn new(CONFIG: &mut Config, ARG_MODE: ViewMode, brshtop_box: &mut BrshtopBox) -> Self {
+    pub fn new(CONFIG: &Config, ARG_MODE: ViewMode, brshtop_box: &BrshtopBox) -> Self {
         let net = NetBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
             sub: SubBox::new(),
-            name: "net".to_owned(),
-            height_p: 30,
-            width_p: 45,
-            x: 1,
-            y: 1,
-            resized: true,
             redraw: true,
             graph_height: HashMap::<String, u32>::new(),
             symbols: [("download", "▼"), ("upload", "▲")]
@@ -53,47 +41,74 @@ impl NetBox {
             buffer: "net".to_owned(),
         };
 
-        brshtop_box.buffers.push(net.buffer);
+        brshtop_box.push_buffers(net.buffer.clone());
 
+        net.set_parent_name("net".to_owned());
+        net.set_parent_height_p(30);
+        net.set_parent_width_p(45);
+        net.set_parent_x(1);
+        net.set_parent_y(1);
+        net.set_parent_resized(true);
         net
     }
 
-    pub fn calc_size(&mut self, term: &mut Term, brshtop_box: &mut BrshtopBox) {
+    pub fn calc_size(&mut self, term: &Term, brshtop_box: &BrshtopBox) {
         let mut width_p: u32 = 0;
 
-        if self.parent.stat_mode {
+        if self.get_parent().get_stat_mode() {
             width_p = 100;
         } else {
-            width_p = self.width_p;
+            width_p = self.get_parent().get_width_p();
         }
-        self.parent.width = ((term.width as u32) * width_p / 100) as u32;
-        self.parent.height =
-            u32::try_from(term.height as i32 - brshtop_box._b_cpu_h - brshtop_box._b_mem_h)
-                .unwrap_or(0);
-        self.y = ((term.height as u32) - self.parent.height + 1) as i32;
-        self.sub.box_width = if self.parent.width > 45 { 27 } else { 19 };
-        self.sub.box_height = if self.parent.height > 10 {
+        self.set_parent_width(((term.width as u32) * width_p / 100) as u32);
+        self.set_parent_height(
+            u32::try_from(
+                term.height as i32 - brshtop_box.get_b_cpu_h() - brshtop_box.get_b_mem_h(),
+            )
+            .unwrap_or(0),
+        );
+        self.set_parent_y(
+            u32::try_from((term.height as i32) - self.parent.get_height() as i32 + 1).unwrap_or(0),
+        );
+        self.set_sub_box_width(if self.parent.get_width() > 45 { 27 } else { 19 });
+        self.set_sub_box_height(if self.parent.get_height() > 10 {
             9
         } else {
-            self.parent.height - 2
-        };
-        self.sub.box_x = self.parent.width - self.sub.box_width - 1;
-        self.sub.box_y = self.y as u32 + ((self.parent.height - 2) / 2) as u32
-            - (self.sub.box_height / 2) as u32
-            + 1;
-        self.graph_height.insert(
+            u32::try_from(self.parent.get_height() as i32 - 2).unwrap_or(0)
+        });
+        self.set_sub_box_x(
+            u32::try_from(self.parent.get_width() as i32 - self.sub.get_box_width() as i32 - 1)
+                .unwrap_or(0),
+        );
+        self.set_sub_box_y(
+            self.get_parent().get_y()
+                + u32::try_from(
+                    ((self.parent.get_height() as i32 - 2) / 2)
+                        - (self.sub.get_box_height() / 2) as i32,
+                )
+                .unwrap_or(0)
+                + 1,
+        );
+        self.set_graph_height_index(
             "download".to_owned(),
-            ((self.parent.height - 2) as f64 / 2.0).round() as u32,
+            ((self.parent.get_height() as i32 - 2) as f64 / 2.0).round() as u32,
         );
-        self.graph_height.insert(
+        self.set_graph_height_index(
             "upload".to_owned(),
-            self.parent.height - 2 - self.graph_height[&"download".to_owned()],
+            u32::try_from(
+                self.parent.get_height() as i32
+                    - 2
+                    - self
+                        .get_graph_height_index("download".to_owned())
+                        .unwrap_or(0) as i32,
+            )
+            .unwrap_or(0),
         );
-        self.redraw = true;
+        self.set_redraw(true);
     }
 
-    pub fn draw_bg(&mut self, theme: &mut Theme, term : &mut Term) -> String {
-        if self.parent.proc_mode {
+    pub fn draw_bg(&mut self, theme: &Theme, term: &Term) -> String {
+        if self.parent.get_proc_mode() {
             return String::default();
         }
         format!(
@@ -113,10 +128,10 @@ impl NetBox {
                 theme
             ),
             create_box(
-                self.sub.box_x,
-                self.sub.box_y,
-                self.sub.box_width,
-                self.sub.box_height,
+                self.sub.get_box_x(),
+                self.sub.get_box_y(),
+                self.sub.get_box_width(),
+                self.sub.get_box_height(),
                 Some("Download".to_owned()),
                 Some("Upload".to_owned()),
                 Some(theme.colors.div_line),
@@ -131,20 +146,20 @@ impl NetBox {
 
     pub fn draw_fg(
         &mut self,
-        theme: &mut Theme,
-        key: &mut Key,
-        term: &mut Term,
-        CONFIG: &mut Config,
-        draw: &mut Draw,
-        graphs: &mut Graphs,
-        menu: &mut Menu,
+        theme: &Theme,
+        key: &Key,
+        term: &Term,
+        CONFIG: &Config,
+        draw: &Draw,
+        graphs: &Graphs,
+        menu: &Menu,
+        net: &NetCollector,
     ) {
-        if self.parent.proc_mode {
+        if self.get_parent().get_proc_mode() {
             return;
         }
 
-        let mut net: NetCollector = NetCollector::new(self, CONFIG);
-        if net.parent.redraw {
+        if net.parent.get_redraw() {
             self.redraw = true;
         }
         if net.nic.is_none() {
@@ -153,36 +168,38 @@ impl NetBox {
 
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
-        let x = self.x + 1;
-        let y = self.y + 1;
-        let w = self.parent.width - 2;
-        let h = self.parent.height - 2;
-        let bx = self.sub.box_x + 1;
-        let by = self.sub.box_y + 1;
-        let bw = self.sub.box_width - 2;
-        let bh = self.sub.box_height - 2;
-        let nic_name : String = net.nic.unwrap().name().to_owned();
+        let x: u32 = self.get_parent().get_x() + 1;
+        let y: u32 = self.get_parent().get_y() + 1;
+        let w: u32 = u32::try_from(self.get_parent().get_width() as i32 - 2).unwrap_or(0);
+        let h: u32 = u32::try_from(self.get_parent().get_height() as i32 - 2).unwrap_or(0);
+        let bx: u32 = self.get_sub().get_box_x() + 1;
+        let by: u32 = self.get_sub().get_box_y() + 1;
+        let bw: u32 = u32::try_from(self.get_sub().get_box_width() as i32 - 2).unwrap_or(0);
+        let bh: u32 = u32::try_from(self.get_sub().get_box_height() as i32 - 2).unwrap_or(0);
+        let nic_name: String = net.nic.unwrap().name().to_owned();
         let reset: bool = match net.stats[&nic_name][&"download".to_owned()][&"offset".to_owned()] {
             NetCollectorStat::Bool(b) => b,
             NetCollectorStat::I32(i) => i > 0,
             NetCollectorStat::U64(u) => u > 0,
             NetCollectorStat::Vec(v) => v.len() > 0,
             NetCollectorStat::String(s) => {
-                errlog(format!("Malformed type in net.stats[{}]['download']['offset']", nic_name));
+                errlog(format!(
+                    "Malformed type in net.stats[{}]['download']['offset']",
+                    nic_name
+                ));
                 s.parse::<i64>().unwrap_or(0) > 0
             }
         };
 
-
-        if self.resized || self.redraw {
+        if self.get_parent().get_resized() || self.get_redraw() {
             out_misc.push_str(self.draw_bg(theme, term).as_str());
             if key.mouse.contains_key(&"b".to_owned()) {
                 let mut b_vec_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                 for i in 0..4 {
                     let mut b_insert: Vec<i32> = Vec::<i32>::new();
-                    b_insert.push(x + w as i32 - nic_name[..10].len() as i32 - 9 + i);
-                    b_insert.push(y - 1);
+                    b_insert.push(x as i32 + w as i32 - nic_name[..10].len() as i32 - 9 + i);
+                    b_insert.push(y as i32 - 1);
                     b_vec_top.push(b_insert);
                 }
 
@@ -192,8 +209,8 @@ impl NetBox {
 
                 for i in 0..4 {
                     let mut n_insert: Vec<i32> = Vec::<i32>::new();
-                    n_insert.push(x + w as i32 - 5 + i);
-                    n_insert.push(y - 1);
+                    n_insert.push(x as i32 + w as i32 - 5 + i);
+                    n_insert.push(y as i32 - 1);
                     n_vec_top.push(n_insert);
                 }
 
@@ -203,8 +220,8 @@ impl NetBox {
 
                 for i in 0..4 {
                     let mut z_insert: Vec<i32> = Vec::<i32>::new();
-                    z_insert.push(x + w as i32 - nic_name[..10].len() as i32 - 14 + i);
-                    z_insert.push(y - 1);
+                    z_insert.push(x as i32 + w as i32 - nic_name[..10].len() as i32 - 14 + i);
+                    z_insert.push(y as i32 - 1);
                     z_vec_top.push(z_insert);
                 }
 
@@ -248,8 +265,8 @@ impl NetBox {
                     for i in 0..4 {
                         let mut inserter: Vec<i32> = Vec::<i32>::new();
 
-                        inserter.push(x + w as i32 - 20 - nic_name[..10].len() as i32 + i);
-                        inserter.push(y - 1);
+                        inserter.push(x as i32 + w as i32 - 20 - nic_name[..10].len() as i32 + i);
+                        inserter.push(y as i32 - 1);
                         inserter_top.push(inserter);
                     }
                     key.mouse.insert("a".to_owned(), inserter_top);
@@ -258,8 +275,9 @@ impl NetBox {
                     format!(
                         "{}{}{}{}{}{}{}{}",
                         mv::to(
-                            (y as u32) - 1,
-                            (x as u32) + w - 21 - nic_name[..10].len() as u32
+                            u32::try_from(y as i32 - 1).unwrap_or(0),
+                            u32::try_from(x as i32 + w as i32 - 21 - nic_name[..10].len() as i32)
+                                .unwrap_or(0)
                         ),
                         theme
                             .colors
@@ -278,14 +296,14 @@ impl NetBox {
                     .as_str(),
                 );
             }
-            if w - nic_name[..10].len() as u32 - 20 > 6 {
+            if w as i32 - nic_name[..10].len() as i32 - 20 > 6 {
                 if !key.mouse.contains_key(&"a".to_owned()) {
                     let mut inserter_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..4 {
                         let mut inserter: Vec<i32> = Vec::<i32>::new();
-                        inserter.push(x + w as i32 - 20 - nic_name[..10].len() as i32 + i);
-                        inserter.push(y - 1);
+                        inserter.push(x as i32 + w as i32 - 20 - nic_name[..10].len() as i32 + i);
+                        inserter.push(y as i32 - 1);
                         inserter_top.push(inserter);
                     }
                     key.mouse.insert("a".to_owned(), inserter_top);
@@ -293,7 +311,11 @@ impl NetBox {
                 out_misc.push_str(
                     format!(
                         "{}{}{}{}{}{}{}{}",
-                        mv::to(y as u32 - 1, x as u32 + w - 21 - nic_name[..10].len() as u32),
+                        mv::to(
+                            u32::try_from(y as i32 - 1).unwrap_or(0),
+                            u32::try_from(x as i32 + w as i32 - 21 - nic_name[..10].len() as i32)
+                                .unwrap_or(0)
+                        ),
                         theme
                             .colors
                             .net_box
@@ -318,8 +340,8 @@ impl NetBox {
 
                     for i in 0..4 {
                         let mut inserter: Vec<i32> = Vec::<i32>::new();
-                        inserter.push(x + w as i32 - 26 - nic_name[..10].len() as i32 + i);
-                        inserter.push(y - 1);
+                        inserter.push(x as i32 + w as i32 - 26 - nic_name[..10].len() as i32 + i);
+                        inserter.push(y as i32 - 1);
                         inserter_top.push(inserter);
                     }
                     key.mouse.insert("a".to_owned(), inserter_top);
@@ -327,7 +349,11 @@ impl NetBox {
                 out_misc.push_str(
                     format!(
                         "{}{}{}{}{}{}{}{}{}",
-                        mv::to(y as u32 - 1, x as u32 + w - 27 - nic_name[..10].len() as u32),
+                        mv::to(
+                            u32::try_from(y as i32 - 1).unwrap_or(0),
+                            u32::try_from(x as i32 + w as i32 - 27 - nic_name[..10].len() as i32)
+                                .unwrap_or(0)
+                        ),
                         theme
                             .colors
                             .net_box
@@ -370,7 +396,7 @@ impl NetBox {
             let mut strings = net.strings[&nic_name][&direction].clone();
             let mut stats = net.stats[&nic_name][&direction].clone();
 
-            if self.redraw {
+            if self.get_redraw() {
                 stats[&"redraw".to_owned()] = NetCollectorStat::Bool(true);
             }
             if match stats["redraw"] {
@@ -381,8 +407,8 @@ impl NetBox {
                 NetCollectorStat::String(s) => {
                     errlog("Malformed type in stats['redraw']".to_owned());
                     s.parse::<i32>().unwrap_or(0) > 0
-                },
-            } || self.resized
+                }
+            } || self.get_parent().get_resized()
             {
                 graphs.net[&direction] = Graph::new_with_vec::<Color>(
                     w - bw - 3,
@@ -398,14 +424,20 @@ impl NetBox {
                         net.sync_top
                     } else {
                         match stats[&"graph_top".to_owned()] {
-                            NetCollectorStat::Bool(b) => if b {1} else {0},
+                            NetCollectorStat::Bool(b) => {
+                                if b {
+                                    1
+                                } else {
+                                    0
+                                }
+                            }
                             NetCollectorStat::I32(i) => i,
                             NetCollectorStat::Vec(v) => 0,
                             NetCollectorStat::U64(u) => u as i32,
                             NetCollectorStat::String(s) => {
                                 errlog("Malformed type in stats['graph_top']".to_owned());
                                 s.parse::<i32>().unwrap_or(0)
-                            },
+                            }
                         }
                     },
                     0,
@@ -422,9 +454,11 @@ impl NetBox {
                     "{}{}",
                     mv::to(
                         if direction == "download".to_owned() {
-                            y as u32
+                            y
                         } else {
-                            y as u32 + self.graph_height[&"download".to_owned()]
+                            y + self
+                                .get_graph_height_index("download".to_owned())
+                                .unwrap_or(0)
                         },
                         x as u32
                     ),
@@ -437,7 +471,7 @@ impl NetBox {
                             NetCollectorStat::String(s) => {
                                 errlog("Malformed type in stats['redraw']".to_owned());
                                 s.parse::<i32>().unwrap_or(0) > 0
-                            },
+                            }
                         } {
                             None
                         } else {
@@ -479,8 +513,12 @@ impl NetBox {
                     format!(
                         "{}{} Top:{}{:>12.12}",
                         mv::to(by + cy, bx),
-                        self.symbols[&direction],
-                        mv::to(by + cy, bx + bw - 12),
+                        self.get_symbols_index(direction.clone())
+                            .unwrap_or(String::default()),
+                        mv::to(
+                            by + cy,
+                            u32::try_from(bx as i32 + bw as i32 - 12).unwrap_or(0)
+                        ),
                         "(".to_owned() + strings[&"top".to_owned()].as_str() + ")",
                     )
                     .as_str(),
@@ -512,7 +550,7 @@ impl NetBox {
         out.push_str(
             format!(
                 "{}{}{}{}",
-                mv::to(y as u32, x as u32),
+                mv::to(y, x),
                 theme.colors.graph_text.call(
                     if CONFIG.net_sync {
                         net.sync_string
@@ -521,7 +559,7 @@ impl NetBox {
                     },
                     term
                 ),
-                mv::to(y as u32 + h - 1, x as u32),
+                mv::to(u32::try_from(y as i32 + h as i32 - 1).unwrap_or(0), x),
                 theme.colors.graph_text.call(
                     if CONFIG.net_sync {
                         net.sync_string
@@ -535,7 +573,7 @@ impl NetBox {
         );
 
         draw.buffer(
-            self.buffer,
+            self.get_buffer(),
             vec![format!("{}{}{}", out_misc, out, term.fg)],
             false,
             false,
@@ -546,7 +584,125 @@ impl NetBox {
             key,
         );
 
-        self.redraw = false;
-        self.resized = false;
+        self.set_redraw(false);
+        self.set_parent_resized(false);
+    }
+
+    pub fn get_parent(&self) -> BrshtopBox {
+        self.parent.clone()
+    }
+
+    pub fn set_parent(&self, parent: BrshtopBox) {
+        self.parent = parent.clone()
+    }
+
+    pub fn set_parent_name(&mut self, name: String) {
+        self.parent.set_name(name.clone())
+    }
+
+    pub fn set_parent_width(&mut self, width: u32) {
+        self.parent.set_width(width.clone())
+    }
+
+    pub fn set_parent_height(&mut self, height: u32) {
+        self.parent.set_height(height.clone())
+    }
+
+    pub fn set_parent_height_p(&mut self, height_p: u32) {
+        self.parent.set_height_p(height_p.clone())
+    }
+
+    pub fn set_parent_width_p(&mut self, width_p: u32) {
+        self.parent.set_width_p(width_p.clone())
+    }
+
+    pub fn set_parent_x(&mut self, x: u32) {
+        self.parent.set_x(x.clone())
+    }
+
+    pub fn set_parent_y(&mut self, y: u32) {
+        self.parent.set_y(y.clone())
+    }
+
+    pub fn set_parent_resized(&mut self, resized: bool) {
+        self.parent.set_resized(resized.clone())
+    }
+
+    pub fn get_sub(&self) -> SubBox {
+        self.sub.clone()
+    }
+
+    pub fn set_sub(&mut self, sub: SubBox) {
+        self.sub = sub.clone()
+    }
+
+    pub fn set_sub_box_width(&mut self, box_width: u32) {
+        self.sub.set_box_width(box_width.clone())
+    }
+
+    pub fn set_sub_box_height(&mut self, box_height: u32) {
+        self.sub.set_box_height(box_height.clone())
+    }
+
+    pub fn set_sub_box_x(&mut self, box_x: u32) {
+        self.sub.set_box_x(box_x.clone())
+    }
+
+    pub fn set_sub_box_y(&mut self, box_y: u32) {
+        self.sub.set_box_y(box_y.clone())
+    }
+
+    pub fn get_redraw(&self) -> bool {
+        self.redraw.clone()
+    }
+
+    pub fn set_redraw(&mut self, redraw: bool) {
+        self.redraw = redraw.clone()
+    }
+
+    pub fn get_graph_height(&self) -> HashMap<String, u32> {
+        self.graph_height.clone()
+    }
+
+    pub fn set_graph_height(&mut self, graph_height: HashMap<String, u32>) {
+        self.graph_height = graph_height.clone()
+    }
+
+    pub fn get_graph_height_index(&self, index: String) -> Option<u32> {
+        match self.get_graph_height().get(&index.clone()) {
+            Some(u) => Some(u.to_owned()),
+            None => None,
+        }
+    }
+
+    pub fn set_graph_height_index(&mut self, index: String, element: u32) {
+        self.graph_height.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_symbols(&self) -> HashMap<String, String> {
+        self.symbols.clone()
+    }
+
+    pub fn set_symbols(&mut self, symbols: HashMap<String, String>) {
+        self.symbols = symbols.clone()
+    }
+
+    pub fn get_symbols_index(&self, index: String) -> Option<String> {
+        match self.get_symbols().get(&index.clone()) {
+            Some(s) => Some(s.to_owned()),
+            None => None,
+        }
+    }
+
+    pub fn set_symbols_index(&mut self, index: String, element: String) {
+        self.symbols.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_buffer(&self) -> String {
+        self.buffer.clone()
+    }
+
+    pub fn set_buffer(&mut self, buffer: String) {
+        self.buffer = buffer.clone()
     }
 }

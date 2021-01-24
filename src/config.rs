@@ -91,6 +91,10 @@ pub enum ViewMode {
     Proc,
     Stat,
     None,
+} impl ViewMode {
+    pub fn replace_self(&mut self, viewmode : ViewMode) {
+        self = &mut viewmode.clone()
+    }
 }
 impl Display for ViewMode {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
