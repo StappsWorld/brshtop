@@ -12,8 +12,11 @@ use {
         fx,
         init::Init,
         key::Key,
+        membox::MemBox,
         menu::Menu,
+        netbox::NetBox,
         mv,
+        procbox::ProcBox,
         theme::{Color, Theme},
         timer::Timer,
     },
@@ -83,6 +86,9 @@ impl Term {
         config: &Config,
         theme: &Theme,
         cpu: &CpuCollector,
+        mem_box : &MemBox,
+        net_box : &NetBox,
+        proc_box : &ProcBox,
     ) {
         if self.resized {
             self.winch = Event::Flag(true);
@@ -131,6 +137,11 @@ impl Term {
                         None,
                         self,
                         theme,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
                     ),
                     format!(
                         "{}{}{}{}Width : {}   Height: {}{}{}{}",
@@ -165,6 +176,11 @@ impl Term {
                             None,
                             self,
                             theme,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
                         ),
                         format!(
                             "{}{}{}{}Width: {}{}   ",
@@ -231,7 +247,7 @@ impl Term {
         }
 
         key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
-        brshtop_box.calc_sizes(boxes, self, config, cpu);
+        brshtop_box.calc_sizes(boxes, self, config, cpu, cpu_box, mem_box, net_box, proc_box);
         if init.running {
             self.resized = false;
             return;
@@ -241,7 +257,7 @@ impl Term {
             menu.resized = true;
         }
 
-        brshtop_box.draw_bg(false, draw, boxes, menu, config, cpu_box, key, theme, self);
+        brshtop_box.draw_bg(false, draw, boxes, menu, config, cpu_box,  mem_box, net_box, proc_box, key, theme, self);
         self.resized = false;
         timer.finish(key, config);
 

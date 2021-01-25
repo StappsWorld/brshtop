@@ -3,6 +3,7 @@ use {
         draw::Draw, error::throw_error, event::Event, menu::Menu, nonblocking::Nonblocking,
         raw::Raw, term::Term,
     },
+    crossbeam,
     nix::sys::{
         select::{select, FdSet},
         time::{TimeVal, TimeValLike},
@@ -33,7 +34,6 @@ pub struct Key {
     pub mouse_report: bool,
     pub stopping: bool,
     pub started: bool,
-    pub reader: Option<thread::JoinHandle<()>>,
 }
 impl Key {
     pub fn new() -> Self {
@@ -91,27 +91,20 @@ impl Key {
             mouse_report: false,
             stopping: false,
             started: false,
-            reader: None,
         }
     }
 
-    pub fn start(&'static mut self, draw: &'static Draw, menu: &'static Menu) {
+    pub fn start(&mut self, draw: &Draw, menu: &Menu) {
         self.stopping = false;
-        self.reader = Some(thread::spawn(|| self.get_key(draw, menu)));
+        crossbeam::thread::scope(|s| {
+            s.spawn(|_| self.get_key(draw, menu));
+        })
+        .unwrap();
         self.started = true;
     }
 
-    pub fn stop(&mut self) -> Option<bool> {
-        if self.started
-            && match self.reader.unwrap().join() {
-                Ok(_) => true,
-                Err(_) => return None,
-            }
-        {
-            self.stopping = true;
-            return Some(true);
-        }
-        None
+    pub fn stop(&mut self) {
+        self.stopping = true;
     }
 
     pub fn last(&mut self) -> Option<String> {
@@ -321,10 +314,7 @@ impl Key {
                         };
                     }
                 }
-                Err(_) => match self.stop() {
-                    Some(s) => (),
-                    None => throw_error("Unable to get input from stdin"),
-                },
+                Err(_) => self.stop(),
             };
 
             raw.exit();

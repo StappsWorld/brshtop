@@ -39,34 +39,32 @@ use {
 };
 
 pub struct ProcBox {
-    pub parent: BrshtopBox,
-    pub name: String,
-    pub current_y: u32,
-    pub current_h: u32,
-    pub select_max: usize,
-    pub selected: usize,
-    pub selected_pid: u32,
-    pub last_selection: usize,
-    pub filtering: bool,
-    pub moved: bool,
-    pub start: i32,
-    pub count: i32,
-    pub s_len: usize,
-    pub detailed: bool,
-    pub detailed_x: u32,
-    pub detailed_y: u32,
-    pub detailed_width: u32,
-    pub detailed_height: u32,
-    pub buffer: String,
-    pub pid_counter: HashMap<u32, u32>,
-    pub redraw : bool,
+    parent: BrshtopBox,
+    current_y: u32,
+    current_h: u32,
+    select_max: usize,
+    selected: usize,
+    selected_pid: u32,
+    last_selection: usize,
+    filtering: bool,
+    moved: bool,
+    start: i32,
+    count: i32,
+    s_len: usize,
+    detailed: bool,
+    detailed_x: u32,
+    detailed_y: u32,
+    detailed_width: u32,
+    detailed_height: u32,
+    buffer: String,
+    pid_counter: HashMap<u32, u32>,
+    redraw : bool,
 }
 impl<'a> ProcBox {
     pub fn new(brshtop_box: &BrshtopBox, CONFIG: &Config, ARG_MODE: ViewMode) -> Self {
         brshtop_box.push_buffers("proc".to_owned());
         let procbox = ProcBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
-            name: "proc".to_owned(),
             current_y: 0,
             current_h: 0,
             select_max: 0,
@@ -87,11 +85,12 @@ impl<'a> ProcBox {
             pid_counter: HashMap::<u32, u32>::new(),
             redraw : true,
         };
-        procbox.parent.set_x(1);
-        procbox.parent.set_y(1);
-        procbox.parent.set_height_p(68);
-        procbox.parent.set_width_p(55);
-        procbox.parent.set_resized(true);
+        procbox.set_parent_x(1);
+        procbox.set_parent_y(1);
+        procbox.set_parent_height_p(68);
+        procbox.set_parent_width_p(55);
+        procbox.set_parent_resized(true);
+        procbox.set_parent_name("proc".to_owned());
         procbox
     }
 
@@ -115,7 +114,7 @@ impl<'a> ProcBox {
         self.parent.set_resized(true);
     }
 
-    pub fn draw_bg(&mut self, theme: &Theme, term : &Term) -> String {
+    pub fn draw_bg(&self, theme: &Theme, term : &Term) -> String {
         if self.parent.get_stat_mode() {
             return String::default();
         }
@@ -129,15 +128,20 @@ impl<'a> ProcBox {
             Some(theme.colors.proc_box),
             None,
             true,
-            Some(Boxes::ProcBox(self)),
+            Some(Boxes::ProcBox),
             term,
             theme,
+            None,
+            None,
+            None,
+            None,
+            Some(self),
         );
     }
 
     /// Default mouse_pos = (0, 0)
     pub fn selector(
-        &mut self,
+        &self,
         key: String,
         mouse_pos: (i32, i32),
         proc_collector: &ProcCollector,
@@ -255,7 +259,7 @@ impl<'a> ProcBox {
         if old != (self.start, self.selected) {
             self.moved = true;
             collector.collect(
-                vec![Collectors::<'a>::ProcCollector(proc_collector)],
+                vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
                 false,
@@ -444,7 +448,7 @@ impl<'a> ProcBox {
                                 .proc_box
                                 .call(symbol::title_left.to_owned(), term),
                             fx::b,
-                            THEME.colors.title.call(self.name.clone(), term),
+                            THEME.colors.title.call(self.get_parent().get_name().clone(), term),
                             fx::ub,
                             THEME
                                 .colors
@@ -680,7 +684,7 @@ impl<'a> ProcBox {
                             mv::to(y - 1, x + 1),
                             THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                             fx::b,
-                            THEME.colors.title.call(self.name.clone(), term),
+                            THEME.colors.title.call(self.get_parent().get_name().clone(), term),
                             fx::ub,
                             THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                             mv::to(y + 7, x - 1),
@@ -1843,4 +1847,196 @@ impl<'a> ProcBox {
         self.parent.set_resized(false);
         self.moved = false;
     }
+
+    pub fn get_parent(&self) -> BrshtopBox {
+        self.parent.clone()
+    }
+
+    pub fn set_parent(&mut self, parent : BrshtopBox) {
+        self.parent = parent.clone()
+    }
+
+    pub fn set_parent_name(&mut self, name : String) {
+        self.parent.set_name(name.clone())
+    }
+
+    pub fn set_parent_x(&mut self, x : u32) {
+        self.parent.set_x(x.clone())
+    }
+
+    pub fn set_parent_y(&mut self, y : u32) {
+        self.parent.set_y(y.clone())
+    }
+
+    pub fn set_parent_height_p(&mut self, height_p : u32) {
+        self.parent.set_height_p(height_p.clone())
+    }
+
+    pub fn set_parent_width_p(&mut self, width_p : u32) {
+        self.parent.set_width_p(width_p.clone())
+    }
+
+    pub fn set_parent_resized(&mut self, resized : bool) {
+        self.parent.set_resized(resized.clone())
+    }
+
+    pub fn get_current_y(&self) -> u32 {
+        self.current_y.clone()
+    }
+
+    pub fn get_current_h(&self) -> u32 {
+        self.current_h.clone()
+    }
+
+    pub fn set_current_h(&mut self, current_h : u32) {
+        self.current_h = current_h.clone()
+    }
+
+    pub fn get_select_max(&self) -> usize {
+        self.select_max.clone()
+    }
+
+    pub fn set_select_max(&mut self, select_max : usize) {
+        self.select_max = select_max.clone()
+    }
+
+    pub fn get_selected(&self) -> usize {
+        self.selected.clone()
+    }
+
+    pub fn set_selected(&mut self, selected : usize) {
+        self.selected = selected.clone()
+    }
+
+    pub fn get_selected_pid(&self) -> u32 {
+        self.selected_pid.clone()
+    }
+
+    pub fn set_selected_pid(&mut self, selected_pid : u32) {
+        self.selected_pid = selected_pid.clone()
+    }
+
+    pub fn get_last_selection(&self) -> usize {
+        self.last_selection.clone()
+    }
+
+    pub fn set_last_selection(&mut self, last_selection : usize) {
+        self.last_selection = last_selection.clone()
+    }
+
+    pub fn get_filtering(&self) -> bool {
+        self.filtering.clone()
+    }
+
+    pub fn set_filtering(&mut self, filtering : bool) {
+        self.filtering = filtering.clone()
+    }
+
+    pub fn get_moved(&self) -> bool {
+        self.moved.clone()
+    }
+
+    pub fn set_moved(&mut self, moved : bool) {
+        self.moved = moved.clone();
+    }
+
+    pub fn get_start(&self) -> i32 {
+        self.start.clone()
+    }
+
+    pub fn set_start(&mut self, start : i32) {
+        self.start = start.clone()
+    }
+
+    pub fn get_count(&self) -> i32 {
+        self.count.clone()
+    }
+
+    pub fn set_count(&mut self, count : i32) {
+        self.count = count.clone()
+    }
+
+    pub fn get_s_len(&self) -> usize {
+        self.s_len.clone()
+    }
+
+    pub fn set_s_len(&mut self, s_len : usize) {
+        self.s_len = s_len.clone()
+    }
+
+    pub fn get_detailed(&self) -> bool {
+        self.detailed.clone()
+    }
+
+    pub fn set_detailed(&mut self, detailed : bool) {
+        self.detailed = detailed.clone()
+    }
+
+    pub fn get_detailed_x(&self) -> u32 {
+        self.detailed_x.clone()
+    }
+
+    pub fn set_detailed_x(&mut self, detailed_x : u32) {
+        self.detailed_x = detailed_x.clone()
+    }
+
+    pub fn get_detailed_y(&self) -> u32 {
+        self.detailed_y.clone()
+    }
+
+    pub fn set_detailed_y(&mut self, detailed_y : u32) {
+        self.detailed_y = detailed_y.clone()
+    }
+
+    pub fn get_detailed_width(&self) -> u32 {
+        self.detailed_width.clone()
+    }
+
+    pub fn set_detailed_width(&mut self, detailed_width : u32) {
+        self.detailed_width = detailed_width.clone()
+    }
+
+    pub fn get_detailed_height(&self) -> u32 {
+        self.detailed_height.clone()
+    }
+
+    pub fn set_detaied_height(&mut self, detailed_height : u32) {
+        self.detailed_height = detailed_height.clone()
+    }
+
+    pub fn get_buffer(&self) -> String {
+        self.buffer.clone()
+    }
+
+    pub fn set_buffer(&mut self, buffer : String) {
+        self.buffer = buffer.clone()
+    }
+
+    pub fn get_pid_counter(&self) -> HashMap<u32, u32> {
+        self.pid_counter.clone()
+    }
+
+    pub fn set_pid_counter(&mut self, pid_counter : HashMap<u32, u32>) {
+        self.pid_counter = pid_counter.clone()
+    }
+
+    pub fn get_pid_counter_index(&self, index : u32) -> Option<u32> {
+        match self.get_pid_counter().get(&index.clone()) {
+            Some(u) => Some(u.to_owned()),
+            None => None,
+        }
+    }
+
+    pub fn set_pid_counter_index(&mut self, index : u32, element : u32) {
+        self.pid_counter.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_redraw(&self) -> bool {
+        self.redraw.clone()
+    }
+
+    pub fn set_redraw(&mut self, redraw : bool) {
+        self.redraw = redraw.clone()
+    }
+
 }

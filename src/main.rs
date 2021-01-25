@@ -178,7 +178,7 @@ lazy_static! {
         },
     };
     pub static ref THEME_DIR : &'static Path = {
-        let theme_dir_check = Path::new(format!("{}/bpytop-themes", EXECUTE_PATH.to_str().unwrap()).as_str());
+        let theme_dir_check = Path::new(format!("{}/bpytop-themes", EXECUTE_PATH.to_owned().to_str().unwrap()).as_str());
         let mut out : &'static Path;
         if theme_dir_check.exists() {
             out = theme_dir_check.clone();
@@ -473,12 +473,7 @@ pub fn main() {
         Collectors::CpuCollector,
     ];
 
-    let mut boxes: Vec<Boxes> = vec![
-        Boxes::CpuBox(&cpu_box),
-        Boxes::MemBox(&mem_box),
-        Boxes::NetBox(&net_box),
-        Boxes::ProcBox(&proc_box),
-    ];
+    let mut boxes: Vec<Boxes> = vec![Boxes::CpuBox, Boxes::MemBox, Boxes::NetBox, Boxes::ProcBox];
 
     let mut graphs: Graphs = Graphs::default();
 
@@ -528,6 +523,9 @@ pub fn main() {
         &CONFIG,
         &THEME,
         &cpu_collector,
+        &mem_box,
+        &net_box,
+        &proc_box,
     );
 
     // Start a thread checking for updates while running init
@@ -592,9 +590,19 @@ pub fn main() {
         if CONFIG.check_temp {
             cpu_collector.get_sensors(&CONFIG);
         }
-        brshtop_box.calc_sizes(boxes, &term, &CONFIG, &cpu_collector);
+        brshtop_box.calc_sizes(
+            boxes,
+            &term,
+            &CONFIG,
+            &cpu_collector,
+            &cpu_box,
+            &mem_box,
+            &net_box,
+            &proc_box,
+        );
         brshtop_box.draw_bg(
-            false, &draw, boxes, &menu, &CONFIG, &cpu_box, &key, &THEME, &term,
+            false, &draw, boxes, &menu, &CONFIG, &cpu_box, &mem_box, &net_box, &proc_box, &key,
+            &THEME, &term,
         );
         init.success(&CONFIG, &draw, &term, &key);
     }
@@ -667,6 +675,11 @@ pub fn main() {
                     &proc_box,
                     &mem_box,
                     &cpu_collector,
+                    &mem_collector,
+                    &net_collector,
+                    &proc_collector,
+                    &mem_box,
+                    &proc_box,
                 ),
                 SIGINT => clean_quit(None, None, &key, &collector, &draw, &term, &CONFIG, None),
                 SIGWINCH => term.refresh(
@@ -684,6 +697,9 @@ pub fn main() {
                     &CONFIG,
                     &THEME,
                     &cpu_collector,
+                    &mem_box,
+                    &net_box,
+                    &proc_box,
                 ),
                 _ => unreachable!(),
             }
@@ -750,6 +766,10 @@ pub fn main() {
         &net_box,
         &proc_box,
         &mem_box,
+        &cpu_collector,
+        &mem_collector,
+        &net_collector,
+        &proc_collector,
     );
     init.success(&CONFIG, &draw, &term, &key);
 
@@ -814,6 +834,9 @@ pub fn main() {
         &CONFIG,
         &THEME,
         &cpu_collector,
+        &mem_box,
+        &net_box,
+        &proc_box,
     );
     draw.out(vec![], true, &key);
     if CONFIG.draw_clock.len() > 0 {
@@ -847,6 +870,7 @@ pub fn main() {
         collectors,
         &mem_collector,
         &graphs,
+        &mem_box,
     );
 }
 
@@ -854,7 +878,7 @@ pub fn run(
     term: &Term,
     key: &Key,
     timer: &Timer,
-    collector: & Collector,
+    collector: &Collector,
     boxes: Vec<Boxes>,
     init: &Init,
     cpu_box: &CpuBox,
@@ -865,14 +889,15 @@ pub fn run(
     THEME: &Theme,
     ARG_MODE: ViewMode,
     procbox: &ProcBox,
-    proccollector: & ProcCollector,
-    netcollector: & NetCollector,
+    proccollector: &ProcCollector,
+    netcollector: &NetCollector,
     cpucollector: &CpuCollector,
     netbox: &NetBox,
     update_checker: &UpdateChecker,
     collectors: Vec<Collectors>,
-    memcollector: & MemCollector,
+    memcollector: &MemCollector,
     graphs: &Graphs,
+    mem_box: &MemBox,
 ) {
     loop {
         term.refresh(
@@ -890,6 +915,9 @@ pub fn run(
             CONFIG,
             THEME,
             cpucollector,
+            mem_box,
+            netbox,
+            procbox,
         );
         timer.stamp();
 
@@ -918,6 +946,8 @@ pub fn run(
                     timer,
                     memcollector,
                     graphs,
+                    mem_box,
+                    procbox,
                 )
             }
         }
@@ -940,6 +970,11 @@ pub fn create_box(
     box_to_use: Option<Boxes>,
     term: &Term,
     THEME: &Theme,
+    brshtop_box: Option<&BrshtopBox>,
+    cpu_box: Option<&CpuBox>,
+    mem_box: Option<&MemBox>,
+    net_box: Option<&NetBox>,
+    proc_box: Option<&ProcBox>,
 ) -> String {
     let mut out: String = format!("{}{}", term.fg, term.bg);
     let mut lc: Color = match line_color {
@@ -962,39 +997,39 @@ pub fn create_box(
     // * Get values from box class if given
     match box_to_use {
         Some(o) => match o {
-            Boxes::BrshtopBox(b) => {
-                wx = b.get_x();
-                wy = b.get_y();
-                ww = b.get_width();
-                wh = b.get_height();
-                wt = b.get_name();
+            Boxes::BrshtopBox => {
+                wx = brshtop_box.unwrap().get_x();
+                wy = brshtop_box.unwrap().get_y();
+                ww = brshtop_box.unwrap().get_width();
+                wh = brshtop_box.unwrap().get_height();
+                wt = brshtop_box.unwrap().get_name();
             }
-            Boxes::CpuBox(b) => {
-                let parent_box = b.get_parent();
+            Boxes::CpuBox => {
+                let parent_box = cpu_box.unwrap().get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
                 wh = parent_box.get_height();
                 wt = parent_box.get_name();
             }
-            Boxes::MemBox(b) => {
-                let parent_box = b.get_parent();
+            Boxes::MemBox => {
+                let parent_box = mem_box.unwrap().get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
                 wh = parent_box.get_height();
                 wt = parent_box.get_name();
             }
-            Boxes::NetBox(b) => {
-                let parent_box = b.get_parent();
+            Boxes::NetBox => {
+                let parent_box = net_box.unwrap().get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
                 wh = parent_box.get_height();
                 wt = parent_box.get_name();
             }
-            Boxes::ProcBox(b) => {
-                let parent_box = b.parent;
+            Boxes::ProcBox => {
+                let parent_box = proc_box.unwrap().get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
@@ -1339,8 +1374,8 @@ pub fn process_keys<'a>(
     ARG_MODE: ViewMode,
     key_class: &Key,
     procbox: &ProcBox,
-    collector: &'a Collector,
-    proccollector: &'a ProcCollector,
+    collector: &Collector,
+    proccollector: &ProcCollector,
     CONFIG: &Config,
     draw: &Draw,
     term: &Term,
@@ -1356,8 +1391,10 @@ pub fn process_keys<'a>(
     update_checker: &UpdateChecker,
     collectors: Vec<Collectors>,
     timer: &Timer,
-    memcollector: &'a MemCollector,
+    memcollector: &MemCollector,
     graphs: &Graphs,
+    mem_box: &MemBox,
+    proc_box: &ProcBox,
 ) {
     let mut mouse_pos: (i32, i32) = (0, 0);
     let mut filtered: bool = false;
@@ -1373,9 +1410,9 @@ pub fn process_keys<'a>(
             .contains(&key)
         {
             mouse_pos = key_class.get_mouse();
-            if mouse_pos.0 >= procbox.parent.get_x() as i32
-                && procbox.current_y as i32 + 1 <= mouse_pos.1
-                && mouse_pos.1 < (procbox.current_y + procbox.current_h - 1) as i32
+            if mouse_pos.0 >= procbox.get_parent().get_x() as i32
+                && procbox.get_current_y() as i32 + 1 <= mouse_pos.1
+                && mouse_pos.1 < procbox.get_current_y() as i32 + procbox.get_current_h() as i32 - 1
             {
                 ()
             } else if key == "mouse_click".to_owned() {
@@ -1384,14 +1421,14 @@ pub fn process_keys<'a>(
                 key = "_null".to_owned()
             }
         }
-        if procbox.filtering {
+        if procbox.get_filtering() {
             if vec!["enter", "mouse_click", "mouse_unselect"]
                 .iter()
                 .map(|s| s.to_owned().to_owned())
                 .collect::<Vec<String>>()
                 .contains(&key)
             {
-                procbox.filtering = false;
+                procbox.set_filtering(false);
                 collector.collect(
                     vec![Collectors::ProcCollector],
                     CONFIG,
@@ -1409,7 +1446,7 @@ pub fn process_keys<'a>(
                 .contains(&key)
             {
                 proccollector.search_filter = String::default();
-                procbox.filtering = false;
+                procbox.set_filtering(false);
             } else if key.len() == 1 {
                 proccollector.search_filter.push_str(key.as_str());
             } else if key == "backspace".to_owned() && proccollector.search_filter.len() > 0 {
@@ -1479,6 +1516,8 @@ pub fn process_keys<'a>(
                 boxes,
                 &netbox,
                 &proccollector,
+                &mem_box,
+                &proc_box,
             );
         } else if vec!["o", "f2"]
             .iter()
@@ -1505,6 +1544,8 @@ pub fn process_keys<'a>(
                 netbox,
                 proccollector,
                 collectors,
+                proc_box,
+                mem_box,
             );
         } else if vec!["h", "f1"]
             .iter()
@@ -1560,10 +1601,13 @@ pub fn process_keys<'a>(
         {
             // TODO : Fix this...
             //proccollector.sorting(key);
-        } else if key == " ".to_owned() && CONFIG.proc_tree && procbox.selected > 0 {
-            if proccollector.collapsed.contains_key(&procbox.selected_pid) {
-                proccollector.collapsed[&procbox.selected_pid] =
-                    !proccollector.collapsed[&procbox.selected_pid];
+        } else if key == " ".to_owned() && CONFIG.proc_tree && procbox.get_selected() > 0 {
+            if proccollector
+                .collapsed
+                .contains_key(&procbox.get_selected_pid())
+            {
+                proccollector.collapsed[&procbox.get_selected_pid()] =
+                    !proccollector.collapsed[&procbox.get_selected_pid()];
             }
             collector.collect(
                 vec![Collectors::ProcCollector],
@@ -1632,9 +1676,9 @@ pub fn process_keys<'a>(
                 false,
             );
         } else if key == "f".to_owned() {
-            procbox.filtering = true;
+            procbox.set_filtering(true);
             if proccollector.search_filter.len() == 0 {
-                procbox.start = 0;
+                procbox.set_start(0);
             }
             collector.collect(
                 vec![Collectors::ProcCollector],
@@ -1683,6 +1727,9 @@ pub fn process_keys<'a>(
                 CONFIG,
                 THEME,
                 cpucollector,
+                mem_box,
+                netbox,
+                proc_box,
             );
         } else if vec!["t", "k", "i"]
             .iter()
@@ -1690,8 +1737,8 @@ pub fn process_keys<'a>(
             .collect::<Vec<String>>()
             .contains(&key.to_ascii_lowercase())
         {
-            let pid: u32 = if procbox.selected > 0 {
-                procbox.selected_pid
+            let pid: u32 = if procbox.get_selected() > 0 {
+                procbox.get_selected_pid()
             } else {
                 proccollector.detailed_pid.unwrap()
             };
@@ -1724,21 +1771,21 @@ pub fn process_keys<'a>(
                 false,
             );
         } else if key == "enter".to_owned() {
-            if procbox.selected > 0
-                && proccollector.detailed_pid.unwrap_or(0) != procbox.selected_pid
-                && psutil::process::pid_exists(procbox.selected_pid)
+            if procbox.get_selected() > 0
+                && proccollector.detailed_pid.unwrap_or(0) != procbox.get_selected_pid()
+                && psutil::process::pid_exists(procbox.get_selected_pid())
             {
                 proccollector.detailed = true;
-                procbox.last_selection = procbox.selected;
-                procbox.selected = 0;
-                proccollector.detailed_pid = Some(procbox.selected_pid);
-                procbox.parent.set_resized(true);
+                procbox.set_last_selection(procbox.get_selected());
+                procbox.set_selected(0);
+                proccollector.detailed_pid = Some(procbox.get_selected_pid());
+                procbox.set_parent_resized(true);
             } else if proccollector.detailed {
-                procbox.selected = procbox.last_selection;
-                procbox.last_selection = 0;
+                procbox.set_selected(procbox.get_last_selection());
+                procbox.set_last_selection(0);
                 proccollector.detailed = false;
                 proccollector.detailed_pid = None;
-                procbox.parent.set_resized(true);
+                procbox.set_parent_resized(true);
             } else {
                 continue;
             }
@@ -1830,17 +1877,7 @@ fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader
 
 /// Reset terminal settings and stop background input read before putting to sleep
 pub fn now_sleeping(key: &Key, collector: &Collector, draw: &Draw, term: &Term) -> Option<()> {
-    match key.stop() {
-        Some(b) => {
-            if b {
-                ()
-            } else {
-                return None;
-            }
-        }
-        None => return None,
-    };
-
+    key.stop();
     collector.stop();
     draw.now(
         vec![
@@ -1863,29 +1900,34 @@ pub fn now_sleeping(key: &Key, collector: &Collector, draw: &Draw, term: &Term) 
 }
 
 /// Set terminal settings and restart background input read
-pub fn now_awake<'a>(
-    draw: &'static Draw,
-    term: &'static Term,
-    key: &'static Key,
-    brshtop_box: &'static BrshtopBox,
-    collector: &'static Collector,
+pub fn now_awake(
+    draw: &Draw,
+    term: &Term,
+    key: &Key,
+    brshtop_box: &BrshtopBox,
+    collector: &Collector,
     boxes: Vec<Boxes>,
     init: &Init,
-    cpu_box: &'static CpuBox,
-    menu: &'static Menu,
+    cpu_box: &CpuBox,
+    menu: &Menu,
     timer: &Timer,
-    CONFIG: &'static Config,
-    THEME: &'static Theme,
+    CONFIG: &Config,
+    THEME: &Theme,
     DEBUG: bool,
     collectors: Vec<Collectors>,
-    timeit: &'static TimeIt,
+    timeit: &TimeIt,
     ARG_MODE: ViewMode,
-    graphs: &'static Graphs,
-    meters: &'static Meters,
-    netbox: &'static NetBox,
-    procbox: &'static ProcBox,
-    membox: &'static MemBox,
-    cpu_collector: &'static CpuCollector,
+    graphs: &Graphs,
+    meters: &Meters,
+    netbox: &NetBox,
+    procbox: &ProcBox,
+    membox: &MemBox,
+    cpu_collector: &CpuCollector,
+    mem_collector: &MemCollector,
+    net_collector: &NetCollector,
+    proc_collector: &ProcCollector,
+    mem_box: &MemBox,
+    proc_box: &ProcBox,
 ) {
     draw.now(
         vec![
@@ -1914,9 +1956,23 @@ pub fn now_awake<'a>(
         CONFIG,
         THEME,
         cpu_collector,
+        mem_box,
+        netbox,
+        proc_box,
     );
-    brshtop_box.calc_sizes(boxes, term, CONFIG, cpu_collector);
-    brshtop_box.draw_bg(true, draw, boxes, menu, CONFIG, cpu_box, key, THEME, term);
+    brshtop_box.calc_sizes(
+        boxes,
+        term,
+        CONFIG,
+        cpu_collector,
+        cpu_box,
+        membox,
+        netbox,
+        procbox,
+    );
+    brshtop_box.draw_bg(
+        true, draw, boxes, menu, CONFIG, cpu_box, membox, netbox, procbox, key, THEME, term,
+    );
     collector.start(
         CONFIG,
         DEBUG,
@@ -1935,5 +1991,9 @@ pub fn now_awake<'a>(
         netbox,
         procbox,
         membox,
+        cpu_collector,
+        mem_collector,
+        net_collector,
+        proc_collector,
     )
 }

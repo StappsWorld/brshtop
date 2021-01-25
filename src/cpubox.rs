@@ -171,7 +171,7 @@ impl CpuBox {
     }
 
     pub fn draw_bg(
-        &mut self,
+        &self,
         key: &Key,
         theme: &Theme,
         term: &Term,
@@ -203,6 +203,11 @@ impl CpuBox {
                 Some(Boxes::CpuBox),
                 term,
                 theme,
+                None,
+                Some(self),
+                None,
+                None,
+                None,
             ),
             mv::to(self.get_parent().get_y(), self.get_parent().get_x() + 10),
             theme
@@ -238,11 +243,16 @@ impl CpuBox {
                 Some(Boxes::CpuBox),
                 term,
                 theme,
+                None,
+                Some(self),
+                None,
+                None,
+                None,
             )
         );
     }
 
-    pub fn battery_activity(&mut self, menu: &Menu) -> bool {
+    pub fn battery_activity(&self, menu: &Menu) -> bool {
         let battery_manager = match Manager::new() {
             Ok(m) => m,
             Err(_) => {
@@ -368,7 +378,7 @@ impl CpuBox {
     }
 
     pub fn draw_fg(
-        &mut self,
+        &self,
         cpu: &CpuCollector,
         config: &Config,
         key: &Key,

@@ -133,7 +133,7 @@ impl ProcCollector {
     pub fn new(procbox: &ProcBox) -> Self {
         let mut proc = ProcCollector {
             parent: Collector::new(),
-            buffer: procbox.buffer.clone(),
+            buffer: procbox.get_buffer().clone(),
             search_filter: String::default(),
             processes: HashMap::<Pid, HashMap<String, ProcessInfo>>::new(),
             num_procs: 0,
@@ -326,8 +326,8 @@ impl ProcCollector {
 
         if self.detailed {
             self.expand = u32::try_from(
-                ((procbox.parent.get_width() as i32 - 2)
-                    - ((procbox.parent.get_width() as i32 - 2) / 3)
+                ((procbox.get_parent().get_width() as i32 - 2)
+                    - ((procbox.get_parent().get_width() as i32 - 2) / 3)
                     - 40)
                     / 10,
             )
@@ -354,7 +354,7 @@ impl ProcCollector {
                 None => {
                     self.details[&"killed".to_owned()] = ProcCollectorDetails::Bool(true);
                     self.details[&"status".to_owned()] = ProcCollectorDetails::Status(Status::Dead);
-                    procbox.redraw = true;
+                    procbox.set_redraw(true);
                     return;
                 }
             };
@@ -364,7 +364,7 @@ impl ProcCollector {
                     errlog(format!("Unable find process {} (error {:?})", c_pid, e));
                     self.details[&"killed".to_owned()] = ProcCollectorDetails::Bool(true);
                     self.details[&"status".to_owned()] = ProcCollectorDetails::Status(Status::Dead);
-                    procbox.redraw = true;
+                    procbox.set_redraw(true);
                     return;
                 }
             };
@@ -675,10 +675,10 @@ impl ProcCollector {
                     20.0
                 },
             ) as u32);
-            if self.details_cpu.len() as u32 > procbox.parent.get_width() {
+            if self.details_cpu.len() as u32 > procbox.get_parent().get_width() {
                 self.details_cpu.remove(0);
             }
-            if self.details_mem.len() as u32 > procbox.parent.get_width() {
+            if self.details_mem.len() as u32 > procbox.get_parent().get_width() {
                 self.details_mem.remove(0);
             }
         }

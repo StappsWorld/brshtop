@@ -139,7 +139,7 @@ impl BrshtopBox {
                 }
                 Boxes::ProcBox => {
                     proc_box.calc_size(term, self);
-                    proc_box.parent.resized = true;
+                    proc_box.set_parent_resized(true);
                 }
             }
         }

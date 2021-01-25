@@ -71,7 +71,7 @@ impl MemBox {
     }
 
     pub fn calc_size(
-        &mut self,
+        &self,
         term: &Term,
         brshtop_box: &BrshtopBox,
         CONFIG: &Config,
@@ -188,7 +188,7 @@ impl MemBox {
         }
     }
 
-    pub fn draw_bg(&mut self, THEME: &Theme, CONFIG: &Config, term: &Term) -> String {
+    pub fn draw_bg(&self, THEME: &Theme, CONFIG: &Config, term: &Term) -> String {
         if self.get_parent().get_proc_mode() {
             String::default()
         } else {
@@ -204,9 +204,14 @@ impl MemBox {
                     Some(THEME.colors.mem_box),
                     None,
                     true,
-                    Some(Boxes::MemBox(self)),
+                    Some(Boxes::MemBox),
                     term,
                     THEME,
+                    None,
+                    None,
+                    Some(self),
+                    None,
+                    None,
                 )
                 .as_str(),
             );
@@ -259,7 +264,7 @@ impl MemBox {
     }
 
     pub fn draw_fg(
-        &mut self,
+        &self,
         mem: &MemCollector,
         term: &Term,
         brshtop_box: &BrshtopBox,

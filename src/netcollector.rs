@@ -177,7 +177,7 @@ impl<'a> NetCollector<'a> {
 
         unsafe {
             collector.collect(
-                vec![Collectors::<'a>::NetCollector(self)],
+                vec![Collectors::NetCollector],
                 CONFIG,
                 true,
                 false,

@@ -23,6 +23,7 @@ use {
         timeit::TimeIt,
         CONFIG_DIR,
     },
+    crossbeam,
     std::{
         path::*,
         sync::{Arc, Mutex},
@@ -46,7 +47,6 @@ pub struct Collector {
     draw_now: bool,
     redraw: bool,
     only_draw: bool,
-    pub thread: Option<thread::JoinHandle<()>>,
     pub flag: Flag,
     pub control: Control,
     collect_run: Event,
@@ -69,7 +69,6 @@ impl Collector {
             only_draw: false,
             flag: flag_build,
             control: control_build,
-            thread: None,
             collect_run: Event::Flag(false),
             collect_done: Event::Flag(false),
             collect_idle: Event::Flag(true),
@@ -83,7 +82,7 @@ impl Collector {
 
     /// Defaults draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False
     pub fn collect(
-        &mut self,
+        &self,
         collectors: Vec<Collectors>,
         CONFIG: &Config,
         draw_now: bool,
@@ -114,7 +113,7 @@ impl Collector {
     }
 
     pub fn start(
-        &mut self,
+        &self,
         CONFIG: &Config,
         DEBUG: bool,
         collectors: Vec<Collectors>,
@@ -138,54 +137,35 @@ impl Collector {
         proc_collector : &ProcCollector,
     ) {
         self.stopping = false;
-
-        let thread_CONFIG = Arc::new(Mutex::new(CONFIG));
-        let thread_brshtop_box = Arc::new(Mutex::new(brshtop_box));
-        let thread_timeit = Arc::new(Mutex::new(timeit));
-        let thread_menu = Arc::new(Mutex::new(menu));
-        let thread_draw = Arc::new(Mutex::new(draw));
-        let thread_term = Arc::new(Mutex::new(term));
-        let thread_cpu_box = Arc::new(Mutex::new(cpu_box));
-        let thread_key = Arc::new(Mutex::new(key));
-        let thread_THEME = Arc::new(Mutex::new(THEME));
-        let thread_graphs = Arc::new(Mutex::new(graphs));
-        let thread_meters = Arc::new(Mutex::new(meters));
-        let thread_netbox = Arc::new(Mutex::new(netbox));
-        let thread_procbox = Arc::new(Mutex::new(procbox));
-        let thread_membox = Arc::new(Mutex::new(membox));
-        let thread_cpu_collector = Arc::new(Mutex::new(cpu_collector));
-        let thread_mem_collector = Arc::new(Mutex::new(mem_collector));
-        let thread_net_collector = Arc::new(Mutex::new(net_collector));
-        let thread_proc_collector = Arc::new(Mutex::new(proc_collector));
-
-
-        self.thread = Some(thread::spawn(move || {
-            let (flag_build, control_build) = make_pair();
-            self.flag = flag_build;
-            self.control = control_build;
-            self.runner(
-                thread_CONFIG,
-                DEBUG,
-                thread_brshtop_box,
-                thread_timeit,
-                thread_menu,
-                thread_draw,
-                thread_term,
-                thread_cpu_box,
-                thread_key,
-                thread_THEME,
-                ARG_MODE,
-                thread_graphs,
-                thread_meters,
-                thread_netbox,
-                thread_procbox,
-                thread_membox,
-                thread_cpu_collector,
-                thread_net_collector,
-                thread_proc_collector,
-                thread_mem_collector,
-            )
-        }));
+        crossbeam::scope(|s| {
+            s.spawn(move |_| {
+                let (flag_build, control_build) = make_pair();
+                self.flag = flag_build;
+                self.control = control_build;
+                self.runner(
+                    CONFIG,
+                    DEBUG,
+                    brshtop_box,
+                    timeit,
+                    menu,
+                    draw,
+                    term,
+                    cpu_box,
+                    key,
+                    THEME,
+                    ARG_MODE,
+                    graphs,
+                    meters,
+                    netbox,
+                    procbox,
+                    membox,
+                    cpu_collector,
+                    net_collector,
+                    proc_collector,
+                    mem_collector,
+                );
+            });
+        });
 
         self.set_started(true);
         self.set_default_collect_queue(collectors.clone());
@@ -211,48 +191,27 @@ impl Collector {
 
     pub fn runner(
         &mut self,
-        thread_CONFIG: Arc<Mutex<&Config>>,
+        CONFIG: &Config,
         DEBUG: bool,
-        thread_brshtop_box: Arc<Mutex<&BrshtopBox>>,
-        thread_timeit: Arc<Mutex<&TimeIt>>,
-        thread_menu: Arc<Mutex<&Menu>>,
-        thread_draw: Arc<Mutex<&Draw>>,
-        thread_term: Arc<Mutex<&Term>>,
-        thread_cpu_box: Arc<Mutex<&CpuBox>>,
-        thread_key: Arc<Mutex<&Key>>,
-        thread_THEME: Arc<Mutex<&Theme>>,
+        brshtop_box: &BrshtopBox,
+        timeit: &TimeIt,
+        menu: &Menu,
+        draw: &Draw,
+        term: &Term,
+        cpu_box: &CpuBox,
+        key: &Key,
+        THEME: &Theme,
         ARG_MODE: ViewMode,
-        thread_graphs: Arc<Mutex<&Graphs>>,
-        thread_meters: Arc<Mutex<&Meters>>,
-        thread_netbox: Arc<Mutex<&NetBox>>,
-        thread_procbox: Arc<Mutex<&ProcBox>>,
-        thread_membox: Arc<Mutex<&MemBox>>,
-        thread_cpu_collector : Arc<Mutex<&&CpuCollector>>,
-        thread_net_collector : Arc<Mutex<&&NetCollector>>,
-        thread_proc_collector : Arc<Mutex<&&ProcCollector>>,
-        thread_mem_collector : Arc<Mutex<&&MemCollector>>,
+        graphs: &Graphs,
+        meters: &Meters,
+        netbox: &NetBox,
+        procbox: &ProcBox,
+        membox: &MemBox,
+        cpu_collector : &CpuCollector,
+        net_collector : &NetCollector,
+        proc_collector : &ProcCollector,
+        mem_collector : &MemCollector,
     ) {
-
-        let CONFIG  = thread_CONFIG.lock().unwrap().to_owned();
-        let brshtop_box = thread_brshtop_box.lock().unwrap().to_owned();
-        let timeit  = thread_timeit.lock().unwrap().to_owned();
-        let menu  = thread_menu.lock().unwrap().to_owned();
-        let draw  = thread_draw.lock().unwrap().to_owned();
-        let term  = thread_term.lock().unwrap().to_owned();
-        let cpu_box  = thread_cpu_box.lock().unwrap().to_owned();
-        let key  = thread_key.lock().unwrap().to_owned();
-        let THEME  = thread_THEME.lock().unwrap().to_owned();
-        let graphs  = thread_graphs.lock().unwrap().to_owned();
-        let meters  = thread_meters.lock().unwrap().to_owned();
-        let netbox  = thread_netbox.lock().unwrap().to_owned();
-        let procbox  = thread_procbox.lock().unwrap().to_owned();
-        let membox  = thread_membox.lock().unwrap().to_owned();
-        let cpu_collector = thread_cpu_collector.lock().unwrap().to_owned();
-        let net_collector = thread_net_collector.lock().unwrap().to_owned();
-        let proc_collector = thread_proc_collector.lock().unwrap().to_owned();
-        let mem_collector = thread_mem_collector.lock().unwrap().to_owned();
-
-
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
@@ -520,7 +479,6 @@ impl<'a> Clone for Collector {
             draw_now: self.draw_now.clone(),
             redraw: self.redraw.clone(),
             only_draw: self.only_draw.clone(),
-            thread: None,
             flag: flag_build,
             control: control_build,
             collect_run: self.collect_run.clone(),

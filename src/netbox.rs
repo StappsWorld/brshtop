@@ -107,7 +107,7 @@ impl NetBox {
         self.set_redraw(true);
     }
 
-    pub fn draw_bg(&mut self, theme: &Theme, term: &Term) -> String {
+    pub fn draw_bg(&self, theme: &Theme, term: &Term) -> String {
         if self.parent.get_proc_mode() {
             return String::default();
         }
@@ -123,9 +123,14 @@ impl NetBox {
                 Some(theme.colors.net_box),
                 None,
                 true,
-                Some(Boxes::NetBox(self)),
+                Some(Boxes::NetBox),
                 term,
-                theme
+                theme,
+                None,
+                None,
+                None,
+                Some(self),
+                None,
             ),
             create_box(
                 self.sub.get_box_x(),
@@ -140,6 +145,11 @@ impl NetBox {
                 None,
                 term,
                 theme,
+                None,
+                None,
+                None,
+                Some(self),
+                None,
             )
         )
     }

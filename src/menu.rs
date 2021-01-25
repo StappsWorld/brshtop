@@ -16,9 +16,11 @@ use {
         first_letter_to_upper_case, fx,
         init::Init,
         key::Key,
+        membox::MemBox,
         mv,
         netbox::NetBox,
         netcollector::NetCollector,
+        procbox::ProcBox,
         proccollector::ProcCollector,
         symbol,
         term::Term,
@@ -109,6 +111,8 @@ impl Menu {
         boxes: Vec<Boxes>,
         netbox: &NetBox,
         proccollector: &ProcCollector,
+        membox: &MemBox,
+        procbox: &ProcBox,
     ) {
         let mut out: String = String::default();
         let mut banner_mut: String = String::default();
@@ -313,6 +317,8 @@ impl Menu {
                             netbox,
                             proccollector,
                             collectors,
+                            procbox,
+                            membox,
                         );
                         self.resized = true;
                     } else if menu_current == "help".to_owned() {
@@ -483,6 +489,11 @@ impl Menu {
                         None,
                         term,
                         theme,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
                     )
                     .as_str(),
                 );
@@ -690,6 +701,8 @@ impl Menu {
         netbox: &NetBox,
         proc_collector: &ProcCollector,
         collectors: Vec<Collectors>,
+        procbox: &ProcBox,
+        membox: &MemBox,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -1132,6 +1145,11 @@ impl Menu {
                         None,
                         term,
                         theme,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
                     )
                     .as_str(),
                 );
@@ -1363,6 +1381,11 @@ impl Menu {
                                 None,
                                 term,
                                 theme,
+                                None,
+                                None,
+                                None,
+                                None,
+                                None,
                             )
                             .as_str(),
                         );
@@ -1519,6 +1542,9 @@ impl Menu {
                                             CONFIG,
                                             THEME,
                                             cpucollector,
+                                            membox,
+                                            netbox,
+                                            procbox,
                                         );
                                         self.resized = false;
                                     }
@@ -1652,6 +1678,9 @@ impl Menu {
                         CONFIG,
                         THEME,
                         cpucollector,
+                        membox,
+                        netbox,
+                        procbox,
                     );
                     self.resized = true;
                 } else if ["left", "right"]
@@ -1677,7 +1706,9 @@ impl Menu {
                     collector.get_collect_idle_reference().wait(-1.0);
                     CONFIG.color_theme =
                         theme.themes.keys().cloned().collect::<Vec<String>>()[color_i];
-                    THEME.replace_self(Theme::from_str(CONFIG.color_theme).unwrap_or(Theme::default()));
+                    THEME.replace_self(
+                        Theme::from_str(CONFIG.color_theme).unwrap_or(Theme::default()),
+                    );
                     term.refresh(
                         vec![],
                         boxes,
@@ -1693,6 +1724,9 @@ impl Menu {
                         CONFIG,
                         THEME,
                         cpucollector,
+                        membox,
+                        netbox,
+                        procbox,
                     );
                     timer.finish(key_class, CONFIG);
                 } else if ["left", "right"]
@@ -1771,6 +1805,9 @@ impl Menu {
                             CONFIG,
                             THEME,
                             cpucollector,
+                            membox,
+                            netbox,
+                            procbox,
                         );
                         self.resized = false;
                     }
@@ -1814,6 +1851,9 @@ impl Menu {
                         CONFIG,
                         THEME,
                         cpucollector,
+                        membox,
+                        netbox,
+                        procbox,
                     );
                     self.resized = false;
                 } else if key == "up".to_owned() {
