@@ -9,6 +9,7 @@ use {
     from_map::{FromMap, FromMapDefault},
     gradient::Gradient,
     lazy_static::lazy_static,
+    once_cell::sync::OnceCell,
     regex::Regex,
     std::{
         collections::HashMap,
@@ -17,6 +18,7 @@ use {
         iter::FromIterator,
         path::{Path, PathBuf},
         ffi::OsString,
+        sync::Mutex,
     },
 };
 
@@ -129,7 +131,7 @@ impl Color {
         }
     }
 
-    pub fn call(&mut self, adder: String, term: &Term) -> Color {
+    pub fn call(&mut self, adder: String, term: &OnceCell<Mutex<Term>>) -> Color {
         if adder.len() < 1 {
             return Color::default();
         }
@@ -139,8 +141,8 @@ impl Color {
             self.escape(),
             adder,
             match self.depth {
-                LayerDepth::Fg => term.fg,
-                LayerDepth::Bg => term.bg,
+                LayerDepth::Fg => term.get().unwrap().lock().unwrap().get_fg(),
+                LayerDepth::Bg => term.get().unwrap().lock().unwrap().get_bg(),
             }
         ))
     }

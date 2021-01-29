@@ -5,9 +5,11 @@ use {
         symbol,
         term::Term,
     },
+    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         fmt,
+        sync::Mutex,
     },
 };
 
@@ -132,7 +134,7 @@ pub struct Meter {
 } impl Meter {
 
     /// Defaults invert : bool = false
-    pub fn new(value : i32, width : u32, gradient_name : String, invert : bool, THEME : &Theme, term : &Term) -> Self {
+    pub fn new(value : i32, width : u32, gradient_name : String, invert : bool, THEME : &Theme, term : &OnceCell<Mutex<Term>>) -> Self {
         let meter = Meter{
             out : gradient_name,
             color_gradient : THEME.gradient[&gradient_name],
@@ -147,7 +149,7 @@ pub struct Meter {
         meter
     }
 
-    pub fn call(&mut self, value : Option<i32>, term : &Term) -> String {
+    pub fn call(&mut self, value : Option<i32>, term : &OnceCell<Mutex<Term>>) -> String {
         match value {
             Some(i) => {
                 let mut new_val : i32 = 0;
@@ -167,7 +169,7 @@ pub struct Meter {
         }
     }
 
-    pub fn _create(&mut self, value : i32, term : &Term) -> String {
+    pub fn _create(&mut self, value : i32, term : &OnceCell<Mutex<Term>>) -> String {
         let mut new_value : i32 = 0;
         if value > 100 {
             new_value = 100;
@@ -206,7 +208,7 @@ pub struct Meter {
             }
         }
         if !broke {
-            out.push_str(term.fg.to_string().as_str());
+            out.push_str(term.get().unwrap().lock().unwrap().get_fg().to_string().as_str());
         }
 
         if self.saved.contains_key(&new_value) {

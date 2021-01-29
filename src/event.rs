@@ -8,7 +8,7 @@ pub enum Event {
 }
 impl Event {
     /// Give a time in milliseconds to pause the current connection between threads, or give -1 for  time to wait until a different thread has set this enum
-    pub fn wait(&mut self, time : f64) {
+    pub fn wait(&self, time : f64) {
         let now = SystemTime::now();
         let wait_period = time::Duration::from_millis(50);
         match time {

@@ -18,6 +18,7 @@ use {
     },
     futures::{future, stream::StreamExt},
     heim::disk::{io_counters, IoCounters},
+    once_cell::sync::OnceCell,
     psutil::{
         disk::{DiskUsage, FileSystem},
         memory::{
@@ -25,7 +26,7 @@ use {
         },
         Bytes,
     },
-    std::{collections::HashMap, convert::TryFrom, fmt, path::Path, time::SystemTime},
+    std::{collections::HashMap, convert::TryFrom, fmt, path::Path, sync::{Arc, Mutex}, time::SystemTime},
 };
 
 #[derive(Clone)]
@@ -65,7 +66,7 @@ pub struct MemCollector {
     buffer: String,
 }
 impl MemCollector {
-    pub fn new(membox: &MemBox) -> Self {
+    pub fn new(membox: &OnceCell<Mutex<MemBox>>) -> Self {
         let mem = MemCollector {
             parent: Collector::new(),
             values: HashMap::<String, Bytes>::new(),
@@ -82,7 +83,7 @@ impl MemCollector {
             io_error: false,
             old_disks: Vec::<String>::new(),
             excludes: vec![FileSystem::Other("squashfs".to_owned())],
-            buffer: membox.get_buffer().clone(),
+            buffer: membox.get().unwrap().lock().unwrap().get_buffer().clone(),
         };
         if SYSTEM.to_owned() == "BSD".to_owned() {
             for s in vec!["devfs", "tmpfs", "procfs", "linprocfs", "gvfs", "fusefs"]
@@ -98,7 +99,7 @@ impl MemCollector {
         mem
     }
 
-    pub fn collect(&mut self, CONFIG: &Config, membox: &MemBox) {
+    pub fn collect(&mut self, CONFIG: &OnceCell<Mutex<Config>>, membox: &OnceCell<Mutex<MemBox>>) {
         // * Collect memory
         let mem: VirtualMemory = match virtual_memory() {
             Ok(v) => v,
@@ -144,7 +145,7 @@ impl MemCollector {
                 key.clone(),
                 value * 100 / self.get_values_index("total".to_owned()).unwrap_or(1),
             );
-            if CONFIG.mem_graphs {
+            if CONFIG.get().unwrap().lock().unwrap().mem_graphs {
                 if !self.get_vlist().contains_key(&key.clone()) {
                     self.vlist.insert(key, vec![]);
                 }
@@ -153,7 +154,7 @@ impl MemCollector {
                     self.get_percent_index(key.clone()).unwrap_or(0),
                 );
                 if self.get_vlist_index(key.clone()).unwrap_or(vec![]).len() as u32
-                    > membox.get_parent().get_width()
+                    > membox.get().unwrap().lock().unwrap().get_parent().get_width()
                 {
                     match self.remove_vlist_inner_index(key.clone(), 0) {
                         Err(s) => errlog(format!(
@@ -167,7 +168,9 @@ impl MemCollector {
         }
 
         // * Collect swap
-        if CONFIG.show_swap || CONFIG.swap_disk {
+        if CONFIG.get().unwrap().lock().unwrap().show_swap
+            || CONFIG.get().unwrap().lock().unwrap().swap_disk
+        {
             let swap: SwapMemory = match swap_memory() {
                 Ok(s) => s,
                 Err(e) => {
@@ -191,9 +194,9 @@ impl MemCollector {
             self.set_swap_values_index("used".to_owned(), swap.total() / swap.free());
 
             if swap.total() > 0 {
-                if !membox.get_swap_on() {
-                    membox.set_redraw(true);
-                    membox.set_swap_on(true);
+                if !membox.get().unwrap().lock().unwrap().get_swap_on() {
+                    membox.get().unwrap().lock().unwrap().set_redraw(true);
+                    membox.get().unwrap().lock().unwrap().set_swap_on(true);
                 }
                 for (key, value) in self.get_swap_values() {
                     self.set_swap_string_index(
@@ -207,7 +210,7 @@ impl MemCollector {
                         key.clone(),
                         value.clone() * 100 / self.get_swap_values_index(key.clone()).unwrap_or(1),
                     );
-                    if CONFIG.mem_graphs {
+                    if CONFIG.get().unwrap().lock().unwrap().mem_graphs {
                         if !self.get_swap_vlist().contains_key(&key.clone()) {
                             self.set_swap_vlist_index(key.clone(), vec![]);
                         }
@@ -219,26 +222,26 @@ impl MemCollector {
                             .get_swap_vlist_index(key.clone())
                             .unwrap_or(vec![])
                             .len() as u32
-                            > membox.get_parent().get_width()
+                            > membox.get().unwrap().lock().unwrap().get_parent().get_width()
                         {
                             self.remove_vlist_inner_index(key.clone(), 0);
                         }
                     }
                 }
             } else {
-                if membox.get_swap_on() {
-                    membox.set_redraw(true);
-                    membox.set_swap_on(false);
+                if membox.get().unwrap().lock().unwrap().get_swap_on() {
+                    membox.get().unwrap().lock().unwrap().set_redraw(true);
+                    membox.get().unwrap().lock().unwrap().set_swap_on(false);
                 }
             }
         } else {
-            if membox.get_swap_on() {
-                membox.set_redraw(true);
-                membox.set_swap_on(false);
+            if membox.get().unwrap().lock().unwrap().get_swap_on() {
+                membox.get().unwrap().lock().unwrap().set_redraw(true);
+                membox.get().unwrap().lock().unwrap().set_swap_on(false);
             }
         }
 
-        if !CONFIG.show_disks {
+        if !CONFIG.get().unwrap().lock().unwrap().show_disks {
             return;
         }
 
@@ -254,11 +257,22 @@ impl MemCollector {
         let mut disk_list: Vec<String> = Vec::<String>::new();
         self.set_disks(HashMap::<String, HashMap<String, DiskInfo>>::new());
 
-        if CONFIG.disks_filter.len() > 0 {
-            if CONFIG.disks_filter.starts_with("exclude=") {
+        if CONFIG.get().unwrap().lock().unwrap().disks_filter.len() > 0 {
+            if CONFIG
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .disks_filter
+                .starts_with("exclude=")
+            {
                 filter_exclude = true;
                 let mut adder: Vec<String> = Vec::<String>::new();
                 for v in CONFIG
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
                     .disks_filter
                     .replace("exclude=", "")
                     .trim()
@@ -269,7 +283,15 @@ impl MemCollector {
                 filtering = adder.clone();
             } else {
                 let mut adder: Vec<String> = Vec::<String>::new();
-                for v in CONFIG.disks_filter.trim().split(',') {
+                for v in CONFIG
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .disks_filter
+                    .trim()
+                    .split(',')
+                {
                     adder.push(v.trim().to_owned());
                 }
                 filtering = adder.clone();
@@ -438,7 +460,7 @@ impl MemCollector {
                         vec![disk_io.read_bytes().value, disk_io.write_bytes().value],
                     );
 
-                    if membox.get_disks_width() > 30 {
+                    if membox.get().unwrap().lock().unwrap().get_disks_width() > 30 {
                         if disk_read > 0 {
                             io_string.push_str(
                                 format!(
@@ -492,7 +514,7 @@ impl MemCollector {
                     );
                 }
 
-                if CONFIG.swap_disk && membox.get_swap_on() {
+                if CONFIG.get().unwrap().lock().unwrap().swap_disk && membox.get().unwrap().lock().unwrap().get_swap_on() {
                     self.set_disks_index("__swap".to_owned(), {
                         let mut h = vec![
                             ("name", DiskInfo::String("swap".to_owned())),
@@ -555,7 +577,7 @@ impl MemCollector {
                 }
 
                 if disk_list != self.get_old_disks() {
-                    membox.set_redraw(true);
+                    membox.get().unwrap().lock().unwrap().set_redraw(true);
                     self.set_old_disks(disk_list.clone());
                 }
 
@@ -571,18 +593,18 @@ impl MemCollector {
     /// JUST CALL MemBox.draw_fg()
     pub fn draw(
         &mut self,
-        membox: &MemBox,
-        term: &Term,
-        brshtop_box: &BrshtopBox,
-        CONFIG: &Config,
+        membox: &OnceCell<Mutex<MemBox>>,
+        term: &OnceCell<Mutex<Term>>,
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
+        CONFIG: &OnceCell<Mutex<Config>>,
         meters: &Meters,
         THEME: &Theme,
-        key: &Key,
-        collector: &Collector,
-        draw: &Draw,
+        key: &OnceCell<Mutex<Key>>,
+        collector: &OnceCell<Mutex<Collector>>,
+        draw: &OnceCell<Mutex<Draw>>,
         menu: &Menu,
     ) {
-        membox.draw_fg(
+        membox.get().unwrap().lock().unwrap().draw_fg(
             self,
             term,
             brshtop_box,
@@ -593,6 +615,7 @@ impl MemCollector {
             collector,
             draw,
             menu,
+            membox,
         );
     }
 

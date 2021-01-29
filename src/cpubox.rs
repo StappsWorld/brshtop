@@ -1,7 +1,7 @@
 use {
     crate::{
         brshtop_box::{Boxes, BrshtopBox, SubBoxes},
-        config::{Config, ViewMode},
+        config::{Config, ViewMode, ViewModeEnum},
         cpucollector::CpuCollector,
         create_box,
         draw::Draw,
@@ -22,7 +22,8 @@ use {
         *,
     },
     math::round::ceil,
-    std::{collections::HashMap, convert::TryFrom, fs::File, path::Path},
+    once_cell::sync::OnceCell,
+    std::{collections::HashMap, convert::TryFrom, fs::File, path::Path, sync::Mutex,},
 };
 
 pub struct CpuBox {
@@ -41,7 +42,7 @@ pub struct CpuBox {
     clock_block: bool,
 }
 impl CpuBox {
-    pub fn new(brshtop_box: &BrshtopBox, config: &Config, ARG_MODE: ViewMode) -> Self {
+    pub fn new(brshtop_box: &OnceCell<Mutex<BrshtopBox>>, config: &OnceCell<Mutex<Config>>, ARG_MODE: ViewMode) -> Self {
         let mut bsm: HashMap<String, String> = HashMap::<String, String>::new();
         bsm.insert("Charging".to_owned(), "▲".to_owned());
         bsm.insert("Discharging".to_owned(), "▼".to_owned());
@@ -50,7 +51,7 @@ impl CpuBox {
 
         let buffer_mut: String = "cpu".to_owned();
 
-        brshtop_box.push_buffers(buffer_mut.clone());
+        brshtop_box.get().unwrap().lock().unwrap().push_buffers(buffer_mut.clone());
 
         let cpu_box = CpuBox {
             parent: BrshtopBox::new(config, ARG_MODE),
@@ -77,9 +78,9 @@ impl CpuBox {
     }
 
     pub fn calc_size(
-        &self,
-        term: &Term,
-        brshtop_box: &BrshtopBox,
+        &mut self,
+        term: &OnceCell<Mutex<Term>>,
+        set_b_cpu_h : &mut i32,
         cpu: &CpuCollector,
     ) {
         let mut height_p: u32 = if self.get_parent().get_proc_mode() {
@@ -88,16 +89,16 @@ impl CpuBox {
             self.get_parent().get_height_p()
         };
 
-        self.set_parent_width((term.width as u32 * self.get_parent().get_width_p() / 100) as u32);
+        self.set_parent_width((term.get().unwrap().lock().unwrap().get_width() as u32 * self.get_parent().get_width_p() / 100) as u32);
         self.set_parent_height(
-            (term.height as u32 * self.get_parent().get_height_p() / 100) as u32,
+            (term.get().unwrap().lock().unwrap().get_height() as u32 * self.get_parent().get_height_p() / 100) as u32,
         );
 
         if self.get_parent().get_height() < 8 {
             self.set_parent_height(8);
         }
 
-        brshtop_box.set_b_cpu_h(self.get_parent().get_height() as i32);
+        set_b_cpu_h = &mut (self.get_parent().get_height() as i32);
 
         self.set_sub_box_columns(ceil(
             ((THREADS.to_owned() + 1) / (self.get_parent().get_height() - 5) as u64) as f64,
@@ -171,13 +172,14 @@ impl CpuBox {
     }
 
     pub fn draw_bg(
-        &self,
-        key: &Key,
+        &mut self,
+        key: &OnceCell<Mutex<Key>>,
         theme: &Theme,
-        term: &Term,
-        config: &Config,
+        term: &OnceCell<Mutex<Term>>,
+        config: &OnceCell<Mutex<Config>>,
+        passable_self : &OnceCell<Mutex<CpuBox>>,
     ) -> String {
-        if !key.mouse.contains_key(&"M".to_owned()) {
+        if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"M".to_owned()) {
             let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
             for i in 0..6 {
                 let mut pusher: Vec<i32> = Vec::<i32>::new();
@@ -185,7 +187,7 @@ impl CpuBox {
                 pusher.push(self.get_parent().get_y() as i32);
                 top.push(pusher);
             }
-            key.mouse.insert("M".to_owned(), top);
+            key.get().unwrap().lock().unwrap().mouse.insert("M".to_owned(), top);
         }
 
         return format!(
@@ -204,7 +206,7 @@ impl CpuBox {
                 term,
                 theme,
                 None,
-                Some(self),
+                Some(passable_self),
                 None,
                 None,
                 None,
@@ -227,12 +229,12 @@ impl CpuBox {
                 self.get_sub().get_box_y(),
                 self.get_sub().get_box_width(),
                 self.get_sub().get_box_height(),
-                Some(if config.custom_cpu_name != String::default() {
+                Some(if config.get().unwrap().lock().unwrap().custom_cpu_name != String::default() {
                     CPU_NAME.to_owned()
                         [..usize::try_from(self.get_sub().get_box_width() as i32 - 14).unwrap_or(0)]
                         .to_owned()
                 } else {
-                    config.custom_cpu_name
+                    config.get().unwrap().lock().unwrap().custom_cpu_name
                         [..usize::try_from(self.get_sub().get_box_width() as i32 - 14).unwrap_or(0)]
                         .to_owned()
                 }),
@@ -244,7 +246,7 @@ impl CpuBox {
                 term,
                 theme,
                 None,
-                Some(self),
+                Some(passable_self),
                 None,
                 None,
                 None,
@@ -380,11 +382,11 @@ impl CpuBox {
     pub fn draw_fg(
         &self,
         cpu: &CpuCollector,
-        config: &Config,
-        key: &Key,
+        config: &OnceCell<Mutex<Config>>,
+        key: &OnceCell<Mutex<Key>>,
         theme: &Theme,
-        term: &Term,
-        draw: &Draw,
+        term: &OnceCell<Mutex<Term>>,
+        draw: &OnceCell<Mutex<Draw>>,
         ARG_MODE: ViewMode,
         graphs: &Graphs,
         meters: &Meters,
@@ -411,7 +413,7 @@ impl CpuBox {
         let mut bw: u32 = sub.get_box_width() - 2;
         let mut bh: u32 = sub.get_box_height() - 2;
         let mut hh: u32 = ceil((h / 2) as f64, 0) as u32;
-        let mut hide_cores: bool = (cpu.cpu_temp_only || !config.show_coretemp) && cpu.got_sensors;
+        let mut hide_cores: bool = (cpu.cpu_temp_only || !config.get().unwrap().lock().unwrap().show_coretemp) && cpu.got_sensors;
         let mut ct_width: u32 = if hide_cores {
             if 6 * sub.get_column_size() > 6 {
                 6 * sub.get_column_size()
@@ -423,7 +425,7 @@ impl CpuBox {
         };
 
         if parent_box.get_resized() || self.get_redraw() {
-            if !key.mouse.contains_key(&"m".to_owned()) {
+            if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"m".to_owned()) {
                 let mut parent = Vec::<Vec<i32>>::new();
                 for i in 0..12 {
                     let mut adder = Vec::<i32>::new();
@@ -431,7 +433,7 @@ impl CpuBox {
                     adder.push(self.get_parent().get_y() as i32);
                     parent.push(adder);
                 }
-                key.mouse.insert("m".to_owned(), parent);
+                key.get().unwrap().lock().unwrap().mouse.insert("m".to_owned(), parent);
             }
             out_misc += format!(
                 "{}{}{}{}{}ode:{}{}{}",
@@ -443,7 +445,7 @@ impl CpuBox {
                 fx::b,
                 theme.colors.hi_fg.call("m".to_owned(), term),
                 theme.colors.title,
-                ARG_MODE != ViewMode::None || config.view_mode != ViewMode::None,
+                ARG_MODE.t != ViewModeEnum::None || config.get().unwrap().lock().unwrap().view_mode.t != ViewModeEnum::None,
                 fx::ub,
                 theme
                     .colors
@@ -535,7 +537,7 @@ impl CpuBox {
                 }
             }
 
-            draw.buffer(
+            draw.get().unwrap().lock().unwrap().buffer(
                 "cpu_misc".to_owned(),
                 vec![out_misc.clone()],
                 false,
@@ -548,7 +550,7 @@ impl CpuBox {
             );
         }
 
-        if config.show_battery && self.battery_activity(menu) {
+        if config.get().unwrap().lock().unwrap().show_battery && self.battery_activity(menu) {
             let mut bat_out: String = String::default();
             let mut battery_time: String = String::default();
             let battery_secs: f32 = self.get_battery_secs();
@@ -576,7 +578,7 @@ impl CpuBox {
                 .get(&self.get_battery_status())
                 .unwrap()
                 .clone();
-            let battery_len: u32 = (format!("{}", config.update_ms).len()
+            let battery_len: u32 = (format!("{}", config.get().unwrap().lock().unwrap().update_ms).len()
                 + if self.get_parent().get_width() >= 100 {
                     11
                 } else {
@@ -643,9 +645,9 @@ impl CpuBox {
                 .as_str(),
             );
 
-            draw.buffer(
+            draw.get().unwrap().lock().unwrap().buffer(
                 "battery".to_owned(),
-                vec![format!("{}{}", bat_out, term.fg,)],
+                vec![format!("{}{}", bat_out, term.get().unwrap().lock().unwrap().get_fg(),)],
                 false,
                 false,
                 100,
@@ -674,7 +676,7 @@ impl CpuBox {
             self.set_old_battery_len(0);
             self.set_battery_path(None);
 
-            draw.clear(vec!["battery".to_owned()], true);
+            draw.get().unwrap().lock().unwrap().clear(vec!["battery".to_owned()], true);
         }
 
         let mut cx: u32 = 0;
@@ -979,9 +981,9 @@ impl CpuBox {
             .as_str(),
         );
 
-        draw.buffer(
+        draw.get().unwrap().lock().unwrap().buffer(
             self.get_buffer(),
-            vec![format!("{}{}{}", out_misc, out, term.fg)],
+            vec![format!("{}{}{}", out_misc, out, term.get().unwrap().lock().unwrap().get_fg())],
             false,
             false,
             100,

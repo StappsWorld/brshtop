@@ -2,10 +2,12 @@ use {
     crate::{mv, symbol, term::Term, theme::Color},
     maplit::hashmap,
     math::round::ceil,
+    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         default::Default,
         fmt::{self, Display, Formatter},
+        sync::Mutex,
     },
 };
 
@@ -53,7 +55,7 @@ impl Graph {
         height: i32,
         color: Option<ColorSwitch>,
         data: Vec<i32>,
-        term: &Term,
+        term: &OnceCell<Mutex<Term>>,
         invert: bool,
         max_value: i32,
         offset: i32,
@@ -171,7 +173,7 @@ impl Graph {
         height: u32,
         color: Vec<String>,
         data: Vec<i32>, // TODO: Data type
-        term: &Term,
+        term: &OnceCell<Mutex<Term>>,
         invert: bool,
         max_value: i32,
         offset: i32,
@@ -279,7 +281,7 @@ impl Graph {
         };
         self
     }
-    pub fn max_value(mut self, max_value: i32, term: &mut Term) -> Self {
+    pub fn max_value(mut self, max_value: i32, term: &OnceCell<Mutex<Term>>) -> Self {
         self.max_value = max_value;
         self._refresh_data(term);
         self
@@ -293,7 +295,7 @@ impl Graph {
         self
     }
 
-    fn _refresh_data(&mut self, term: &Term) {
+    fn _refresh_data(&mut self, term: &OnceCell<Mutex<Term>>) {
         let value_width = (self._data.len() as f32 / 2.).ceil() as i32;
 
         self._data = if self._data.is_empty() {
@@ -327,7 +329,7 @@ impl Graph {
         self._create(true, term);
     }
 
-    fn _create(&mut self, new: bool, term: &Term) {
+    fn _create(&mut self, new: bool, term: &OnceCell<Mutex<Term>>) {
         let mut value = hashmap! {
             "left" => 0,
             "right" => 0,
@@ -450,11 +452,11 @@ impl Graph {
         }
 
         if !self.colors.is_empty() {
-            self.out.push_str(&term.fg.to_string())
+            self.out.push_str(&term.get().unwrap().lock().unwrap().get_fg().to_string())
         }
     }
 
-    pub fn call(&mut self, value: Option<i32>, term: &Term) -> String {
+    pub fn call(&mut self, value: Option<i32>, term: &OnceCell<Mutex<Term>>) -> String {
         if let Some(value) = value {
             self.current = !self.current;
 
@@ -504,7 +506,7 @@ impl Graph {
         self.out.clone()
     }
 
-    pub fn add(&mut self, value: Option<i32>, term: &Term) -> String {
+    pub fn add(&mut self, value: Option<i32>, term: &OnceCell<Mutex<Term>>) -> String {
         self.call(value, term)
     }
 }

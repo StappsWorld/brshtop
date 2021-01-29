@@ -18,7 +18,8 @@ use {
     },
     inflector::Inflector,
     math::round::ceil,
-    std::{collections::HashMap, convert::TryFrom},
+    once_cell::sync::OnceCell,
+    std::{collections::HashMap, convert::TryFrom, sync::Mutex,},
 };
 
 pub struct MemBox {
@@ -37,7 +38,7 @@ pub struct MemBox {
     swap_names: Vec<String>,
 }
 impl MemBox {
-    pub fn new(brshtop_box: &BrshtopBox, CONFIG: &Config, ARG_MODE: ViewMode) -> Self {
+    pub fn new(brshtop_box: &OnceCell<Mutex<BrshtopBox>>, CONFIG: &OnceCell<Mutex<Config>>, ARG_MODE: ViewMode) -> Self {
         let membox = MemBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
             mem_meter: 0,
@@ -49,7 +50,7 @@ impl MemBox {
             graph_height: 0,
             redraw: false,
             buffer: "mem".to_owned(),
-            swap_on: CONFIG.show_swap,
+            swap_on: CONFIG.get().unwrap().lock().unwrap().show_swap,
             mem_names: vec!["used", "available", "cached", "free"]
                 .iter()
                 .map(|s| s.to_owned().to_owned())
@@ -59,7 +60,7 @@ impl MemBox {
                 .map(|s| s.to_owned().to_owned())
                 .collect(),
         };
-        brshtop_box.push_buffers(membox.buffer.clone());
+        brshtop_box.get().unwrap().lock().unwrap().push_buffers(membox.buffer.clone());
 
         membox.set_parent_name("mem".to_owned());
         membox.set_parent_height_p(38);
@@ -72,9 +73,10 @@ impl MemBox {
 
     pub fn calc_size(
         &self,
-        term: &Term,
-        brshtop_box: &BrshtopBox,
-        CONFIG: &Config,
+        term: &OnceCell<Mutex<Term>>,
+        b_mem_h: &mut i32,
+        b_cpu_h: i32,
+        CONFIG: &OnceCell<Mutex<Config>>,
     ) {
         let mut width_p: u32 = 0;
         let mut height_p: u32 = 0;
@@ -86,11 +88,11 @@ impl MemBox {
             width_p = self.get_parent().get_width_p();
             height_p = self.get_parent().get_height_p();
         }
-        self.set_parent_width(term.width as u32 * width_p / 100);
-        self.set_parent_height((term.height as u32 * height_p / 100) + 1);
-        brshtop_box.set_b_mem_h(self.get_parent().get_height() as i32);
-        self.set_parent_y(u32::try_from(brshtop_box.get_b_cpu_h() + 1).unwrap_or(0));
-        if CONFIG.show_disks {
+        self.set_parent_width(term.get().unwrap().lock().unwrap().get_width() as u32 * width_p / 100);
+        self.set_parent_height((term.get().unwrap().lock().unwrap().get_height() as u32 * height_p / 100) + 1);
+        b_mem_h = &mut (self.get_parent().get_height() as i32);
+        self.set_parent_y(u32::try_from(b_cpu_h + 1).unwrap_or(0));
+        if CONFIG.get().unwrap().lock().unwrap().show_disks {
             self.set_mem_width(
                 u32::try_from(
                     ceil((self.get_parent().get_width() as i32 - 3) as f64 / 2.0, 0) as i32,
@@ -115,14 +117,14 @@ impl MemBox {
             );
         }
 
-        let mut item_height: u32 = if self.get_swap_on() && !CONFIG.swap_disk {
+        let mut item_height: u32 = if self.get_swap_on() && !CONFIG.get().unwrap().lock().unwrap().swap_disk {
             6
         } else {
             4
         };
         self.set_mem_width(
             if self.get_parent().get_height()
-                - if self.get_swap_on() && !CONFIG.swap_disk {
+                - if self.get_swap_on() && !CONFIG.get().unwrap().lock().unwrap().swap_disk {
                     3
                 } else {
                     2
@@ -139,7 +141,7 @@ impl MemBox {
 
         self.set_mem_meter(
             (self.get_parent().get_width()
-                - if CONFIG.show_disks {
+                - if CONFIG.get().unwrap().lock().unwrap().show_disks {
                     self.get_disks_width()
                 } else {
                     0
@@ -154,10 +156,10 @@ impl MemBox {
             self.set_mem_meter(0);
         }
 
-        if CONFIG.mem_graphs {
+        if CONFIG.get().unwrap().lock().unwrap().mem_graphs {
             self.set_graph_height(
                 ((self.get_parent().get_height()
-                    - if self.get_swap_on() && !CONFIG.swap_disk {
+                    - if self.get_swap_on() && !CONFIG.get().unwrap().lock().unwrap().swap_disk {
                         2
                     } else {
                         1
@@ -175,7 +177,7 @@ impl MemBox {
             self.set_graph_height(0);
         }
 
-        if CONFIG.show_disks {
+        if CONFIG.get().unwrap().lock().unwrap().show_disks {
             self.set_disk_meter(
                 self.get_parent().get_width() as i32 - self.get_mem_width() as i32 - 23,
             );
@@ -188,7 +190,7 @@ impl MemBox {
         }
     }
 
-    pub fn draw_bg(&self, THEME: &Theme, CONFIG: &Config, term: &Term) -> String {
+    pub fn draw_bg(&self, THEME: &Theme, CONFIG: &OnceCell<Mutex<Config>>, term: &OnceCell<Mutex<Term>>, passable_self : &OnceCell<Mutex<MemBox>>) -> String {
         if self.get_parent().get_proc_mode() {
             String::default()
         } else {
@@ -209,13 +211,13 @@ impl MemBox {
                     THEME,
                     None,
                     None,
-                    Some(self),
+                    Some(passable_self),
                     None,
                     None,
                 )
                 .as_str(),
             );
-            if CONFIG.show_disks {
+            if CONFIG.get().unwrap().lock().unwrap().show_disks {
                 let mut adder: String = String::default();
                 for i in 1..self.get_parent().get_height() - 1 {
                     adder.push_str(
@@ -266,15 +268,16 @@ impl MemBox {
     pub fn draw_fg(
         &self,
         mem: &MemCollector,
-        term: &Term,
-        brshtop_box: &BrshtopBox,
-        CONFIG: &Config,
+        term: &OnceCell<Mutex<Term>>,
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
+        CONFIG: &OnceCell<Mutex<Config>>,
         meters: &Meters,
         THEME: &Theme,
-        key: &Key,
-        collector: &Collector,
-        draw: &Draw,
+        key: &OnceCell<Mutex<Key>>,
+        collector: &OnceCell<Mutex<Collector>>,
+        draw: &OnceCell<Mutex<Draw>>,
         menu: & Menu,
+        passable_self : &OnceCell<Mutex<MemBox>>,
     ) {
         if self.get_parent().get_proc_mode() {
             return;
@@ -297,15 +300,15 @@ impl MemBox {
         let mut h = parent_box.get_height() - 2;
 
         if parent_box.get_resized() || self.get_redraw() {
-            self.calc_size(term, brshtop_box, CONFIG);
-            out_misc.push_str(self.draw_bg(THEME, CONFIG, term).as_str());
+            self.calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_mem_h_mut(), brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(), CONFIG);
+            out_misc.push_str(self.draw_bg(THEME, CONFIG, term, passable_self).as_str());
             meters.set_mem(HashMap::<String, MeterUnion>::new());
             meters.set_swap(HashMap::<String, MeterUnion>::new());
             meters.set_disks_used(HashMap::<String, Meter>::new());
             meters.set_disks_free(HashMap::<String, Meter>::new());
             if self.get_mem_meter() > 0 {
                 for name in self.get_mem_names() {
-                    if CONFIG.mem_graphs {
+                    if CONFIG.get().unwrap().lock().unwrap().mem_graphs {
                         meters.set_mem_index(name.clone(), MeterUnion::Graph(Graph::new(
                             self.get_mem_meter(),
                             self.get_graph_height() as i32,
@@ -334,7 +337,7 @@ impl MemBox {
                 }
                 if self.get_swap_on() {
                     for name in self.get_swap_names() {
-                        if CONFIG.mem_graphs && !CONFIG.swap_disk {
+                        if CONFIG.get().unwrap().lock().unwrap().mem_graphs && !CONFIG.get().unwrap().lock().unwrap().swap_disk {
                             meters.set_swap_index(name.clone(), MeterUnion::Graph(Graph::new(
                                 self.get_mem_meter(),
                                 self.get_graph_height() as i32,
@@ -350,7 +353,7 @@ impl MemBox {
                                 0,
                                 None,
                             )));
-                        } else if CONFIG.swap_disk && CONFIG.show_disks {
+                        } else if CONFIG.get().unwrap().lock().unwrap().swap_disk && CONFIG.get().unwrap().lock().unwrap().show_disks {
                             meters.set_disks_used_index("__swap".to_owned(), Meter::new(
                                 mem.get_swap_percent_index("used".to_owned()).unwrap_or(0) as i32,
                                 self.get_disk_meter() as u32,
@@ -425,7 +428,7 @@ impl MemBox {
                     }
                 }
             }
-            if !key.mouse.contains_key(&"g".to_owned()) {
+            if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"g".to_owned()) {
                 let mut top = Vec::<Vec<i32>>::new();
                 for i in 0..5 {
                     let mut adder: Vec<i32> = Vec::<i32>::new();
@@ -433,7 +436,7 @@ impl MemBox {
                     adder.push(y as i32 - 1);
                     top.push(adder);
                 }
-                key.mouse.insert("g".to_owned(), top);
+                key.get().unwrap().lock().unwrap().mouse.insert("g".to_owned(), top);
             }
             out_misc.push_str(
                 format!(
@@ -443,7 +446,7 @@ impl MemBox {
                         .colors
                         .mem_box
                         .call(symbol::title_left.to_owned(), term),
-                    if CONFIG.mem_graphs { fx::b } else { "" },
+                    if CONFIG.get().unwrap().lock().unwrap().mem_graphs { fx::b } else { "" },
                     THEME.colors.hi_fg.call("g".to_owned(), term),
                     THEME.colors.title.call("wap".to_owned(), term),
                     fx::ub,
@@ -454,8 +457,8 @@ impl MemBox {
                 )
                 .as_str(),
             );
-            if CONFIG.show_disks {
-                if !key.mouse.contains_key(&"s".to_owned()) {
+            if CONFIG.get().unwrap().lock().unwrap().show_disks {
+                if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"s".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
                     for i in 0..4 {
                         let mut adder: Vec<i32> = Vec::<i32>::new();
@@ -463,7 +466,7 @@ impl MemBox {
                         adder.push(y as i32 - 1);
                         top.push(adder);
                     }
-                    key.mouse.insert("s".to_owned(), top);
+                    key.get().unwrap().lock().unwrap().mouse.insert("s".to_owned(), top);
                 }
                 out_misc.push_str(
                     format!(
@@ -473,7 +476,7 @@ impl MemBox {
                             .colors
                             .mem_box
                             .call(symbol::title_left.to_owned(), term),
-                        if CONFIG.swap_disk { fx::b } else { "" },
+                        if CONFIG.get().unwrap().lock().unwrap().swap_disk { fx::b } else { "" },
                         THEME.colors.hi_fg.call("s".to_owned(), term),
                         THEME.colors.title.call("raph".to_owned(), term),
                         fx::ub,
@@ -485,10 +488,10 @@ impl MemBox {
                     .as_str(),
                 );
             }
-            if collector.get_collect_interrupt() {
+            if collector.get().unwrap().lock().unwrap().get_collect_interrupt() {
                 return;
             }
-            draw.buffer(
+            draw.get().unwrap().lock().unwrap().buffer(
                 "mem_misc".to_owned(),
                 vec![out_misc.clone()],
                 false,
@@ -526,7 +529,7 @@ impl MemBox {
                     .call(symbol::title_right.to_owned(), term),
                 THEME.colors.div_line,
                 symbol::h_line.repeat(self.get_mem_width() as usize - 1),
-                if CONFIG.show_disks {
+                if CONFIG.get().unwrap().lock().unwrap().show_disks {
                     "".to_owned()
                 } else {
                     THEME.colors.mem_box.to_string()
@@ -547,7 +550,7 @@ impl MemBox {
 
         let big_mem: bool = false;
         for name in self.get_mem_names() {
-            if collector.get_collect_interrupt() {
+            if collector.get().unwrap().lock().unwrap().get_collect_interrupt() {
                 return;
             }
             if self.get_mem_size() > 2 {
@@ -653,7 +656,7 @@ impl MemBox {
         }
 
         // * Swap
-        if self.get_swap_on() && CONFIG.show_swap && !CONFIG.swap_disk && mem.get_swap_string().len() > 0
+        if self.get_swap_on() && CONFIG.get().unwrap().lock().unwrap().show_swap && !CONFIG.get().unwrap().lock().unwrap().swap_disk && mem.get_swap_string().len() > 0
         {
             if h - cy > 5 {
                 out.push_str(format!("{}{}", mv::to(y + cy, x + cx), gli).as_str());
@@ -674,7 +677,7 @@ impl MemBox {
             );
             cy += 1;
             for name in self.get_swap_names() {
-                if collector.get_collect_interrupt() {
+                if collector.get().unwrap().lock().unwrap().get_collect_interrupt() {
                     return;
                 }
                 if self.get_mem_size() > 2 {
@@ -785,7 +788,7 @@ impl MemBox {
         }
 
         // * Disks
-        if CONFIG.show_disks && mem.get_disks().len() > 0 {
+        if CONFIG.get().unwrap().lock().unwrap().show_disks && mem.get_disks().len() > 0 {
             cx = u32::try_from(x as i32 + self.mem_width as i32 - 1).unwrap_or(0);
             cy = 0;
             let mut big_disk: bool = self.get_disks_width() >= 25;
@@ -801,7 +804,7 @@ impl MemBox {
             );
 
             for (name, item) in mem.get_disks() {
-                if collector.get_collect_interrupt() {
+                if collector.get().unwrap().lock().unwrap().get_collect_interrupt() {
                     return;
                 }
                 if !meters.get_disks_used().contains_key(&name) {
@@ -917,9 +920,9 @@ impl MemBox {
                 }
             }
         }
-        draw.buffer(
+        draw.get().unwrap().lock().unwrap().buffer(
             self.get_buffer(),
-            vec![format!("{}{}{}", out_misc, out, term.fg)],
+            vec![format!("{}{}{}", out_misc, out, term.get().unwrap().lock().unwrap().get_fg())],
             false,
             false,
             100,

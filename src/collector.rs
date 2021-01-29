@@ -24,6 +24,7 @@ use {
         CONFIG_DIR,
     },
     crossbeam,
+    once_cell::sync::OnceCell,
     std::{
         path::*,
         sync::{Arc, Mutex},
@@ -33,7 +34,7 @@ use {
     thread_control::*,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Collectors {
     CpuCollector,
     NetCollector,
@@ -82,9 +83,9 @@ impl Collector {
 
     /// Defaults draw_now: bool = True, interrupt: bool = False, proc_interrupt: bool = False, redraw: bool = False, only_draw: bool = False
     pub fn collect(
-        &self,
+        &mut self,
         collectors: Vec<Collectors>,
-        CONFIG: &Config,
+        CONFIG: &OnceCell<Mutex<Config>>,
         draw_now: bool,
         interrupt: bool,
         proc_interrupt: bool,
@@ -113,32 +114,33 @@ impl Collector {
     }
 
     pub fn start(
-        &self,
-        CONFIG: &Config,
+        &mut self,
+        CONFIG: &OnceCell<Mutex<Config>>,
         DEBUG: bool,
         collectors: Vec<Collectors>,
-        brshtop_box: &BrshtopBox,
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         timeit: &TimeIt,
         menu: &Menu,
-        draw: &Draw,
-        term: &Term,
-        cpu_box: &CpuBox,
-        key: &Key,
+        draw: &OnceCell<Mutex<Draw>>,
+        term: &OnceCell<Mutex<Term>>,
+        cpu_box: &OnceCell<Mutex<CpuBox>>,
+        key: &OnceCell<Mutex<Key>>,
         THEME: &Theme,
         ARG_MODE: ViewMode,
         graphs: &Graphs,
         meters: &Meters,
-        netbox: &NetBox,
-        procbox: &ProcBox,
-        membox: &MemBox,
+        netbox: &OnceCell<Mutex<NetBox>>,
+        procbox: &OnceCell<Mutex<ProcBox>>,
+        membox: &OnceCell<Mutex<MemBox>>,
         cpu_collector : &CpuCollector,
         mem_collector : &MemCollector,
         net_collector : &NetCollector,
         proc_collector : &ProcCollector,
+        passable_self : &OnceCell<Mutex<Collector>>,
     ) {
-        self.stopping = false;
+        self.set_stopping(false);
         crossbeam::scope(|s| {
-            s.spawn(move |_| {
+            s.spawn(|_| {
                 let (flag_build, control_build) = make_pair();
                 self.flag = flag_build;
                 self.control = control_build;
@@ -163,6 +165,7 @@ impl Collector {
                     net_collector,
                     proc_collector,
                     mem_collector,
+                    passable_self
                 );
             });
         });
@@ -191,34 +194,35 @@ impl Collector {
 
     pub fn runner(
         &mut self,
-        CONFIG: &Config,
+        CONFIG: &OnceCell<Mutex<Config>>,
         DEBUG: bool,
-        brshtop_box: &BrshtopBox,
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         timeit: &TimeIt,
         menu: &Menu,
-        draw: &Draw,
-        term: &Term,
-        cpu_box: &CpuBox,
-        key: &Key,
+        draw: &OnceCell<Mutex<Draw>>,
+        term: &OnceCell<Mutex<Term>>,
+        cpu_box: &OnceCell<Mutex<CpuBox>>,
+        key: &OnceCell<Mutex<Key>>,
         THEME: &Theme,
         ARG_MODE: ViewMode,
         graphs: &Graphs,
         meters: &Meters,
-        netbox: &NetBox,
-        procbox: &ProcBox,
-        membox: &MemBox,
+        netbox: &OnceCell<Mutex<NetBox>>,
+        procbox: &OnceCell<Mutex<ProcBox>>,
+        membox: &OnceCell<Mutex<MemBox>>,
         cpu_collector : &CpuCollector,
         net_collector : &NetCollector,
         proc_collector : &ProcCollector,
         mem_collector : &MemCollector,
+        passable_self : &OnceCell<Mutex<Collector>>,
     ) {
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
 
         while !self.get_stopping() {
-            if CONFIG.draw_clock != String::default() && CONFIG.update_ms != 1000 {
-                brshtop_box.draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
+            if CONFIG.get().unwrap().lock().unwrap().draw_clock != String::default() && CONFIG.get().unwrap().lock().unwrap().update_ms != 1000 {
+                brshtop_box.get().unwrap().lock().unwrap().draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
             }
             self.set_collect_run(Event::Wait);
             self.get_collect_run_reference().wait(0.1);
@@ -252,7 +256,7 @@ impl Collector {
                         cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu,
                     ),
                     Collectors::NetCollector => {
-                        net_collector.draw(netbox, THEME, key, term, CONFIG, draw, graphs, menu)
+                        net_collector.draw(netbox, THEME, key, term, CONFIG, draw, graphs, menu, netbox)
                     }
                     Collectors::ProcCollector => {
                         proc_collector.draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu)
@@ -265,7 +269,7 @@ impl Collector {
                         meters,
                         THEME,
                         key,
-                        self,
+                        passable_self,
                         draw,
                         menu,
                     ),
@@ -292,14 +296,14 @@ impl Collector {
 
             if self.get_draw_now() && !menu.active && !self.get_collect_interrupt() {
                 if self.get_use_draw_list() {
-                    draw.out(draw_buffers, false, key);
+                    draw.get().unwrap().lock().unwrap().out(draw_buffers, false, key);
                 } else {
-                    draw.out(Vec::<String>::new(), false, key);
+                    draw.get().unwrap().lock().unwrap().out(Vec::<String>::new(), false, key);
                 }
             }
 
-            if CONFIG.draw_clock != String::default() && CONFIG.update_ms == 1000 {
-                brshtop_box.draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
+            if CONFIG.get().unwrap().lock().unwrap().draw_clock != String::default() && CONFIG.get().unwrap().lock().unwrap().update_ms == 1000 {
+                brshtop_box.get().unwrap().lock().unwrap().draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
             }
 
             self.set_collect_idle(Event::Flag(true));

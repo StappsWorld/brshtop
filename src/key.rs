@@ -8,10 +8,12 @@ use {
         select::{select, FdSet},
         time::{TimeVal, TimeValLike},
     },
+    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         io::{self, stdin, Read, Stdin},
         path::Path,
+        sync::Mutex,
         thread,
         time::Duration,
     },
@@ -94,7 +96,7 @@ impl Key {
         }
     }
 
-    pub fn start(&mut self, draw: &Draw, menu: &Menu) {
+    pub fn start(&mut self, draw: &OnceCell<Mutex<Draw>>, menu: &Menu) {
         self.stopping = false;
         crossbeam::thread::scope(|s| {
             s.spawn(|_| self.get_key(draw, menu));
@@ -153,18 +155,33 @@ impl Key {
     }
 
     /// Returns true if key is detected else waits out timer and returns false, defaults sec: float = 0.0, mouse: bool = False
-    pub fn input_wait(&mut self, sec: f64, mouse: bool, draw: &Draw, term: &Term) -> bool {
+    pub fn input_wait(
+        &mut self,
+        sec: f64,
+        mouse: bool,
+        draw: &OnceCell<Mutex<Draw>>,
+        term: &OnceCell<Mutex<Term>>,
+    ) -> bool {
         if self.list.len() > 0 {
             return true;
         }
         if mouse {
-            draw.now(vec![term.mouse_direct_on], self);
+            draw.get().unwrap().lock().unwrap().now(
+                vec![term.get().unwrap().lock().unwrap().get_mouse_direct_on()],
+                &mut self.idle,
+            );
         }
         self.new = Event::Wait;
         self.new.wait(if sec > 0.0 { sec } else { 0.0 });
         self.new = Event::Flag(false);
         if mouse {
-            draw.now(vec![term.mouse_direct_off, term.mouse_on], self);
+            draw.get().unwrap().lock().unwrap().now(
+                vec![
+                    term.get().unwrap().lock().unwrap().get_mouse_direct_off(),
+                    term.get().unwrap().lock().unwrap().get_mouse_on(),
+                ],
+                &mut self.idle,
+            );
         }
 
         if self.new.is_set() {
@@ -184,7 +201,7 @@ impl Key {
     }
 
     /// Get a key or escape sequence from stdin, convert to readable format and save to keys list. Meant to be run in it's own thread
-    pub fn get_key(&mut self, draw: &Draw, menu: &Menu) {
+    pub fn get_key(&mut self, draw: &OnceCell<Mutex<Draw>>, menu: &Menu) {
         let mut input_key: String = String::default();
         let mut clean_key: String = String::default();
 
@@ -207,8 +224,8 @@ impl Key {
                             Ok(_) => {
                                 if input_key == String::from("\033") {
                                     self.idle = Event::Flag(false);
-                                    draw.idle = Event::Wait;
-                                    draw.idle.wait(-1.0);
+                                    draw.get().unwrap().lock().unwrap().idle = Event::Wait;
+                                    draw.get().unwrap().lock().unwrap().idle.wait(-1.0);
 
                                     let mut nonblocking = Nonblocking::new(&mut current_stdin);
                                     nonblocking.enter();

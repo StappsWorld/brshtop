@@ -1,8 +1,10 @@
 use {
     crate::{event::Event, key::Key},
+    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         io::{self, Write},
+        sync::Mutex
     },
 };
 
@@ -27,17 +29,17 @@ impl Draw {
     }
 
     /// Wait for input reader and self to be idle then print to screen
-    pub fn now(&mut self, args: Vec<String>, key: &Key) {
-        key.idle = Event::Wait;
-        key.idle.wait(-1.0);
-        key.idle = Event::Flag(false);
+    pub fn now(&mut self, args: Vec<String>, idle: &mut Event) {
+        idle = &mut Event::Wait;
+        idle.wait(-1.0);
+        idle = &mut Event::Flag(false);
 
         io::stdout().flush().unwrap();
         for s in args {
             print!("{}", s);
         }
 
-        key.idle = Event::Flag(true);
+        idle = &mut Event::Flag(true);
     }
 
     /// Defaults append: bool = False, now: bool = False, z: int = 100, only_save: bool = False, no_save: bool = False, once: bool = False
@@ -51,7 +53,7 @@ impl Draw {
         only_save: bool,
         no_save: bool,
         once: bool,
-        key: &Key,
+        key: &OnceCell<Mutex<Key>>,
     ) {
         let string: String = String::default();
         let mut append_mut: bool = append.clone();
@@ -90,7 +92,7 @@ impl Draw {
     }
 
     /// Defaults clear = false
-    pub fn out(&mut self, names: Vec<String>, clear: bool, key: &Key) {
+    pub fn out(&mut self, names: Vec<String>, clear: bool, key: &OnceCell<Mutex<Key>>) {
         let mut out: String = String::default();
         if self.strings.len() == 0 {
             return;
@@ -113,7 +115,7 @@ impl Draw {
             if clear {
                 self.clear(vec![], false);
             }
-            self.now(vec![out], key);
+            self.now(vec![out], &mut key.get().unwrap().lock().unwrap().idle);
         }
     }
 

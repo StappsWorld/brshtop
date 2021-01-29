@@ -1,6 +1,8 @@
 use {
     crate::{draw::Draw, mv, theme::Color, BANNER_SRC, term::Term, key::Key,},
+    once_cell::sync::OnceCell,
     lazy_static::lazy_static,
+    std::sync::Mutex,
 };
 lazy_static! {
     static ref BANNER_META: BannerMeta = BannerMeta::new();
@@ -63,25 +65,23 @@ pub fn draw_banner(
     mut col: u32, /*TODO: Same*/
     center: bool,
     now: bool,
-    term : & Term,
-    draw : & Draw,
-    key : & Key,
+    term : &OnceCell<Mutex<Term>>,
+    draw : & OnceCell<Mutex<Draw>>,
+    key : & OnceCell<Mutex<Key>>,
 ) -> String {
     let mut out = String::new();
     if center {
-        col = term.width as u32 / 2 - BANNER_META.length as u32 / 2;
+        col = term.get().unwrap().lock().unwrap().get_width() as u32 / 2 - BANNER_META.length as u32 / 2;
     }
 
     for (n, o) in BANNER_META.out.iter().enumerate() {
         out.push_str(&format!("{}{}", mv::to(line + n as u32, col), o))
     }
 
-    out.push_str(&term.fg.to_string());
+    out.push_str(&term.get().unwrap().lock().unwrap().get_fg().to_string().as_str());
 
     if now {
-        draw.out(vec![out], false, key);
-    } else {
-        return out;
+        draw.get().unwrap().lock().unwrap().out(vec![out.clone()], false, key);
     }
 
     out

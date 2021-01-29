@@ -20,29 +20,31 @@ use {
         theme::{Color, Theme},
         timer::Timer,
     },
-    std::{collections::HashMap, io, os::unix::io::AsRawFd},
+    once_cell::sync::OnceCell,
+    std::{collections::HashMap, io, os::unix::io::AsRawFd, sync::Mutex,},
     terminal_size::{terminal_size, Height, Width},
     termios::*,
 };
 
+#[derive(Clone)]
 pub struct Term {
-    pub width: u16,
-    pub height: u16,
-    pub resized: bool,
-    pub _w: u16,
-    pub _h: u16,
-    pub fg: Color,
-    pub bg: Color,
-    pub hide_cursor: String,
-    pub show_cursor: String,
-    pub alt_screen: String,
-    pub normal_screen: String,
-    pub clear: String,
-    pub mouse_on: String,
-    pub mouse_off: String,
-    pub mouse_direct_on: String,
-    pub mouse_direct_off: String,
-    pub winch: Event,
+    width: u16,
+    height: u16,
+    resized: bool,
+    _w: u16,
+    _h: u16,
+    fg: Color,
+    bg: Color,
+    hide_cursor: String,
+    show_cursor: String,
+    alt_screen: String,
+    normal_screen: String,
+    clear: String,
+    mouse_on: String,
+    mouse_off: String,
+    mouse_direct_on: String,
+    mouse_direct_off: String,
+    winch: Event,
 }
 impl Term {
     pub fn new() -> Self {
@@ -74,21 +76,21 @@ impl Term {
         &mut self,
         args: Vec<String>,
         boxes: Vec<Boxes>,
-        collector: &Collector,
+        collector: &OnceCell<Mutex<Collector>>,
         init: &Init,
-        cpu_box: &CpuBox,
-        draw: &Draw,
+        cpu_box: &OnceCell<Mutex<CpuBox>>,
+        draw: &OnceCell<Mutex<Draw>>,
         force: bool,
-        key: &Key,
+        key: & OnceCell<Mutex<Key>>,
         menu: &Menu,
-        brshtop_box: &BrshtopBox,
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         timer: &Timer,
-        config: &Config,
+        config: &OnceCell<Mutex<Config>>,
         theme: &Theme,
         cpu: &CpuCollector,
-        mem_box : &MemBox,
-        net_box : &NetBox,
-        proc_box : &ProcBox,
+        mem_box : &OnceCell<Mutex<MemBox>>,
+        net_box : &OnceCell<Mutex<NetBox>>,
+        proc_box : &OnceCell<Mutex<ProcBox>>,
     ) {
         if self.resized {
             self.winch = Event::Flag(true);
@@ -108,7 +110,7 @@ impl Term {
             return;
         }
         if force {
-            collector.set_collect_interrupt(true);
+            collector.get().unwrap().lock().unwrap().set_collect_interrupt(true);
         }
 
         while (self._w != self.width && self._h != self.height) || (self._w < 80 || self._h < 24) {
@@ -116,13 +118,16 @@ impl Term {
                 init.resized = true;
             }
 
-            cpu_box.set_clock_block(true);
+            cpu_box.get().unwrap().lock().unwrap().set_clock_block(true);
             self.resized = true;
-            collector.set_collect_interrupt(true);
+            collector.get().unwrap().lock().unwrap().set_collect_interrupt(true);
             self.width = self._w;
             self.height = self._h;
-            draw.now(vec![self.clear], key);
-            draw.now(
+            draw.get().unwrap().lock().unwrap().now(vec![self.clear], &mut key.get().unwrap().lock().unwrap().idle);
+            let mut mutex_self : Mutex<Term> = Mutex::new(self.clone());
+            let mut passable_self : OnceCell<Mutex<Term>> = OnceCell::new();
+            passable_self.set(mutex_self);
+            draw.get().unwrap().lock().unwrap().now(
                 vec![
                     create_box(
                         (self._w as u32 / 2) - 25,
@@ -135,7 +140,7 @@ impl Term {
                         Some(Color::White()),
                         true,
                         None,
-                        self,
+                        &passable_self,
                         theme,
                         None,
                         None,
@@ -149,19 +154,19 @@ impl Term {
                         Color::Default(),
                         Color::BlackBg(),
                         fx::bold,
-                        self._w,
-                        self._h,
+                        self.get_w(),
+                        self.get_h(),
                         fx::ub,
-                        self.bg,
-                        self.fg
+                        self.get_bg(),
+                        self.get_fg()
                     ),
                 ],
-                key,
+                &mut key.get().unwrap().lock().unwrap().idle,
             );
 
             while self._w < 80 || self._h < 24 {
-                draw.now(vec![self.clear], key);
-                draw.now(
+                draw.get().unwrap().lock().unwrap().now(vec![self.clear], &mut key.get().unwrap().lock().unwrap().idle);
+                draw.get().unwrap().lock().unwrap().now(
                     vec![
                         create_box(
                             (self._w as u32 / 2) - 25,
@@ -174,7 +179,7 @@ impl Term {
                             Some(Color::White()),
                             true,
                             None,
-                            self,
+                            &passable_self,
                             theme,
                             None,
                             None,
@@ -193,19 +198,19 @@ impl Term {
                             } else {
                                 Color::Green()
                             },
-                            self._w
+                            self.get_w()
                         ),
                         format!(
                             "{}Height: {}{}{}{}",
                             Color::Default(),
-                            if self._h < 24 {
+                            if self.get_h() < 24 {
                                 Color::Red()
                             } else {
                                 Color::Green()
                             },
-                            self._h,
-                            self.bg,
-                            self.fg
+                            self.get_h(),
+                            self.get_bg(),
+                            self.get_fg()
                         ),
                         format!(
                             "{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}",
@@ -213,11 +218,11 @@ impl Term {
                             Color::Default(),
                             Color::BlackBg(),
                             fx::ub,
-                            self.bg,
-                            self.fg
+                            self.get_bg(),
+                            self.get_fg()
                         ),
                     ],
-                    key,
+                    &mut key.get().unwrap().lock().unwrap().idle,
                 );
                 self.winch = Event::Wait;
                 self.winch.wait(0.3);
@@ -246,8 +251,11 @@ impl Term {
             };
         }
 
-        key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
-        brshtop_box.calc_sizes(boxes, self, config, cpu, cpu_box, mem_box, net_box, proc_box);
+        key.get().unwrap().lock().unwrap().mouse = HashMap::<String, Vec<Vec<i32>>>::new();
+        let mut mutex_self : Mutex<Term> = Mutex::new(self.clone());
+        let mut passable_self : OnceCell<Mutex<Term>> = OnceCell::new();
+        passable_self.set(mutex_self);
+        brshtop_box.get().unwrap().lock().unwrap().calc_sizes(boxes, &passable_self, config, cpu, cpu_box, mem_box, net_box, proc_box);
         if init.running {
             self.resized = false;
             return;
@@ -257,7 +265,7 @@ impl Term {
             menu.resized = true;
         }
 
-        brshtop_box.draw_bg(false, draw, boxes, menu, config, cpu_box,  mem_box, net_box, proc_box, key, theme, self);
+        brshtop_box.get().unwrap().lock().unwrap().draw_bg(false, draw, boxes, menu, config, cpu_box,  mem_box, net_box, proc_box, key, theme, &passable_self);
         self.resized = false;
         timer.finish(key, config);
 
@@ -304,4 +312,142 @@ impl Term {
         }
         format!("\033]0;{}{}", out, ascii_utils::table::BEL)
     }
+
+    pub fn get_width(&self) -> u16 {
+        self.width.clone()
+    }
+
+    pub fn set_width(&mut self, width : u16) {
+        self.width = width.clone()
+    }  
+
+    pub fn get_height(&self) -> u16 {
+        self.height.clone()
+    }
+
+    pub fn set_height(&mut self, height : u16) {
+        self.height = height.clone()
+    }
+
+    pub fn get_resized(&self) -> bool {
+        self.resized.clone()
+    }
+
+    pub fn set_resized(&mut self, resized : bool) {
+        self.resized = resized.clone()
+    }
+
+    pub fn get_w(&self) -> u16 {
+        self._w.clone()
+    }
+
+    pub fn set_w(&mut self, _w : u16) {
+        self._w = _w.clone()
+    }
+
+    pub fn get_h(&self) -> u16 {
+        self._h.clone()
+    }
+
+    pub fn set_h(&mut self, _h : u16) {
+        self._h = _h.clone()
+    }
+
+    pub fn get_fg(&self) -> Color {
+        self.fg.clone()
+    }
+
+    pub fn set_fg(&mut self, fg : Color) {
+        self.fg = fg.clone()
+    }
+
+    pub fn get_bg(&self) -> Color {
+        self.bg.clone()
+    }
+
+    pub fn set_bg(&mut self, bg : Color) {
+        self.bg = bg.clone()
+    }
+
+    pub fn get_hide_cursor(&self) -> String {
+        self.hide_cursor.clone()
+    }
+
+    pub fn set_hide_cursor(&mut self, hide_cursor : String) {
+        self.hide_cursor = hide_cursor.clone()
+    }
+
+    pub fn get_show_cursor(&self) -> String {
+        self.show_cursor.clone()
+    }
+
+    pub fn set_show_cursor(&mut self, show_cursor : String) {
+        self.show_cursor = show_cursor.clone()
+    }
+
+    pub fn get_alt_screen(&self) -> String {
+        self.alt_screen.clone()
+    }
+
+    pub fn set_alt_screen(&mut self, alt_screen : String) {
+        self.alt_screen = alt_screen.clone()
+    }
+
+    pub fn get_normal_screen(&self) -> String {
+        self.normal_screen.clone()
+    }
+
+    pub fn set_normal_screen(&mut self, normal_screen : String) {
+        self.normal_screen = normal_screen.clone()
+    }
+
+    pub fn get_clear(&self) -> String {
+        self.clear.clone()
+    }
+
+    pub fn set_clear(&mut self, clear : String) {
+        self.clear = clear.clone()
+    }
+
+    pub fn get_mouse_on(&self) -> String {
+        self.mouse_on.clone()
+    }
+
+    pub fn set_mouse_on(&mut self, mouse_on : String) {
+        self.mouse_on = mouse_on.clone()
+    }
+    
+    pub fn get_mouse_off(&self) -> String {
+        self.mouse_off.clone()
+    }
+
+    pub fn set_mouse_off(&mut self, mouse_off : String) {
+        self.mouse_off = mouse_off.clone()
+    }
+
+    pub fn get_mouse_direct_on(&self) -> String {
+        self.mouse_direct_on.clone()
+    }
+
+    pub fn set_mouse_direct_on(&mut self, mouse_direct_on : String) {
+        self.mouse_direct_on = mouse_direct_on.clone()
+    }
+
+    pub fn get_mouse_direct_off(&self) -> String {
+        self.mouse_direct_off.clone()
+    }
+
+    pub fn set_mouse_direct_off(&mut self, mouse_direct_off : String) {
+        self.mouse_direct_off = mouse_direct_off.clone()
+    }
+
+    pub fn get_winch(&self) -> Event {
+        self.winch.clone()
+    }
+
+    pub fn set_winch(&mut self, winch : Event) {
+        self.winch = winch.clone()
+    }
+
+
 }

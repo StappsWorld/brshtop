@@ -6,7 +6,7 @@ use {
         brshtop_box::{Boxes, BrshtopBox},
         clean_quit,
         collector::{Collector, Collectors},
-        config::{Config, ConfigAttr, LogLevel, ViewMode},
+        config::{Config, ConfigAttr, LogLevel, ViewMode, ViewModeEnum},
         cpubox::CpuBox,
         cpucollector::CpuCollector,
         create_box,
@@ -30,7 +30,8 @@ use {
         THEME_DIR, THREADS, VERSION,
     },
     math::round::ceil,
-    std::{collections::HashMap, iter::FromIterator, mem, path::Path},
+    once_cell::sync::OnceCell,
+    std::{collections::HashMap, iter::FromIterator, mem, path::Path, sync::Mutex},
 };
 
 pub struct Menu {
@@ -93,26 +94,26 @@ impl Menu {
     pub fn main(
         &mut self,
         theme: &Theme,
-        draw: &Draw,
-        term: &Term,
+        draw: &OnceCell<Mutex<Draw>>,
+        term: &OnceCell<Mutex<Term>>,
         update_checker: &UpdateChecker,
         THEME: &Theme,
-        key_class: &Key,
+        key_class: &OnceCell<Mutex<Key>>,
         timer: &Timer,
-        collector: &Collector,
+        collector: &OnceCell<Mutex<Collector>>,
         collectors: Vec<Collectors>,
-        CONFIG: &Config,
+        CONFIG: &OnceCell<Mutex<Config>>,
         ARG_MODE: ViewMode,
         netcollector: &NetCollector,
-        brshtop_box: &BrshtopBox,
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         init: &Init,
-        cpubox: &CpuBox,
+        cpubox: &OnceCell<Mutex<CpuBox>>,
         cpucollector: &CpuCollector,
         boxes: Vec<Boxes>,
-        netbox: &NetBox,
+        netbox: &OnceCell<Mutex<NetBox>>,
         proccollector: &ProcCollector,
-        membox: &MemBox,
-        procbox: &ProcBox,
+        membox: &OnceCell<Mutex<MemBox>>,
+        procbox: &OnceCell<Mutex<ProcBox>>,
     ) {
         let mut out: String = String::default();
         let mut banner_mut: String = String::default();
@@ -132,8 +133,8 @@ impl Menu {
         self.background = format!(
             "{}{}{}",
             theme.colors.inactive_fg,
-            fx::Fx::uncolor(draw.saved_buffer()),
-            term.fg
+            fx::Fx::uncolor(draw.get().unwrap().lock().unwrap().saved_buffer()),
+            term.get().unwrap().lock().unwrap().get_fg()
         );
 
         while !self.close {
@@ -142,7 +143,7 @@ impl Menu {
                 banner_mut = format!(
                     "{}{}{}{}{}{} ← esc{}{}Version: {}{}{}{}{}",
                     banner::draw_banner(
-                        (term.height / 2) as u32 - 10,
+                        (term.get().unwrap().lock().unwrap().get_height() / 2) as u32 - 10,
                         0,
                         true,
                         false,
@@ -160,26 +161,28 @@ impl Menu {
                     VERSION.to_owned(),
                     fx::ui,
                     fx::ub,
-                    term.bg,
-                    term.fg,
+                    term.get().unwrap().lock().unwrap().get_bg(),
+                    term.get().unwrap().lock().unwrap().get_fg(),
                 );
 
                 if update_checker.version != VERSION.to_owned() {
                     banner_mut.push_str(format!("{}{}{}New release {} availabel at https://github.com/aristocratos/bpytop{}{}",
-                            mv::to(term.height as u32, 1),
+                            mv::to(term.get().unwrap().lock().unwrap().get_height() as u32, 1),
                             fx::b,
                             THEME.colors.title,
                             update_checker.version,
                             fx::ub,
-                            term.fg,
+                            term.get().unwrap().lock().unwrap().get_fg(),
                         )
                         .as_str()
                     );
                 }
                 let mut cy: u32 = 0;
                 for (name, menu) in self.menus {
-                    let ypos: u32 = (term.height / 2) as u32 - 2 + cy;
-                    let xpos: u32 = (term.width / 2) as u32 - (self.menu_length[&name] / 2) as u32;
+                    let ypos: u32 =
+                        (term.get().unwrap().lock().unwrap().get_height() / 2) as u32 - 2 + cy;
+                    let xpos: u32 = (term.get().unwrap().lock().unwrap().get_width() / 2) as u32
+                        - (self.menu_length[&name] / 2) as u32;
                     mouse_items[&name] = [
                         ("x1", xpos),
                         ("x2", xpos + self.menu_length[&name] as u32 - 1),
@@ -218,19 +221,27 @@ impl Menu {
             }
 
             if skip && redraw {
-                draw.now(vec![out], key_class);
+                draw.get().unwrap().lock().unwrap().now(
+                    vec![out],
+                    &mut key_class.get().unwrap().lock().unwrap().idle,
+                );
             } else if !skip {
-                draw.now(
+                draw.get().unwrap().lock().unwrap().now(
                     vec![format!("{}{}{}", self.background, banner_mut, out)],
-                    key_class,
+                    &mut key_class.get().unwrap().lock().unwrap().idle,
                 );
             }
             skip = false;
             redraw = false;
 
-            if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), true, draw, term) {
-                if key_class.mouse_moved() {
-                    let (mx_set, my_set) = key_class.get_mouse();
+            if key_class.get().unwrap().lock().unwrap().input_wait(
+                timer.left(CONFIG).as_secs_f64(),
+                true,
+                draw,
+                term,
+            ) {
+                if key_class.get().unwrap().lock().unwrap().mouse_moved() {
+                    let (mx_set, my_set) = key_class.get().unwrap().lock().unwrap().get_mouse();
                     mx = mx_set;
                     my = my_set;
 
@@ -256,7 +267,7 @@ impl Menu {
                         mouse_over = false;
                     }
                 } else {
-                    key = match key_class.get() {
+                    key = match key_class.get().unwrap().lock().unwrap().get() {
                         Some(k) => k,
                         None => String::default(),
                     };
@@ -333,24 +344,30 @@ impl Menu {
             if timer.not_zero(CONFIG) && !self.resized {
                 skip = true;
             } else {
-                collector.collect(collectors, CONFIG, true, false, false, false, false);
-                collector.set_collect_done(Event::Wait);
-                collector.get_collect_done_reference().wait(2.0);
-                collector.set_collect_done(Event::Flag(false));
+                collector.get().unwrap().lock().unwrap().collect(collectors, CONFIG, true, false, false, false, false);
+                collector.get().unwrap().lock().unwrap().set_collect_done(Event::Wait);
+                collector.get().unwrap().lock().unwrap().get_collect_done_reference().wait(2.0);
+                collector.get().unwrap().lock().unwrap().set_collect_done(Event::Flag(false));
 
-                if CONFIG.background_update {
+                if CONFIG.get().unwrap().lock().unwrap().background_update {
                     self.background = format!(
                         "{}{}{}",
                         THEME.colors.inactive_fg,
-                        fx::Fx::uncolor(draw.saved_buffer()),
-                        term.fg,
+                        fx::Fx::uncolor(draw.get().unwrap().lock().unwrap().saved_buffer()),
+                        term.get().unwrap().lock().unwrap().get_fg(),
                     );
                 }
                 timer.stamp();
             }
         }
 
-        draw.now(vec![format!("{}", draw.saved_buffer())], key_class);
+        draw.get().unwrap().lock().unwrap().now(
+            vec![format!(
+                "{}",
+                draw.get().unwrap().lock().unwrap().saved_buffer()
+            )],
+            &mut key_class.get().unwrap().lock().unwrap().idle,
+        );
         self.background = String::default();
         self.active = false;
         self.close = false;
@@ -359,12 +376,12 @@ impl Menu {
     pub fn help(
         &mut self,
         theme: &Theme,
-        draw: &Draw,
-        term: &Term,
-        key_class: &Key,
-        collector: &Collector,
+        draw: &OnceCell<Mutex<Draw>>,
+        term: &OnceCell<Mutex<Term>>,
+        key_class: &OnceCell<Mutex<Key>>,
+        collector: &OnceCell<Mutex<Collector>>,
         collectors: Vec<Collectors>,
-        CONFIG: &Config,
+        CONFIG: &OnceCell<Mutex<Config>>,
         timer: &Timer,
     ) {
         let mut out: String = String::default();
@@ -380,8 +397,8 @@ impl Menu {
             self.background = format!(
                 "{}{}{}",
                 theme.colors.inactive_fg,
-                fx::Fx::uncolor(draw.saved_buffer()),
-                term.fg
+                fx::Fx::uncolor(draw.get().unwrap().lock().unwrap().saved_buffer()),
+                term.get().unwrap().lock().unwrap().get_fg()
             );
         }
         let mut help_items: HashMap<String, String> = [
@@ -442,10 +459,14 @@ impl Menu {
         while !self.close {
             key = String::default();
             if self.resized {
-                let mut y: u32 = if term.height < (help_items.len() + 10) as u16 {
+                let mut y: u32 = if term.get().unwrap().lock().unwrap().get_height()
+                    < (help_items.len() + 10) as u16
+                {
                     8
                 } else {
-                    ((term.height / 2) as i32 - (help_items.len() / 2) as i32 + 4) as u32
+                    ((term.get().unwrap().lock().unwrap().get_height() / 2) as i32
+                        - (help_items.len() / 2) as i32
+                        + 4) as u32
                 };
                 out_misc = format!(
                     "{}{}{}{}{}{}← esc{}{}Version: {}{}{}{}{}",
@@ -460,11 +481,11 @@ impl Menu {
                     VERSION.to_owned(),
                     fx::ui,
                     fx::ub,
-                    term.bg,
-                    term.fg
+                    term.get().unwrap().lock().unwrap().get_bg(),
+                    term.get().unwrap().lock().unwrap().get_fg()
                 );
-                let mut x: u32 = (term.width / 2) as u32 - 36;
-                let mut h: u32 = term.height as u32 - 2 - y;
+                let mut x: u32 = (term.get().unwrap().lock().unwrap().get_width() / 2) as u32 - 36;
+                let mut h: u32 = term.get().unwrap().lock().unwrap().get_height() as u32 - 2 - y;
                 let mut w: u32 = 72;
 
                 let mut pages: i32 = 0;
@@ -584,24 +605,32 @@ impl Menu {
                 }
 
                 if skip && redraw {
-                    draw.now(vec![out], key_class);
+                    draw.get().unwrap().lock().unwrap().now(
+                        vec![out],
+                        &mut key_class.get().unwrap().lock().unwrap().idle,
+                    );
                 } else if !skip {
-                    draw.now(
+                    draw.get().unwrap().lock().unwrap().now(
                         vec![format!("{}{}{}", self.background, out_misc, out)],
-                        key_class,
+                        &mut key_class.get().unwrap().lock().unwrap().idle,
                     );
                 }
                 skip = false;
                 redraw = false;
 
-                if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
-                    key = match key_class.get() {
+                if key_class.get().unwrap().lock().unwrap().input_wait(
+                    timer.left(CONFIG).as_secs_f64(),
+                    false,
+                    draw,
+                    term,
+                ) {
+                    key = match key_class.get().unwrap().lock().unwrap().get() {
                         Some(k) => k,
                         None => break,
                     };
 
                     if key == "mouse_click".to_owned() {
-                        let (mx, my) = key_class.get_mouse();
+                        let (mx, my) = key_class.get().unwrap().lock().unwrap().get_mouse();
 
                         if x <= mx as u32
                             && mx <= (x + w) as i32
@@ -655,16 +684,16 @@ impl Menu {
                 if timer.not_zero(CONFIG) && !self.resized {
                     skip = true;
                 } else {
-                    collector.collect(collectors, CONFIG, true, false, false, false, false);
-                    collector.set_collect_done(Event::Wait);
-                    collector.get_collect_done_reference().wait(2.0);
-                    collector.set_collect_done(Event::Flag(false));
-                    if CONFIG.background_update {
+                    collector.get().unwrap().lock().unwrap().collect(collectors, CONFIG, true, false, false, false, false);
+                    collector.get().unwrap().lock().unwrap().set_collect_done(Event::Wait);
+                    collector.get().unwrap().lock().unwrap().get_collect_done_reference().wait(2.0);
+                    collector.get().unwrap().lock().unwrap().set_collect_done(Event::Flag(false));
+                    if CONFIG.get().unwrap().lock().unwrap().background_update {
                         self.background = format!(
                             "{}{}{}",
                             theme.colors.inactive_fg,
-                            fx::Fx::uncolor(draw.saved_buffer()),
-                            term.fg,
+                            fx::Fx::uncolor(draw.get().unwrap().lock().unwrap().saved_buffer()),
+                            term.get().unwrap().lock().unwrap().get_fg(),
                         );
                     }
                     timer.stamp();
@@ -675,7 +704,10 @@ impl Menu {
                 self.close = false;
                 return;
             }
-            draw.now(vec![draw.saved_buffer()], key_class);
+            draw.get().unwrap().lock().unwrap().now(
+                vec![draw.get().unwrap().lock().unwrap().saved_buffer()],
+                &mut key_class.get().unwrap().lock().unwrap().idle,
+            );
             self.active = false;
             self.close = false;
         }
@@ -686,23 +718,23 @@ impl Menu {
         ARG_MODE: ViewMode,
         THEME: &Theme,
         theme: &Theme,
-        draw: &Draw,
-        term: &Term,
-        CONFIG: &Config,
-        key_class: &Key,
+        draw: &OnceCell<Mutex<Draw>>,
+        term: &OnceCell<Mutex<Term>>,
+        CONFIG: &OnceCell<Mutex<Config>>,
+        key_class: &OnceCell<Mutex<Key>>,
         timer: &Timer,
         netcollector: &NetCollector,
-        brshtop_box: &BrshtopBox,
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         boxes: Vec<Boxes>,
-        collector: &Collector,
+        collector: &OnceCell<Mutex<Collector>>,
         init: &Init,
-        cpubox: &CpuBox,
+        cpubox: &OnceCell<Mutex<CpuBox>>,
         cpucollector: &CpuCollector,
-        netbox: &NetBox,
+        netbox: &OnceCell<Mutex<NetBox>>,
         proc_collector: &ProcCollector,
         collectors: Vec<Collectors>,
-        procbox: &ProcBox,
-        membox: &MemBox,
+        procbox: &OnceCell<Mutex<ProcBox>>,
+        membox: &OnceCell<Mutex<MemBox>>,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -720,8 +752,8 @@ impl Menu {
             self.background = format!(
                 "{}{}{}",
                 THEME.colors.inactive_fg,
-                fx::Fx::uncolor(draw.saved_buffer()),
-                term.fg,
+                fx::Fx::uncolor(draw.get().unwrap().lock().unwrap().saved_buffer()),
+                term.get().unwrap().lock().unwrap().get_fg(),
             );
         }
 
@@ -1064,24 +1096,40 @@ impl Menu {
 
         let option_len: usize = option_items.len() * 2;
         let sorting_i: usize = CONFIG
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
             .sorting_options
             .iter()
-            .position(|SO| *SO == CONFIG.proc_sorting)
+            .position(|SO| *SO == CONFIG.get().unwrap().lock().unwrap().proc_sorting)
             .unwrap();
         let loglevel_i: usize = CONFIG
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
             .log_levels
             .iter()
-            .position(|LL| *LL == CONFIG.log_level)
+            .position(|LL| *LL == CONFIG.get().unwrap().lock().unwrap().log_level)
             .unwrap();
         let view_mode_i: usize = CONFIG
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
             .view_modes
             .iter()
-            .position(|VM| *VM == CONFIG.view_mode)
+            .position(|VM| *VM == CONFIG.get().unwrap().lock().unwrap().view_mode)
             .unwrap();
         let cpu_sensor_i: usize = CONFIG
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
             .cpu_sensors
             .iter()
-            .position(|s| s.clone() == CONFIG.cpu_sensor)
+            .position(|s| s.clone() == CONFIG.get().unwrap().lock().unwrap().cpu_sensor)
             .unwrap();
         let mut color_i: usize = 0;
 
@@ -1090,13 +1138,17 @@ impl Menu {
             let selected_int: usize = 0;
             let mut pages: u32 = 0;
             let mut page: u32 = 1;
-            let y: u32 = if (term.height as u32) < (option_len as u32 + 10) {
+            let y: u32 = if (term.get().unwrap().lock().unwrap().get_height() as u32)
+                < (option_len as u32 + 10)
+            {
                 9
             } else {
-                (term.height / 2) as u32 - (option_len / 2) as u32 + 4
+                (term.get().unwrap().lock().unwrap().get_height() / 2) as u32
+                    - (option_len / 2) as u32
+                    + 4
             };
-            let x: u32 = (term.width / 2) as u32 - 38;
-            let h: u32 = term.height as u32 - 2 - y;
+            let x: u32 = (term.get().unwrap().lock().unwrap().get_width() / 2) as u32 - 38;
+            let h: u32 = term.get().unwrap().lock().unwrap().get_height() as u32 - 2 - y;
             let w: u32 = 26;
             let x2: u32 = x + 27;
             let w2: u32 = 50;
@@ -1115,8 +1167,8 @@ impl Menu {
                     VERSION.to_owned(),
                     fx::ui,
                     fx::ub,
-                    term.bg,
-                    term.fg
+                    term.get().unwrap().lock().unwrap().get_bg(),
+                    term.get().unwrap().lock().unwrap().get_fg()
                 );
                 h -= h % 2;
                 color_i = THEME
@@ -1200,7 +1252,7 @@ impl Menu {
                         continue;
                     }
 
-                    let value: ConfigAttr = CONFIG.getattr(opt);
+                    let value: ConfigAttr = CONFIG.get().unwrap().lock().unwrap().getattr(opt);
                     let attr: String = match value {
                         ConfigAttr::Bool(_) => "bool".to_owned(),
                         ConfigAttr::Int64(_) => "i64".to_owned(),
@@ -1241,13 +1293,29 @@ impl Menu {
                     if opt == "color_theme".to_owned() {
                         counter = format!(" {}/{}", color_i + 1, THEME.themes.len());
                     } else if opt == "proc_sorting".to_owned() {
-                        counter = format!(" {}/{}", sorting_i + 1, CONFIG.sorting_options.len());
+                        counter = format!(
+                            " {}/{}",
+                            sorting_i + 1,
+                            CONFIG.get().unwrap().lock().unwrap().sorting_options.len()
+                        );
                     } else if opt == "log_level".to_owned() {
-                        counter = format!(" {}/{}", loglevel_i + 1, CONFIG.log_levels.len());
+                        counter = format!(
+                            " {}/{}",
+                            loglevel_i + 1,
+                            CONFIG.get().unwrap().lock().unwrap().log_levels.len()
+                        );
                     } else if opt == "view_mode".to_owned() {
-                        counter = format!(" {}/{}", view_mode_i + 1, CONFIG.view_modes.len());
+                        counter = format!(
+                            " {}/{}",
+                            view_mode_i + 1,
+                            CONFIG.get().unwrap().lock().unwrap().view_modes.len()
+                        );
                     } else if opt == "cpu_sensor".to_owned() {
-                        counter = format!(" {}/{}", cpu_sensor_i + 1, CONFIG.cpu_sensors.len());
+                        counter = format!(
+                            " {}/{}",
+                            cpu_sensor_i + 1,
+                            CONFIG.get().unwrap().lock().unwrap().cpu_sensors.len()
+                        );
                     } else {
                         counter = String::default();
                     }
@@ -1360,12 +1428,20 @@ impl Menu {
                             .as_str(),
                         )
                     }
-                    out.push_str(term.bg.to_string().as_str());
+                    out.push_str(
+                        term.get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_bg()
+                            .to_string()
+                            .as_str(),
+                    );
                     if opt == selected {
                         let h2: u32 = (option_items[&opt].len() + 2) as u32;
                         let mut y2: u32 = (y + (selected_int as u32 * 2) - ((page - 1) * h)) as u32;
-                        if y2 + h2 > term.height as u32 {
-                            y2 = term.height as u32 - h2;
+                        if y2 + h2 > term.get().unwrap().lock().unwrap().get_height() as u32 {
+                            y2 = term.get().unwrap().lock().unwrap().get_height() as u32 - h2;
                         }
                         out.push_str(
                             create_box(
@@ -1419,23 +1495,28 @@ impl Menu {
             }
 
             if !skip || redraw {
-                draw.now(
+                draw.get().unwrap().lock().unwrap().now(
                     vec![format!("{}{}{}", self.background, out_misc, out)],
-                    key_class,
+                    &mut key_class.get().unwrap().lock().unwrap().idle,
                 );
             }
             skip = false;
             redraw = false;
 
-            if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
-                key = match key_class.get() {
+            if key_class.get().unwrap().lock().unwrap().input_wait(
+                timer.left(CONFIG).as_secs_f64(),
+                false,
+                draw,
+                term,
+            ) {
+                key = match key_class.get().unwrap().lock().unwrap().get() {
                     Some(k) => k,
                     None => "".to_owned(),
                 };
                 redraw = true;
                 let mut has_sel = false;
                 if key == "mouse_click".to_owned() && !inputting {
-                    let (mx, my) = key_class.get_mouse();
+                    let (mx, my) = key_class.get().unwrap().lock().unwrap().get_mouse();
                     if x < mx as u32
                         && mx < (x + w) as i32
                         && y < my as u32
@@ -1484,31 +1565,45 @@ impl Menu {
                         inputting = false;
                     } else if key == "enter".to_owned() {
                         inputting = false;
-                        match CONFIG.getattr(selected) {
+                        match CONFIG.get().unwrap().lock().unwrap().getattr(selected) {
                             ConfigAttr::String(s) => {
                                 if s != input_val {
                                     let parsed: i64 = input_val.parse::<i64>().unwrap();
                                     if selected == "update_ms".to_owned() {
                                         if input_val == String::default() || parsed < 100 {
-                                            CONFIG.update_ms = 100;
+                                            CONFIG.get().unwrap().lock().unwrap().update_ms = 100;
                                         } else if parsed > 86399900 {
-                                            CONFIG.update_ms = 86399900;
+                                            CONFIG.get().unwrap().lock().unwrap().update_ms =
+                                                86399900;
                                         } else {
-                                            CONFIG.update_ms = parsed;
+                                            CONFIG.get().unwrap().lock().unwrap().update_ms =
+                                                parsed;
                                         }
                                     } else if selected == "tree_depth".to_owned() {
                                         if input_val == String::default() || parsed < 0 {
-                                            CONFIG.tree_depth = 0;
+                                            CONFIG.get().unwrap().lock().unwrap().tree_depth = 0;
                                         } else {
-                                            CONFIG.tree_depth = parsed as i32;
+                                            CONFIG.get().unwrap().lock().unwrap().tree_depth =
+                                                parsed as i32;
                                         }
                                     } else {
-                                        match CONFIG.getattr(selected) {
+                                        match CONFIG
+                                            .get()
+                                            .unwrap()
+                                            .lock()
+                                            .unwrap()
+                                            .getattr(selected)
+                                        {
                                             ConfigAttr::String(s) => {
-                                                CONFIG.setattr_configattr(
-                                                    selected,
-                                                    ConfigAttr::String(input_val),
-                                                );
+                                                CONFIG
+                                                    .get()
+                                                    .unwrap()
+                                                    .lock()
+                                                    .unwrap()
+                                                    .setattr_configattr(
+                                                        selected,
+                                                        ConfigAttr::String(input_val),
+                                                    );
                                                 if selected.starts_with("net_") {
                                                     netcollector.net_min = [
                                                         ("download".to_owned(), -1),
@@ -1519,15 +1614,38 @@ impl Menu {
                                                     .collect::<HashMap<String, i32>>();
                                                 } else if selected == "draw_clock".to_owned() {
                                                     brshtop_box
-                                                        .set_clock_on(CONFIG.draw_clock.len() > 0);
-                                                    if !brshtop_box.get_clock_on() {
-                                                        draw.clear(vec!["clock".to_owned()], true);
+                                                        .get()
+                                                        .unwrap()
+                                                        .lock()
+                                                        .unwrap()
+                                                        .set_clock_on(
+                                                            CONFIG
+                                                                .get()
+                                                                .unwrap()
+                                                                .lock()
+                                                                .unwrap()
+                                                                .draw_clock
+                                                                .len()
+                                                                > 0,
+                                                        );
+                                                    if !brshtop_box
+                                                        .get()
+                                                        .unwrap()
+                                                        .lock()
+                                                        .unwrap()
+                                                        .get_clock_on()
+                                                    {
+                                                        draw.get()
+                                                            .unwrap()
+                                                            .lock()
+                                                            .unwrap()
+                                                            .clear(vec!["clock".to_owned()], true);
                                                     }
                                                 }
                                             }
                                             _ => (),
                                         }
-                                        term.refresh(
+                                        term.get().unwrap().lock().unwrap().refresh(
                                             vec![],
                                             boxes,
                                             collector,
@@ -1556,13 +1674,13 @@ impl Menu {
                         input_val = input_val[..input_val.len() - 2].to_owned();
                     } else if key == "delete".to_owned() {
                         input_val = String::default();
-                    } else if match CONFIG.getattr(selected) {
+                    } else if match CONFIG.get().unwrap().lock().unwrap().getattr(selected) {
                         ConfigAttr::String(_) => true,
                         _ => false,
                     } && key.len() == 1
                     {
                         input_val.push_str(key.as_str());
-                    } else if match CONFIG.getattr(selected) {
+                    } else if match CONFIG.get().unwrap().lock().unwrap().getattr(selected) {
                         ConfigAttr::Int64(_) => true,
                         _ => false,
                     } && match key.trim().parse::<f64>() {
@@ -1597,46 +1715,62 @@ impl Menu {
                     .contains(&selected)
                 {
                     inputting = true;
-                    input_val = CONFIG.getattr(selected).to_string();
+                    input_val = CONFIG
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .getattr(selected)
+                        .to_string();
                 } else if key == "left".to_owned()
                     && selected == "update_ms".to_owned()
-                    && CONFIG.update_ms - 100 >= 100
+                    && CONFIG.get().unwrap().lock().unwrap().update_ms - 100 >= 100
                 {
-                    CONFIG.update_ms -= 100;
+                    CONFIG.get().unwrap().lock().unwrap().update_ms -= 100;
                     brshtop_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .draw_update_ms(true, CONFIG, cpubox, key_class, draw, self, THEME, term);
                 } else if key == "right".to_owned()
                     && selected == "update_ms".to_owned()
-                    && CONFIG.update_ms + 100 <= 86399900
+                    && CONFIG.get().unwrap().lock().unwrap().update_ms + 100 <= 86399900
                 {
-                    CONFIG.update_ms += 100;
+                    CONFIG.get().unwrap().lock().unwrap().update_ms += 100;
                     brshtop_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .draw_update_ms(true, CONFIG, cpubox, key_class, draw, self, THEME, term);
                 } else if key == "left".to_owned()
                     && selected == "tree_depth".to_owned()
-                    && CONFIG.tree_depth > 0
+                    && CONFIG.get().unwrap().lock().unwrap().tree_depth > 0
                 {
-                    CONFIG.tree_depth -= 1;
+                    CONFIG.get().unwrap().lock().unwrap().tree_depth -= 1;
                     proc_collector.collapsed = HashMap::<u32, bool>::new();
                 } else if ["left", "right"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
                     .collect::<Vec<String>>()
                     .contains(&key)
-                    && match CONFIG.getattr(selected) {
+                    && match CONFIG.get().unwrap().lock().unwrap().getattr(selected) {
                         ConfigAttr::Bool(b) => true,
                         _ => false,
                     }
                 {
-                    CONFIG.setattr_configattr(
+                    CONFIG.get().unwrap().lock().unwrap().setattr_configattr(
                         selected,
-                        ConfigAttr::Bool(match CONFIG.getattr(selected) {
-                            ConfigAttr::Bool(b) => !b,
-                            _ => false,
-                        }),
+                        ConfigAttr::Bool(
+                            match CONFIG.get().unwrap().lock().unwrap().getattr(selected) {
+                                ConfigAttr::Bool(b) => !b,
+                                _ => false,
+                            },
+                        ),
                     );
                     if selected == "check_temp".to_owned() {
-                        if CONFIG.check_temp {
+                        if CONFIG.get().unwrap().lock().unwrap().check_temp {
                             cpucollector.get_sensors(CONFIG);
                         } else {
                             cpucollector.sensor_method = String::default();
@@ -1650,20 +1784,29 @@ impl Menu {
                         .contains(&selected)
                     {
                         if selected == "net_auto".to_owned() {
-                            netcollector.auto_min = CONFIG.net_auto;
+                            netcollector.auto_min = CONFIG.get().unwrap().lock().unwrap().net_auto;
                         }
-                        netbox.set_redraw(true);
+                        netbox.get().unwrap().lock().unwrap().set_redraw(true);
                     } else if selected == "theme_background".to_owned() {
-                        term.bg = if CONFIG.theme_background {
-                            theme.colors.main_bg
-                        } else {
-                            Color::from("\033[49m".to_owned())
-                        };
-                        draw.now(vec![term.bg.to_string()], key_class);
+                        term.get().unwrap().lock().unwrap().set_bg(
+                            if CONFIG.get().unwrap().lock().unwrap().theme_background {
+                                theme.colors.main_bg
+                            } else {
+                                Color::from("\033[49m".to_owned())
+                            },
+                        );
+                        draw.get().unwrap().lock().unwrap().now(
+                            vec![term.get().unwrap().lock().unwrap().get_bg().to_string()],
+                            &mut key_class.get().unwrap().lock().unwrap().idle,
+                        );
                     } else if selected == "show_battery".to_owned() {
-                        draw.clear(vec!["battery".to_owned()], true);
+                        draw.get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .clear(vec!["battery".to_owned()], true);
                     }
-                    term.refresh(
+                    term.get().unwrap().lock().unwrap().refresh(
                         vec![],
                         boxes,
                         collector,
@@ -1702,14 +1845,15 @@ impl Menu {
                             color_i = 0;
                         }
                     }
-                    collector.set_collect_idle(Event::Wait);
-                    collector.get_collect_idle_reference().wait(-1.0);
-                    CONFIG.color_theme =
+                    collector.get().unwrap().lock().unwrap().set_collect_idle(Event::Wait);
+                    collector.get().unwrap().lock().unwrap().get_collect_idle_reference().wait(-1.0);
+                    CONFIG.get().unwrap().lock().unwrap().color_theme =
                         theme.themes.keys().cloned().collect::<Vec<String>>()[color_i];
                     THEME.replace_self(
-                        Theme::from_str(CONFIG.color_theme).unwrap_or(Theme::default()),
+                        Theme::from_str(CONFIG.get().unwrap().lock().unwrap().color_theme)
+                            .unwrap_or(Theme::default()),
                     );
-                    term.refresh(
+                    term.get().unwrap().lock().unwrap().refresh(
                         vec![],
                         boxes,
                         collector,
@@ -1748,19 +1892,28 @@ impl Menu {
                     if key == "left".to_owned() {
                         loglevel_i -= 1;
                         if loglevel_i < 0 {
-                            loglevel_i = CONFIG.log_levels.len() - 1;
+                            loglevel_i = CONFIG.get().unwrap().lock().unwrap().log_levels.len() - 1;
                         }
                     } else if key == "right".to_owned() {
                         loglevel_i == 1;
-                        if loglevel_i > CONFIG.log_levels.len() - 1 {
+                        if loglevel_i > CONFIG.get().unwrap().lock().unwrap().log_levels.len() - 1 {
                             loglevel_i = 0;
                         }
                     }
-                    CONFIG.log_level = CONFIG.log_levels[loglevel_i];
+                    CONFIG.get().unwrap().lock().unwrap().log_level =
+                        CONFIG.get().unwrap().lock().unwrap().log_levels[loglevel_i];
                     // TODO : Implement error logging level
                     error::errlog(
-                        ("LogLevel set to ".to_owned() + CONFIG.log_level.to_string().as_str())
-                            .to_owned(),
+                        ("LogLevel set to ".to_owned()
+                            + CONFIG
+                                .get()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .log_level
+                                .to_string()
+                                .as_str())
+                        .to_owned(),
                     );
                 } else if ["left", "right"]
                     .iter()
@@ -1768,29 +1921,34 @@ impl Menu {
                     .collect::<Vec<String>>()
                     .contains(&key)
                     && selected == "cpu_sensor".to_owned()
-                    && CONFIG.cpu_sensors.len() > 1
+                    && CONFIG.get().unwrap().lock().unwrap().cpu_sensors.len() > 1
                 {
                     if key == "left".to_owned() {
                         cpu_sensor_i -= 1;
                         if cpu_sensor_i < 0 {
-                            cpu_sensor_i = CONFIG.cpu_sensors.len() - 1;
+                            cpu_sensor_i =
+                                CONFIG.get().unwrap().lock().unwrap().cpu_sensors.len() - 1;
                         }
                     } else if key == "right".to_owned() {
                         cpu_sensor_i += 1;
-                        if cpu_sensor_i < CONFIG.cpu_sensors.len() - 1 {
+                        if cpu_sensor_i
+                            < CONFIG.get().unwrap().lock().unwrap().cpu_sensors.len() - 1
+                        {
                             cpu_sensor_i = 0;
                         }
                     }
-                    collector.set_collect_idle(Event::Wait);
-                    collector.get_collect_idle_reference().wait(-1.0);
+                    collector.get().unwrap().lock().unwrap().set_collect_idle(Event::Wait);
+                    collector.get().unwrap().lock().unwrap().get_collect_idle_reference().wait(-1.0);
                     cpucollector.sensor_swap = true;
-                    CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i];
-                    if CONFIG.check_temp
+                    CONFIG.get().unwrap().lock().unwrap().cpu_sensor =
+                        CONFIG.get().unwrap().lock().unwrap().cpu_sensors[cpu_sensor_i];
+                    if CONFIG.get().unwrap().lock().unwrap().check_temp
                         && (cpucollector.sensor_method != "psutil".to_owned()
-                            || CONFIG.cpu_sensor == "Auto".to_owned())
+                            || CONFIG.get().unwrap().lock().unwrap().cpu_sensor
+                                == "Auto".to_owned())
                     {
                         cpucollector.get_sensors(CONFIG);
-                        term.refresh(
+                        term.get().unwrap().lock().unwrap().refresh(
                             vec![],
                             boxes,
                             collector,
@@ -1821,22 +1979,29 @@ impl Menu {
                     if key == "left".to_owned() {
                         view_mode_i -= 1;
                         if view_mode_i < 0 {
-                            view_mode_i = CONFIG.view_modes.len() - 1;
+                            view_mode_i =
+                                CONFIG.get().unwrap().lock().unwrap().view_modes.len() - 1;
                         }
                     } else if key == "right".to_owned() {
                         view_mode_i += 1;
-                        if view_mode_i > CONFIG.view_modes.len() - 1 {
+                        if view_mode_i > CONFIG.get().unwrap().lock().unwrap().view_modes.len() - 1
+                        {
                             view_mode_i = 0;
                         }
                     }
-                    CONFIG.view_mode = CONFIG.view_modes[view_mode_i];
-                    brshtop_box.set_proc_mode(CONFIG.view_mode == ViewMode::Proc);
-                    brshtop_box.set_stat_mode(CONFIG.view_mode == ViewMode::Stat);
-                    if ARG_MODE != ViewMode::None {
-                        ARG_MODE.replace_self(ViewMode::None);
+                    CONFIG.get().unwrap().lock().unwrap().view_mode =
+                        CONFIG.get().unwrap().lock().unwrap().view_modes[view_mode_i];
+                    brshtop_box.get().unwrap().lock().unwrap().set_proc_mode(
+                        CONFIG.get().unwrap().lock().unwrap().view_mode.t == ViewModeEnum::Proc,
+                    );
+                    brshtop_box.get().unwrap().lock().unwrap().set_stat_mode(
+                        CONFIG.get().unwrap().lock().unwrap().view_mode.t == ViewModeEnum::Stat,
+                    );
+                    if ARG_MODE.t != ViewModeEnum::None {
+                        ARG_MODE.replace_self(ViewModeEnum::None);
                     }
-                    draw.clear(vec![], true);
-                    term.refresh(
+                    draw.get().unwrap().lock().unwrap().clear(vec![], true);
+                    term.get().unwrap().lock().unwrap().refresh(
                         vec![],
                         boxes,
                         collector,
@@ -1896,15 +2061,15 @@ impl Menu {
             if timer.not_zero(CONFIG) && !self.resized {
                 skip = true;
             } else {
-                collector.collect(collectors, CONFIG, true, false, false, false, false);
-                collector.set_collect_done(Event::Wait);
-                collector.get_collect_done_reference().wait(2.0);
-                if CONFIG.background_update {
+                collector.get().unwrap().lock().unwrap().collect(collectors, CONFIG, true, false, false, false, false);
+                collector.get().unwrap().lock().unwrap().set_collect_done(Event::Wait);
+                collector.get().unwrap().lock().unwrap().get_collect_done_reference().wait(2.0);
+                if CONFIG.get().unwrap().lock().unwrap().background_update {
                     self.background = format!(
                         "{}{}{}",
                         THEME.colors.inactive_fg,
-                        fx::Fx::uncolor(draw.saved_buffer()),
-                        term.fg,
+                        fx::Fx::uncolor(draw.get().unwrap().lock().unwrap().saved_buffer()),
+                        term.get().unwrap().lock().unwrap().get_fg(),
                     );
                 }
                 timer.stamp();
@@ -1915,7 +2080,10 @@ impl Menu {
             self.close = false;
             return;
         }
-        draw.now(vec![draw.saved_buffer()], key_class);
+        draw.get().unwrap().lock().unwrap().now(
+            vec![draw.get().unwrap().lock().unwrap().saved_buffer()],
+            &mut key_class.get().unwrap().lock().unwrap().idle,
+        );
         self.background = String::default();
         self.active = false;
         self.close = false;

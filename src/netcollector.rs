@@ -15,10 +15,12 @@ use {
     },
     futures::{future, stream::StreamExt},
     heim::net::{io_counters, nic, IoCounters, Nic},
+    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         fmt,
         time::{Duration, SystemTime},
+        sync::Mutex,
     },
 };
 
@@ -71,10 +73,10 @@ pub struct NetCollector<'a> {
     pub sync_string: String,
 }
 impl<'a> NetCollector<'a> {
-    pub fn new(netbox: &NetBox, CONFIG: &Config) -> Self {
+    pub fn new(netbox: &OnceCell<Mutex<NetBox>>, CONFIG: &OnceCell<Mutex<Config>>) -> Self {
         NetCollector {
             parent: Collector::new(),
-            buffer: netbox.get_buffer().clone(),
+            buffer: netbox.get().unwrap().lock().unwrap().get_buffer().clone(),
             nics: Vec::<&'a Nic>::new(),
             nic_i: 0,
             nic: None,
@@ -97,7 +99,7 @@ impl<'a> NetCollector<'a> {
                 .iter()
                 .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
                 .collect::<HashMap<String, i32>>(),
-            auto_min: CONFIG.net_auto,
+            auto_min: CONFIG.get().unwrap().lock().unwrap().net_auto,
             sync_top: 0,
             sync_string: String::default(),
         }
@@ -162,7 +164,7 @@ impl<'a> NetCollector<'a> {
         self.nic = Some(self.nics[self.nic_i as usize]);
     }
 
-    pub fn switch(&'a mut self, key: String, collector: &Collector, CONFIG: &Config) {
+    pub fn switch(&'a mut self, key: String, collector: &OnceCell<Mutex<Collector>>, CONFIG: &OnceCell<Mutex<Config>>) {
         if self.nics.len() < 2 {
             return;
         }
@@ -176,7 +178,7 @@ impl<'a> NetCollector<'a> {
         self.switched = true;
 
         unsafe {
-            collector.collect(
+            collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::NetCollector],
                 CONFIG,
                 true,
@@ -188,7 +190,7 @@ impl<'a> NetCollector<'a> {
         }
     }
 
-    pub fn collect(&mut self, CONFIG: &Config, netbox: &NetBox) {
+    pub fn collect(&mut self, CONFIG: &OnceCell<Mutex<Config>>, netbox: &OnceCell<Mutex<NetBox>>) {
         let mut speed: i32 = 0;
         let mut stat: HashMap<String, NetCollectorStat> =
             HashMap::<String, NetCollectorStat>::new();
@@ -384,8 +386,8 @@ impl<'a> NetCollector<'a> {
                         self.net_min.insert(
                             direction.clone(),
                             units_to_bytes(match direction.as_str() {
-                                "download" => CONFIG.net_download,
-                                "upload" => CONFIG.net_upload,
+                                "download" => CONFIG.get().unwrap().lock().unwrap().net_download,
+                                "upload" => CONFIG.get().unwrap().lock().unwrap().net_upload,
                             }) as i32,
                         );
                         stat.insert(
@@ -442,11 +444,11 @@ impl<'a> NetCollector<'a> {
                         }
                         if direction == "upload".to_owned() {
                             self.reset = false;
-                            netbox.set_redraw(true);
+                            netbox.get().unwrap().lock().unwrap().set_redraw(true);
                         }
                     }
 
-                    if speed_vec.len() as u32 > netbox.get_parent().get_width() * 2 {
+                    if speed_vec.len() as u32 > netbox.get().unwrap().lock().unwrap().get_parent().get_width() * 2 {
                         speed_vec.remove(0);
                     }
 
@@ -602,7 +604,7 @@ impl<'a> NetCollector<'a> {
 
                 self.timestamp = SystemTime::now();
 
-                if CONFIG.net_sync {
+                if CONFIG.get().unwrap().lock().unwrap().net_sync {
                     let download_top = self
                         .stats
                         .get(&self.nic.unwrap().name().to_owned())
@@ -639,7 +641,7 @@ impl<'a> NetCollector<'a> {
                         self.sync_top = c_max;
                         self.sync_string =
                             floating_humanizer(self.sync_top as f64, false, false, 0, false);
-                        netbox.set_redraw(true);
+                        netbox.get().unwrap().lock().unwrap().set_redraw(true);
                     }
                 }
             }
@@ -653,15 +655,16 @@ impl<'a> NetCollector<'a> {
     /// JUST CALL NETBOX.draw_fg()
     pub fn draw(
         &mut self,
-        netbox: &NetBox,
+        netbox: &OnceCell<Mutex<NetBox>>,
         theme: &Theme,
-        key: &Key,
-        term: &Term,
-        CONFIG: &Config,
-        draw: &Draw,
+        key: &OnceCell<Mutex<Key>>,
+        term: &OnceCell<Mutex<Term>>,
+        CONFIG: &OnceCell<Mutex<Config>>,
+        draw: &OnceCell<Mutex<Draw>>,
         graphs: &Graphs,
         menu: &Menu,
+        passable_self : &OnceCell<Mutex<NetBox>>,
     ) {
-        netbox.draw_fg(theme, key, term, CONFIG, draw, graphs, menu, self)
+        netbox.get().unwrap().lock().unwrap().draw_fg(theme, key, term, CONFIG, draw, graphs, menu, self, passable_self)
     }
 }
