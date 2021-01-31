@@ -77,17 +77,17 @@ impl Term {
         args: Vec<String>,
         boxes: Vec<Boxes>,
         collector: &OnceCell<Mutex<Collector>>,
-        init: &Init,
+        init: &OnceCell<Mutex<Init>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         draw: &OnceCell<Mutex<Draw>>,
         force: bool,
         key: & OnceCell<Mutex<Key>>,
-        menu: &Menu,
+        menu: &OnceCell<Mutex<Menu>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        timer: &Timer,
+        timer: &OnceCell<Mutex<Timer>>,
         config: &OnceCell<Mutex<Config>>,
         theme: &Theme,
-        cpu: &CpuCollector,
+        cpu: &OnceCell<Mutex<CpuCollector>>,
         mem_box : &OnceCell<Mutex<MemBox>>,
         net_box : &OnceCell<Mutex<NetBox>>,
         proc_box : &OnceCell<Mutex<ProcBox>>,
@@ -114,8 +114,8 @@ impl Term {
         }
 
         while (self._w != self.width && self._h != self.height) || (self._w < 80 || self._h < 24) {
-            if init.running {
-                init.resized = true;
+            if init.get().unwrap().lock().unwrap().running {
+                init.get().unwrap().lock().unwrap().resized = true;
             }
 
             cpu_box.get().unwrap().lock().unwrap().set_clock_block(true);
@@ -256,18 +256,18 @@ impl Term {
         let mut passable_self : OnceCell<Mutex<Term>> = OnceCell::new();
         passable_self.set(mutex_self);
         brshtop_box.get().unwrap().lock().unwrap().calc_sizes(boxes, &passable_self, config, cpu, cpu_box, mem_box, net_box, proc_box);
-        if init.running {
+        if init.get().unwrap().lock().unwrap().running {
             self.resized = false;
             return;
         }
 
-        if menu.active {
-            menu.resized = true;
+        if menu.get().unwrap().lock().unwrap().active {
+            menu.get().unwrap().lock().unwrap().resized = true;
         }
 
         brshtop_box.get().unwrap().lock().unwrap().draw_bg(false, draw, boxes, menu, config, cpu_box,  mem_box, net_box, proc_box, key, theme, &passable_self);
         self.resized = false;
-        timer.finish(key, config);
+        timer.get().unwrap().lock().unwrap().finish(key, config);
 
         return;
     }

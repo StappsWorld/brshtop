@@ -26,20 +26,20 @@ use {
 
 #[derive(Clone)]
 pub struct CpuCollector {
-    pub parent: Collector,
-    pub cpu_usage: Vec<Vec<u32>>,
-    pub cpu_temp: Vec<Vec<u32>>,
-    pub cpu_temp_high: i32,
-    pub cpu_temp_crit: i32,
-    pub freq_error: bool,
-    pub cpu_freq: f64,
-    pub load_avg: Vec<f64>,
-    pub uptime: String,
-    pub buffer: String,
-    pub sensor_method: String,
-    pub got_sensors: bool,
-    pub sensor_swap: bool,
-    pub cpu_temp_only: bool,
+    parent: Collector,
+    cpu_usage: Vec<Vec<u32>>,
+    cpu_temp: Vec<Vec<u32>>,
+    cpu_temp_high: i32,
+    cpu_temp_crit: i32,
+    freq_error: bool,
+    cpu_freq: f64,
+    load_avg: Vec<f64>,
+    uptime: String,
+    buffer: String,
+    sensor_method: String,
+    got_sensors: bool,
+    sensor_swap: bool,
+    cpu_temp_only: bool,
 }
 impl CpuCollector {
     pub fn new() -> Self {
@@ -75,6 +75,7 @@ impl CpuCollector {
         term: &OnceCell<Mutex<Term>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
+        passable_self : &OnceCell<Mutex<CpuCollector>>,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -153,7 +154,7 @@ impl CpuCollector {
         };
 
         if CONFIG.get().unwrap().lock().unwrap().check_temp && self.got_sensors {
-            self.collect_temps(CONFIG, cpu_box, brshtop_box, term);
+            self.collect_temps(CONFIG, cpu_box, brshtop_box, term, passable_self);
         }
     }
 
@@ -166,12 +167,13 @@ impl CpuCollector {
         term: &OnceCell<Mutex<Term>>,
         draw: &OnceCell<Mutex<Draw>>,
         ARG_MODE: ViewMode,
-        graphs: &Graphs,
-        meters: &Meters,
-        menu: &Menu,
+        graphs: &OnceCell<Mutex<Graphs>>,
+        meters: &OnceCell<Mutex<Meters>>,
+        menu: &OnceCell<Mutex<Menu>>,
+        passable_self : &OnceCell<Mutex<CpuCollector>>,
     ) {
         cpu_box.get().unwrap().lock().unwrap().draw_fg(
-            self, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu, THEME,
+            passable_self, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu, THEME,
         );
     }
 
@@ -265,6 +267,7 @@ impl CpuCollector {
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         term: &OnceCell<Mutex<Term>>,
+        passable_self : &OnceCell<Mutex<CpuCollector>>,
     ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
@@ -527,7 +530,7 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), self);
+                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), passable_self);
                             return;
                         }
                     };
@@ -548,7 +551,7 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), self);
+                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), passable_self);
                             return;
                         }
                     };
@@ -601,7 +604,7 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), self);
+                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), passable_self);
                             return;
                         }
                     };
@@ -627,7 +630,7 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), self);
+                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), passable_self);
                             return;
                         }
                     };
@@ -657,4 +660,19 @@ impl CpuCollector {
             }
         }
     }
+
+    pub fn get_parent(&self) -> Collector {
+        self.parent.clone()
+    } 
+
+    pub fn set_parent(&mut self, parent : Collector) {
+        self.parent = parent.clone()
+    }
+
+    pub fn get_cpu_usage(&self) -> Vec<Vec<u32>> {
+        self.cpu_usage.clone()
+    }
+
+
+
 }

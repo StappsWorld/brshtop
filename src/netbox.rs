@@ -124,7 +124,12 @@ impl NetBox {
         self.set_redraw(true);
     }
 
-    pub fn draw_bg(&self, theme: &Theme, term: &OnceCell<Mutex<Term>>, passable_self : &OnceCell<Mutex<NetBox>>) -> String {
+    pub fn draw_bg(
+        &self,
+        theme: &Theme,
+        term: &OnceCell<Mutex<Term>>,
+        passable_self: &OnceCell<Mutex<NetBox>>,
+    ) -> String {
         if self.parent.get_proc_mode() {
             return String::default();
         }
@@ -178,19 +183,19 @@ impl NetBox {
         term: &OnceCell<Mutex<Term>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         draw: &OnceCell<Mutex<Draw>>,
-        graphs: &Graphs,
-        menu: &Menu,
-        net: &NetCollector,
-        passable_self : &OnceCell<Mutex<NetBox>>,
+        graphs: &OnceCell<Mutex<Graphs>>,
+        menu: &OnceCell<Mutex<Menu>>,
+        net: &OnceCell<Mutex<NetCollector>>,
+        passable_self: &OnceCell<Mutex<NetBox>>,
     ) {
         if self.get_parent().get_proc_mode() {
             return;
         }
 
-        if net.parent.get_redraw() {
+        if net.get().unwrap().lock().unwrap().parent.get_redraw() {
             self.redraw = true;
         }
-        if net.nic.is_none() {
+        if net.get().unwrap().lock().unwrap().nic.is_none() {
             return;
         }
 
@@ -204,15 +209,25 @@ impl NetBox {
         let by: u32 = self.get_sub().get_box_y() + 1;
         let bw: u32 = u32::try_from(self.get_sub().get_box_width() as i32 - 2).unwrap_or(0);
         let bh: u32 = u32::try_from(self.get_sub().get_box_height() as i32 - 2).unwrap_or(0);
-        let nic_name: String = net.nic.unwrap().name().to_owned();
-        let reset: bool = match net.stats[&nic_name][&"download".to_owned()][&"offset".to_owned()] {
+        let nic_name: String = net
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .nic
+            .unwrap()
+            .name()
+            .to_owned();
+        let reset: bool = match net.get().unwrap().lock().unwrap().stats[&nic_name]
+            [&"download".to_owned()][&"offset".to_owned()]
+        {
             NetCollectorStat::Bool(b) => b,
             NetCollectorStat::I32(i) => i > 0,
             NetCollectorStat::U64(u) => u > 0,
             NetCollectorStat::Vec(v) => v.len() > 0,
             NetCollectorStat::String(s) => {
                 errlog(format!(
-                    "Malformed type in net.stats[{}]['download']['offset']",
+                    "Malformed type in net.get().unwrap().lock().unwrap().stats[{}]['download']['offset']",
                     nic_name
                 ));
                 s.parse::<i64>().unwrap_or(0) > 0
@@ -345,7 +360,11 @@ impl NetBox {
                             .colors
                             .net_box
                             .call(symbol::title_left.to_owned(), term),
-                        if net.auto_min { fx::b } else { "" },
+                        if net.get().unwrap().lock().unwrap().auto_min {
+                            fx::b
+                        } else {
+                            ""
+                        },
                         theme.colors.hi_fg.call("a".to_owned(), term),
                         theme.colors.title.call("uto".to_owned(), term),
                         fx::ub,
@@ -394,7 +413,11 @@ impl NetBox {
                             .colors
                             .net_box
                             .call(symbol::title_left.to_owned(), term),
-                        if net.auto_min { fx::b } else { "" },
+                        if net.get().unwrap().lock().unwrap().auto_min {
+                            fx::b
+                        } else {
+                            ""
+                        },
                         theme.colors.hi_fg.call("a".to_owned(), term),
                         theme.colors.title.call("auto".to_owned(), term),
                         fx::ub,
@@ -483,8 +506,9 @@ impl NetBox {
             .map(|s| s.to_owned().to_owned())
             .collect::<Vec<String>>()
         {
-            let mut strings = net.strings[&nic_name][&direction].clone();
-            let mut stats = net.stats[&nic_name][&direction].clone();
+            let mut strings =
+                net.get().unwrap().lock().unwrap().strings[&nic_name][&direction].clone();
+            let mut stats = net.get().unwrap().lock().unwrap().stats[&nic_name][&direction].clone();
 
             if self.get_redraw() {
                 stats[&"redraw".to_owned()] = NetCollectorStat::Bool(true);
@@ -500,7 +524,7 @@ impl NetBox {
                 }
             } || self.get_parent().get_resized()
             {
-                graphs.net[&direction] = Graph::new_with_vec::<Color>(
+                graphs.get().unwrap().lock().unwrap().net[&direction] = Graph::new_with_vec::<Color>(
                     w - bw - 3,
                     self.graph_height[&direction],
                     theme.gradient[&direction],
@@ -511,7 +535,7 @@ impl NetBox {
                     term,
                     direction != "download".to_owned(),
                     if CONFIG.get().unwrap().lock().unwrap().net_sync {
-                        net.sync_top
+                        net.get().unwrap().lock().unwrap().sync_top
                     } else {
                         match stats[&"graph_top".to_owned()] {
                             NetCollectorStat::Bool(b) => {
@@ -532,7 +556,7 @@ impl NetBox {
                     },
                     0,
                     if CONFIG.get().unwrap().lock().unwrap().net_color_fixed {
-                        Some(net.net_min[&direction])
+                        Some(net.get().unwrap().lock().unwrap().net_min[&direction])
                     } else {
                         None
                     },
@@ -552,7 +576,7 @@ impl NetBox {
                         },
                         x as u32
                     ),
-                    graphs.net[&direction].call(
+                    graphs.get().unwrap().lock().unwrap().net[&direction].call(
                         if match stats[&"redraw".to_owned()] {
                             NetCollectorStat::Bool(b) => b,
                             NetCollectorStat::I32(i) => i > 0,
@@ -633,8 +657,8 @@ impl NetBox {
                 }
             }
             stats["redraw"] = NetCollectorStat::Bool(false);
-            net.strings[&nic_name][&direction] = strings;
-            net.stats[&nic_name][&direction] = stats;
+            net.get().unwrap().lock().unwrap().strings[&nic_name][&direction] = strings;
+            net.get().unwrap().lock().unwrap().stats[&nic_name][&direction] = stats;
         }
 
         out.push_str(
@@ -643,18 +667,20 @@ impl NetBox {
                 mv::to(y, x),
                 theme.colors.graph_text.call(
                     if CONFIG.get().unwrap().lock().unwrap().net_sync {
-                        net.sync_string
+                        net.get().unwrap().lock().unwrap().sync_string
                     } else {
-                        net.strings[&nic_name][&"download".to_owned()][&"graph_top".to_owned()]
+                        net.get().unwrap().lock().unwrap().strings[&nic_name]
+                            [&"download".to_owned()][&"graph_top".to_owned()]
                     },
                     term
                 ),
                 mv::to(u32::try_from(y as i32 + h as i32 - 1).unwrap_or(0), x),
                 theme.colors.graph_text.call(
                     if CONFIG.get().unwrap().lock().unwrap().net_sync {
-                        net.sync_string
+                        net.get().unwrap().lock().unwrap().sync_string
                     } else {
-                        net.strings[&nic_name][&"upload".to_owned()][&"graph_top".to_owned()]
+                        net.get().unwrap().lock().unwrap().strings[&nic_name][&"upload".to_owned()]
+                            [&"graph_top".to_owned()]
                     },
                     term
                 ),
@@ -673,7 +699,7 @@ impl NetBox {
             false,
             false,
             100,
-            menu.active,
+            menu.get().unwrap().lock().unwrap().active,
             false,
             false,
             key,

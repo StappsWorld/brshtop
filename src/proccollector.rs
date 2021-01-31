@@ -1277,11 +1277,12 @@ impl ProcCollector {
         CONFIG: &OnceCell<Mutex<Config>>,
         key: &OnceCell<Mutex<Key>>,
         THEME: &Theme,
-        graphs: &Graphs,
+        graphs: &OnceCell<Mutex<Graphs>>,
         term: &OnceCell<Mutex<Term>>,
         draw: &OnceCell<Mutex<Draw>>,
-        menu: &Menu,
+        menu: &OnceCell<Mutex<Menu>>,
+        passable_self : &OnceCell<Mutex<ProcCollector>>,
     ) {
-        procbox.get().unwrap().lock().unwrap().draw_fg(CONFIG, key, THEME, graphs, term, draw, self, menu)
+        procbox.get().unwrap().lock().unwrap().draw_fg(CONFIG, key, THEME, graphs, term, draw, passable_self, menu)
     }
 }

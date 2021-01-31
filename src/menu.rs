@@ -96,24 +96,25 @@ impl Menu {
         theme: &Theme,
         draw: &OnceCell<Mutex<Draw>>,
         term: &OnceCell<Mutex<Term>>,
-        update_checker: &UpdateChecker,
+        update_checker: &OnceCell<Mutex<UpdateChecker>>,
         THEME: &Theme,
         key_class: &OnceCell<Mutex<Key>>,
-        timer: &Timer,
+        timer: &OnceCell<Mutex<Timer>>,
         collector: &OnceCell<Mutex<Collector>>,
         collectors: Vec<Collectors>,
         CONFIG: &OnceCell<Mutex<Config>>,
         ARG_MODE: ViewMode,
-        netcollector: &NetCollector,
+        netcollector: &OnceCell<Mutex<NetCollector>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        init: &Init,
+        init: &OnceCell<Mutex<Init>>,
         cpubox: &OnceCell<Mutex<CpuBox>>,
-        cpucollector: &CpuCollector,
+        cpucollector: &OnceCell<Mutex<CpuCollector>>,
         boxes: Vec<Boxes>,
         netbox: &OnceCell<Mutex<NetBox>>,
-        proccollector: &ProcCollector,
+        proccollector: &OnceCell<Mutex<ProcCollector>>,
         membox: &OnceCell<Mutex<MemBox>>,
         procbox: &OnceCell<Mutex<ProcBox>>,
+        passable_self: &OnceCell<Mutex<Menu>>,
     ) {
         let mut out: String = String::default();
         let mut banner_mut: String = String::default();
@@ -165,12 +166,12 @@ impl Menu {
                     term.get().unwrap().lock().unwrap().get_fg(),
                 );
 
-                if update_checker.version != VERSION.to_owned() {
-                    banner_mut.push_str(format!("{}{}{}New release {} availabel at https://github.com/aristocratos/bpytop{}{}",
+                if update_checker.get().unwrap().lock().unwrap().version != VERSION.to_owned() {
+                    banner_mut.push_str(format!("{}{}{}New release {} available at https://github.com/aristocratos/bpytop{}{}",
                             mv::to(term.get().unwrap().lock().unwrap().get_height() as u32, 1),
                             fx::b,
                             THEME.colors.title,
-                            update_checker.version,
+                            update_checker.get().unwrap().lock().unwrap().version,
                             fx::ub,
                             term.get().unwrap().lock().unwrap().get_fg(),
                         )
@@ -235,7 +236,7 @@ impl Menu {
             redraw = false;
 
             if key_class.get().unwrap().lock().unwrap().input_wait(
-                timer.left(CONFIG).as_secs_f64(),
+                timer.get().unwrap().lock().unwrap().left(CONFIG).as_secs_f64(),
                 true,
                 draw,
                 term,
@@ -330,6 +331,7 @@ impl Menu {
                             collectors,
                             procbox,
                             membox,
+                            passable_self,
                         );
                         self.resized = true;
                     } else if menu_current == "help".to_owned() {
@@ -341,13 +343,34 @@ impl Menu {
                 }
             }
 
-            if timer.not_zero(CONFIG) && !self.resized {
+            if timer.get().unwrap().lock().unwrap().not_zero(CONFIG) && !self.resized {
                 skip = true;
             } else {
-                collector.get().unwrap().lock().unwrap().collect(collectors, CONFIG, true, false, false, false, false);
-                collector.get().unwrap().lock().unwrap().set_collect_done(Event::Wait);
-                collector.get().unwrap().lock().unwrap().get_collect_done_reference().wait(2.0);
-                collector.get().unwrap().lock().unwrap().set_collect_done(Event::Flag(false));
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .collect(collectors, CONFIG, true, false, false, false, false);
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_collect_done(Event::Wait);
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_collect_done_reference()
+                    .wait(2.0);
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_collect_done(Event::Flag(false));
 
                 if CONFIG.get().unwrap().lock().unwrap().background_update {
                     self.background = format!(
@@ -357,7 +380,7 @@ impl Menu {
                         term.get().unwrap().lock().unwrap().get_fg(),
                     );
                 }
-                timer.stamp();
+                timer.get().unwrap().lock().unwrap().stamp();
             }
         }
 
@@ -382,7 +405,7 @@ impl Menu {
         collector: &OnceCell<Mutex<Collector>>,
         collectors: Vec<Collectors>,
         CONFIG: &OnceCell<Mutex<Config>>,
-        timer: &Timer,
+        timer: &OnceCell<Mutex<Timer>>,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -417,7 +440,7 @@ impl Menu {
             ("(F1, h)", "Shows this window."),
             ("(ctrl+z)", "Sleep program and put in background."),
             ("(ctrl+c, q)", "Quits program."),
-            ("(+) / (-)", "Add/Subtract 100ms to/from update timer."),
+            ("(+) / (-)", "Add/Subtract 100ms to/from update timer.get().unwrap().lock().unwrap()."),
             ("(Up) (Down)", "Select in process list."),
             ("(Enter)", "Show detailed information for selected process."),
             (
@@ -619,7 +642,7 @@ impl Menu {
                 redraw = false;
 
                 if key_class.get().unwrap().lock().unwrap().input_wait(
-                    timer.left(CONFIG).as_secs_f64(),
+                    timer.get().unwrap().lock().unwrap().left(CONFIG).as_secs_f64(),
                     false,
                     draw,
                     term,
@@ -681,13 +704,34 @@ impl Menu {
                     }
                 }
 
-                if timer.not_zero(CONFIG) && !self.resized {
+                if timer.get().unwrap().lock().unwrap().not_zero(CONFIG) && !self.resized {
                     skip = true;
                 } else {
-                    collector.get().unwrap().lock().unwrap().collect(collectors, CONFIG, true, false, false, false, false);
-                    collector.get().unwrap().lock().unwrap().set_collect_done(Event::Wait);
-                    collector.get().unwrap().lock().unwrap().get_collect_done_reference().wait(2.0);
-                    collector.get().unwrap().lock().unwrap().set_collect_done(Event::Flag(false));
+                    collector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .collect(collectors, CONFIG, true, false, false, false, false);
+                    collector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set_collect_done(Event::Wait);
+                    collector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_collect_done_reference()
+                        .wait(2.0);
+                    collector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set_collect_done(Event::Flag(false));
                     if CONFIG.get().unwrap().lock().unwrap().background_update {
                         self.background = format!(
                             "{}{}{}",
@@ -696,7 +740,7 @@ impl Menu {
                             term.get().unwrap().lock().unwrap().get_fg(),
                         );
                     }
-                    timer.stamp();
+                    timer.get().unwrap().lock().unwrap().stamp();
                 }
             }
 
@@ -722,19 +766,20 @@ impl Menu {
         term: &OnceCell<Mutex<Term>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         key_class: &OnceCell<Mutex<Key>>,
-        timer: &Timer,
-        netcollector: &NetCollector,
+        timer: &OnceCell<Mutex<Timer>>,
+        netcollector: &OnceCell<Mutex<NetCollector>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         boxes: Vec<Boxes>,
         collector: &OnceCell<Mutex<Collector>>,
-        init: &Init,
+        init: &OnceCell<Mutex<Init>>,
         cpubox: &OnceCell<Mutex<CpuBox>>,
-        cpucollector: &CpuCollector,
+        cpucollector: &OnceCell<Mutex<CpuCollector>>,
         netbox: &OnceCell<Mutex<NetBox>>,
-        proc_collector: &ProcCollector,
+        proc_collector: &OnceCell<Mutex<ProcCollector>>,
         collectors: Vec<Collectors>,
         procbox: &OnceCell<Mutex<ProcBox>>,
         membox: &OnceCell<Mutex<MemBox>>,
+        passable_self: &OnceCell<Mutex<Menu>>,
     ) {
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -1504,7 +1549,7 @@ impl Menu {
             redraw = false;
 
             if key_class.get().unwrap().lock().unwrap().input_wait(
-                timer.left(CONFIG).as_secs_f64(),
+                timer.get().unwrap().lock().unwrap().left(CONFIG).as_secs_f64(),
                 false,
                 draw,
                 term,
@@ -1605,7 +1650,12 @@ impl Menu {
                                                         ConfigAttr::String(input_val),
                                                     );
                                                 if selected.starts_with("net_") {
-                                                    netcollector.net_min = [
+                                                    netcollector
+                                                        .get()
+                                                        .unwrap()
+                                                        .lock()
+                                                        .unwrap()
+                                                        .net_min = [
                                                         ("download".to_owned(), -1),
                                                         ("upload".to_owned(), -1),
                                                     ]
@@ -1654,7 +1704,7 @@ impl Menu {
                                             draw,
                                             true,
                                             key_class,
-                                            self,
+                                            passable_self,
                                             brshtop_box,
                                             timer,
                                             CONFIG,
@@ -1727,29 +1777,38 @@ impl Menu {
                     && CONFIG.get().unwrap().lock().unwrap().update_ms - 100 >= 100
                 {
                     CONFIG.get().unwrap().lock().unwrap().update_ms -= 100;
-                    brshtop_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .draw_update_ms(true, CONFIG, cpubox, key_class, draw, self, THEME, term);
+                    brshtop_box.get().unwrap().lock().unwrap().draw_update_ms(
+                        true,
+                        CONFIG,
+                        cpubox,
+                        key_class,
+                        draw,
+                        passable_self,
+                        THEME,
+                        term,
+                    );
                 } else if key == "right".to_owned()
                     && selected == "update_ms".to_owned()
                     && CONFIG.get().unwrap().lock().unwrap().update_ms + 100 <= 86399900
                 {
                     CONFIG.get().unwrap().lock().unwrap().update_ms += 100;
-                    brshtop_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .draw_update_ms(true, CONFIG, cpubox, key_class, draw, self, THEME, term);
+                    brshtop_box.get().unwrap().lock().unwrap().draw_update_ms(
+                        true,
+                        CONFIG,
+                        cpubox,
+                        key_class,
+                        draw,
+                        passable_self,
+                        THEME,
+                        term,
+                    );
                 } else if key == "left".to_owned()
                     && selected == "tree_depth".to_owned()
                     && CONFIG.get().unwrap().lock().unwrap().tree_depth > 0
                 {
                     CONFIG.get().unwrap().lock().unwrap().tree_depth -= 1;
-                    proc_collector.collapsed = HashMap::<u32, bool>::new();
+                    proc_collector.get().unwrap().lock().unwrap().collapsed =
+                        HashMap::<u32, bool>::new();
                 } else if ["left", "right"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
@@ -1771,10 +1830,16 @@ impl Menu {
                     );
                     if selected == "check_temp".to_owned() {
                         if CONFIG.get().unwrap().lock().unwrap().check_temp {
-                            cpucollector.get_sensors(CONFIG);
+                            cpucollector
+                                .get()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .get_sensors(CONFIG);
                         } else {
-                            cpucollector.sensor_method = String::default();
-                            cpucollector.got_sensors = false;
+                            cpucollector.get().unwrap().lock().unwrap().sensor_method =
+                                String::default();
+                            cpucollector.get().unwrap().lock().unwrap().got_sensors = false;
                         }
                     }
                     if ["net_auto", "net_color_fixed", "net_sync"]
@@ -1784,7 +1849,8 @@ impl Menu {
                         .contains(&selected)
                     {
                         if selected == "net_auto".to_owned() {
-                            netcollector.auto_min = CONFIG.get().unwrap().lock().unwrap().net_auto;
+                            netcollector.get().unwrap().lock().unwrap().auto_min =
+                                CONFIG.get().unwrap().lock().unwrap().net_auto;
                         }
                         netbox.get().unwrap().lock().unwrap().set_redraw(true);
                     } else if selected == "theme_background".to_owned() {
@@ -1815,7 +1881,7 @@ impl Menu {
                         draw,
                         true,
                         key_class,
-                        self,
+                        passable_self,
                         brshtop_box,
                         timer,
                         CONFIG,
@@ -1845,8 +1911,19 @@ impl Menu {
                             color_i = 0;
                         }
                     }
-                    collector.get().unwrap().lock().unwrap().set_collect_idle(Event::Wait);
-                    collector.get().unwrap().lock().unwrap().get_collect_idle_reference().wait(-1.0);
+                    collector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set_collect_idle(Event::Wait);
+                    collector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_collect_idle_reference()
+                        .wait(-1.0);
                     CONFIG.get().unwrap().lock().unwrap().color_theme =
                         theme.themes.keys().cloned().collect::<Vec<String>>()[color_i];
                     THEME.replace_self(
@@ -1862,7 +1939,7 @@ impl Menu {
                         draw,
                         true,
                         key_class,
-                        self,
+                        passable_self,
                         brshtop_box,
                         timer,
                         CONFIG,
@@ -1872,7 +1949,7 @@ impl Menu {
                         netbox,
                         procbox,
                     );
-                    timer.finish(key_class, CONFIG);
+                    timer.get().unwrap().lock().unwrap().finish(key_class, CONFIG);
                 } else if ["left", "right"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
@@ -1937,17 +2014,34 @@ impl Menu {
                             cpu_sensor_i = 0;
                         }
                     }
-                    collector.get().unwrap().lock().unwrap().set_collect_idle(Event::Wait);
-                    collector.get().unwrap().lock().unwrap().get_collect_idle_reference().wait(-1.0);
-                    cpucollector.sensor_swap = true;
+                    collector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set_collect_idle(Event::Wait);
+                    collector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_collect_idle_reference()
+                        .wait(-1.0);
+                    cpucollector.get().unwrap().lock().unwrap().sensor_swap = true;
                     CONFIG.get().unwrap().lock().unwrap().cpu_sensor =
                         CONFIG.get().unwrap().lock().unwrap().cpu_sensors[cpu_sensor_i];
                     if CONFIG.get().unwrap().lock().unwrap().check_temp
-                        && (cpucollector.sensor_method != "psutil".to_owned()
+                        && (cpucollector.get().unwrap().lock().unwrap().sensor_method
+                            != "psutil".to_owned()
                             || CONFIG.get().unwrap().lock().unwrap().cpu_sensor
                                 == "Auto".to_owned())
                     {
-                        cpucollector.get_sensors(CONFIG);
+                        cpucollector
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_sensors(CONFIG);
                         term.get().unwrap().lock().unwrap().refresh(
                             vec![],
                             boxes,
@@ -1957,7 +2051,7 @@ impl Menu {
                             draw,
                             true,
                             key_class,
-                            self,
+                            passable_self,
                             brshtop_box,
                             timer,
                             CONFIG,
@@ -2010,7 +2104,7 @@ impl Menu {
                         draw,
                         true,
                         key_class,
-                        self,
+                        passable_self,
                         brshtop_box,
                         timer,
                         CONFIG,
@@ -2058,12 +2152,28 @@ impl Menu {
                 }
             }
 
-            if timer.not_zero(CONFIG) && !self.resized {
+            if timer.get().unwrap().lock().unwrap().not_zero(CONFIG) && !self.resized {
                 skip = true;
             } else {
-                collector.get().unwrap().lock().unwrap().collect(collectors, CONFIG, true, false, false, false, false);
-                collector.get().unwrap().lock().unwrap().set_collect_done(Event::Wait);
-                collector.get().unwrap().lock().unwrap().get_collect_done_reference().wait(2.0);
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .collect(collectors, CONFIG, true, false, false, false, false);
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_collect_done(Event::Wait);
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_collect_done_reference()
+                    .wait(2.0);
                 if CONFIG.get().unwrap().lock().unwrap().background_update {
                     self.background = format!(
                         "{}{}{}",
@@ -2072,7 +2182,7 @@ impl Menu {
                         term.get().unwrap().lock().unwrap().get_fg(),
                     );
                 }
-                timer.stamp();
+                timer.get().unwrap().lock().unwrap().stamp();
             }
         }
 

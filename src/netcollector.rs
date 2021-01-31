@@ -164,7 +164,7 @@ impl<'a> NetCollector<'a> {
         self.nic = Some(self.nics[self.nic_i as usize]);
     }
 
-    pub fn switch(&'a mut self, key: String, collector: &OnceCell<Mutex<Collector>>, CONFIG: &OnceCell<Mutex<Config>>) {
+    pub fn switch(&mut self, key: String, collector: &OnceCell<Mutex<Collector>>, CONFIG: &OnceCell<Mutex<Config>>) {
         if self.nics.len() < 2 {
             return;
         }
@@ -661,10 +661,10 @@ impl<'a> NetCollector<'a> {
         term: &OnceCell<Mutex<Term>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         draw: &OnceCell<Mutex<Draw>>,
-        graphs: &Graphs,
-        menu: &Menu,
-        passable_self : &OnceCell<Mutex<NetBox>>,
+        graphs: &OnceCell<Mutex<Graphs>>,
+        menu: &OnceCell<Mutex<Menu>>,
+        passable_self : &OnceCell<Mutex<NetCollector>>,
     ) {
-        netbox.get().unwrap().lock().unwrap().draw_fg(theme, key, term, CONFIG, draw, graphs, menu, self, passable_self)
+        netbox.get().unwrap().lock().unwrap().draw_fg(theme, key, term, CONFIG, draw, graphs, menu, passable_self, netbox)
     }
 }

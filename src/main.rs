@@ -467,47 +467,74 @@ pub fn main() {
     passable_brshtop_box.set(mutex_brshtop_box);
 
     let mut cpu_box: CpuBox = CpuBox::new(&passable_brshtop_box, &passable_CONFIG, ARG_MODE);
-    let mut mutex_cpu_box : Mutex<CpuBox> = Mutex::new(cpu_box);
-    let mut passable_cpu_box : OnceCell<Mutex<CpuBox>> = OnceCell::new();
+    let mut mutex_cpu_box: Mutex<CpuBox> = Mutex::new(cpu_box);
+    let mut passable_cpu_box: OnceCell<Mutex<CpuBox>> = OnceCell::new();
     passable_cpu_box.set(mutex_cpu_box);
 
     let mut mem_box: MemBox = MemBox::new(&passable_brshtop_box, &passable_CONFIG, ARG_MODE);
-    let mut mutex_mem_box : Mutex<MemBox> = Mutex::new(mem_box);
-    let mut passable_mem_box : OnceCell<Mutex<MemBox>> = OnceCell::new();
+    let mut mutex_mem_box: Mutex<MemBox> = Mutex::new(mem_box);
+    let mut passable_mem_box: OnceCell<Mutex<MemBox>> = OnceCell::new();
     passable_mem_box.set(mutex_mem_box);
 
     let mut net_box: NetBox = NetBox::new(&passable_CONFIG, ARG_MODE, &passable_brshtop_box);
-    let mut mutex_net_box : Mutex<NetBox> = Mutex::new(net_box);
-    let mut passable_net_box : OnceCell<Mutex<NetBox>> = OnceCell::new();
+    let mut mutex_net_box: Mutex<NetBox> = Mutex::new(net_box);
+    let mut passable_net_box: OnceCell<Mutex<NetBox>> = OnceCell::new();
     passable_net_box.set(mutex_net_box);
 
     let mut proc_box: ProcBox = ProcBox::new(&passable_brshtop_box, &passable_CONFIG, ARG_MODE);
-    let mut mutex_proc_box : Mutex<ProcBox> = Mutex::new(proc_box);
-    let mut passable_proc_box : OnceCell<Mutex<ProcBox>> = OnceCell::new();
+    let mut mutex_proc_box: Mutex<ProcBox> = Mutex::new(proc_box);
+    let mut passable_proc_box: OnceCell<Mutex<ProcBox>> = OnceCell::new();
     passable_proc_box.set(mutex_proc_box);
 
     let mut collector: Collector = Collector::new();
-    let mut mutex_collector : Mutex<Collector> = Mutex::new(collector);
-    let mut passable_collector : OnceCell<Mutex<Collector>> = OnceCell::new();
+    let mut mutex_collector: Mutex<Collector> = Mutex::new(collector);
+    let mut passable_collector: OnceCell<Mutex<Collector>> = OnceCell::new();
     passable_collector.set(mutex_collector);
 
     let mut cpu_collector: CpuCollector = CpuCollector::new();
+    let mut mutex_cpu_collector: Mutex<CpuCollector> = Mutex::new(cpu_collector);
+    let mut passable_cpu_collector: OnceCell<Mutex<CpuCollector>> = OnceCell::new();
+    passable_cpu_collector.set(mutex_cpu_collector);
 
     let mut mem_collector: MemCollector = MemCollector::new(&passable_mem_box);
+    let mut mutex_mem_collector: Mutex<MemCollector> = Mutex::new(mem_collector);
+    let mut passable_mem_collector: OnceCell<Mutex<MemCollector>> = OnceCell::new();
+    passable_mem_collector.set(mutex_mem_collector);
 
     let mut net_collector: NetCollector = NetCollector::new(&passable_net_box, &passable_CONFIG);
+    let mut mutex_net_collector: Mutex<NetCollector> = Mutex::new(net_collector);
+    let mut passable_net_collector: OnceCell<Mutex<NetCollector>> = OnceCell::new();
+    passable_net_collector.set(mutex_net_collector);
 
     let mut proc_collector: ProcCollector = ProcCollector::new(&passable_proc_box);
+    let mut mutex_proc_collector: Mutex<ProcCollector> = Mutex::new(proc_collector);
+    let mut passable_proc_collector: OnceCell<Mutex<ProcCollector>> = OnceCell::new();
+    passable_proc_collector.set(mutex_proc_collector);
 
     let mut menu: Menu = Menu::new(MENUS, MENU_COLORS);
+    let mut mutex_menu: Mutex<Menu> = Mutex::new(menu);
+    let mut passable_menu: OnceCell<Mutex<Menu>> = OnceCell::new();
+    passable_menu.set(mutex_menu);
 
     let mut timer: Timer = Timer::new();
+    let mut mutex_timer: Mutex<Timer> = Mutex::new(timer);
+    let mut passable_timer: OnceCell<Mutex<Timer>> = OnceCell::new();
+    passable_timer.set(mutex_timer);
 
     let mut timeit: TimeIt = TimeIt::new();
+    let mut mutex_timeit: Mutex<TimeIt> = Mutex::new(timeit);
+    let mut passable_timeit: OnceCell<Mutex<TimeIt>> = OnceCell::new();
+    passable_timeit.set(mutex_timeit);
 
     let mut init: Init = Init::new();
+    let mut mutex_init: Mutex<Init> = Mutex::new(init);
+    let mut passable_init: OnceCell<Mutex<Init>> = OnceCell::new();
+    passable_init.set(mutex_init);
 
     let mut updatechecker: UpdateChecker = UpdateChecker::new();
+    let mut mutex_updatechecker: Mutex<UpdateChecker> = Mutex::new(updatechecker);
+    let mut passable_updatechecker: OnceCell<Mutex<UpdateChecker>> = OnceCell::new();
+    passable_updatechecker.set(mutex_updatechecker);
 
     let mut collectors: Vec<Collectors> = vec![
         Collectors::MemCollector,
@@ -519,8 +546,14 @@ pub fn main() {
     let mut boxes: Vec<Boxes> = vec![Boxes::CpuBox, Boxes::MemBox, Boxes::NetBox, Boxes::ProcBox];
 
     let mut graphs: Graphs = Graphs::default();
+    let mut mutex_graphs: Mutex<Graphs> = Mutex::new(graphs);
+    let mut passable_graphs: OnceCell<Mutex<Graphs>> = OnceCell::new();
+    passable_graphs.set(mutex_graphs);
 
     let mut meters: Meters = Meters::default();
+    let mut mutex_meters: Mutex<Meters> = Mutex::new(meters);
+    let mut passable_meters: OnceCell<Mutex<Meters>> = OnceCell::new();
+    passable_meters.set(mutex_meters);
 
     // Main -----------------------------------------------------------------------------------------------
 
@@ -535,7 +568,12 @@ pub fn main() {
 
     // Init ----------------------------------------------------------------------------------
     if DEBUG {
-        timeit.start("Init".to_owned());
+        passable_timeit
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .start("Init".to_owned());
     }
 
     // Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
@@ -565,17 +603,17 @@ pub fn main() {
         vec![],
         boxes.clone(),
         &passable_collector,
-        &init,
+        &passable_init,
         &passable_cpu_box,
         &passable_draw,
         true,
         &passable_key,
-        &menu,
+        &passable_menu,
         &passable_brshtop_box,
-        &timer,
+        &passable_timer,
         &passable_CONFIG,
         &THEME,
-        &cpu_collector,
+        &passable_cpu_collector,
         &passable_mem_box,
         &passable_net_box,
         &passable_proc_box,
@@ -583,12 +621,18 @@ pub fn main() {
 
     // Start a thread checking for updates while running init
     if passable_CONFIG.get().unwrap().lock().unwrap().update_check {
-        updatechecker.run();
+        passable_updatechecker.get().unwrap().lock().unwrap().run();
     }
 
     // Draw banner and init status
-    if passable_CONFIG.get().unwrap().lock().unwrap().show_init && !init.resized {
-        init.start(&passable_draw, &passable_key, &passable_term);
+    if passable_CONFIG.get().unwrap().lock().unwrap().show_init
+        && !passable_init.get().unwrap().lock().unwrap().resized
+    {
+        passable_init.get().unwrap().lock().unwrap().start(
+            &passable_draw,
+            &passable_key,
+            &passable_term,
+        );
     }
 
     // Load theme
@@ -610,9 +654,17 @@ pub fn main() {
             &passable_key,
         );
     }
-    THEME = match Theme::from_str(passable_CONFIG.get().unwrap().lock().unwrap().color_theme.clone()) {
+    THEME = match Theme::from_str(
+        passable_CONFIG
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .color_theme
+            .clone(),
+    ) {
         Ok(t) => {
-            init.success(
+            passable_init.get().unwrap().lock().unwrap().success(
                 &passable_CONFIG,
                 &passable_draw,
                 &passable_term,
@@ -653,23 +705,33 @@ pub fn main() {
             &passable_key,
         );
         if passable_CONFIG.get().unwrap().lock().unwrap().check_temp {
-            cpu_collector.get_sensors(&passable_CONFIG);
+            passable_cpu_collector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .get_sensors(&passable_CONFIG);
         }
-        passable_brshtop_box.get().unwrap().lock().unwrap().calc_sizes(
-            boxes.clone(),
-            &passable_term,
-            &passable_CONFIG,
-            &cpu_collector,
-            &passable_cpu_box,
-            &passable_mem_box,
-            &passable_net_box,
-            &passable_proc_box,
-        );
+        passable_brshtop_box
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .calc_sizes(
+                boxes.clone(),
+                &passable_term,
+                &passable_CONFIG,
+                &passable_cpu_collector,
+                &passable_cpu_box,
+                &passable_mem_box,
+                &passable_net_box,
+                &passable_proc_box,
+            );
         passable_brshtop_box.get().unwrap().lock().unwrap().draw_bg(
             false,
             &passable_draw,
             boxes.clone(),
-            &menu,
+            &passable_menu,
             &passable_CONFIG,
             &passable_cpu_box,
             &passable_mem_box,
@@ -679,7 +741,7 @@ pub fn main() {
             &THEME,
             &passable_term,
         );
-        init.success(
+        passable_init.get().unwrap().lock().unwrap().success(
             &passable_CONFIG,
             &passable_draw,
             &passable_term,
@@ -752,27 +814,26 @@ pub fn main() {
                         &passable_brshtop_box,
                         &passable_collector,
                         boxes.clone(),
-                        &init,
+                        &passable_init,
                         &passable_cpu_box,
-                        &menu,
-                        &timer,
+                        &passable_menu,
+                        &passable_timer,
                         &passable_CONFIG,
                         &THEME,
                         DEBUG,
                         collectors.clone(),
-                        &timeit,
+                        &passable_timeit,
                         ARG_MODE,
-                        &graphs,
-                        &meters,
+                        &passable_graphs,
+                        &passable_meters,
                         &passable_net_box,
                         &passable_proc_box,
                         &passable_mem_box,
-                        &cpu_collector,
-                        &mem_collector,
-                        &net_collector,
-                        &proc_collector,
+                        &passable_cpu_collector,
+                        &passable_mem_collector,
+                        &passable_net_collector,
+                        &passable_proc_collector,
                         &passable_mem_box,
-                        &passable_proc_box,
                     ),
                     SIGINT => clean_quit(
                         None,
@@ -788,17 +849,17 @@ pub fn main() {
                         vec![],
                         boxes.clone(),
                         &passable_collector,
-                        &init,
+                        &passable_init,
                         &passable_cpu_box,
                         &passable_draw,
                         true,
                         &passable_key,
-                        &menu,
+                        &passable_menu,
                         &passable_brshtop_box,
-                        &timer,
+                        &passable_timer,
                         &passable_CONFIG,
                         &THEME,
-                        &cpu_collector,
+                        &passable_cpu_collector,
                         &passable_mem_box,
                         &passable_net_box,
                         &passable_proc_box,
@@ -808,7 +869,7 @@ pub fn main() {
             }
         });
     });
-    init.success(
+    passable_init.get().unwrap().lock().unwrap().success(
         &passable_CONFIG,
         &passable_draw,
         &passable_term,
@@ -834,8 +895,13 @@ pub fn main() {
             &passable_key,
         );
     }
-    passable_key.get().unwrap().lock().unwrap().start(&passable_draw, &menu);
-    init.success(
+    passable_key
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .start(&passable_draw, &passable_menu);
+    passable_init.get().unwrap().lock().unwrap().success(
         &passable_CONFIG,
         &passable_draw,
         &passable_term,
@@ -866,27 +932,26 @@ pub fn main() {
         DEBUG,
         collectors.clone(),
         &passable_brshtop_box,
-        &timeit,
-        &menu,
+        &passable_timeit,
+        &passable_menu,
         &passable_draw,
         &passable_term,
         &passable_cpu_box,
         &passable_key,
         &THEME,
         ARG_MODE,
-        &graphs,
-        &meters,
+        &passable_graphs,
+        &passable_meters,
         &passable_net_box,
         &passable_proc_box,
         &passable_mem_box,
-        &cpu_collector,
-        &mem_collector,
-        &net_collector,
-        &proc_collector,
-        &passable_collector
-        
+        &passable_cpu_collector,
+        &passable_mem_collector,
+        &passable_net_collector,
+        &passable_proc_collector,
+        &passable_collector,
     );
-    init.success(
+    passable_init.get().unwrap().lock().unwrap().success(
         &passable_CONFIG,
         &passable_draw,
         &passable_term,
@@ -921,7 +986,7 @@ pub fn main() {
         false,
         false,
     );
-    init.success(
+    passable_init.get().unwrap().lock().unwrap().success(
         &passable_CONFIG,
         &passable_draw,
         &passable_term,
@@ -947,16 +1012,27 @@ pub fn main() {
             &passable_key,
         );
     }
-    passable_collector.get().unwrap().lock().unwrap().set_collect_done(Event::Wait);
-    passable_collector.get().unwrap().lock().unwrap().get_collect_done_reference().wait(-1.0);
-    init.success(
+    passable_collector
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .set_collect_done(Event::Wait);
+    passable_collector
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .get_collect_done_reference()
+        .wait(-1.0);
+    passable_init.get().unwrap().lock().unwrap().success(
         &passable_CONFIG,
         &passable_draw,
         &passable_term,
         &passable_key,
     );
 
-    init.done(
+    passable_init.get().unwrap().lock().unwrap().done(
         &passable_CONFIG,
         &passable_draw,
         &passable_term,
@@ -966,17 +1042,17 @@ pub fn main() {
         vec![],
         boxes.clone(),
         &passable_collector,
-        &init,
+        &passable_init,
         &passable_cpu_box,
         &passable_draw,
         false,
         &passable_key,
-        &menu,
+        &passable_menu,
         &passable_brshtop_box,
-        &timer,
+        &passable_timer,
         &passable_CONFIG,
         &THEME,
-        &cpu_collector,
+        &passable_cpu_collector,
         &passable_mem_box,
         &passable_net_box,
         &passable_proc_box,
@@ -996,36 +1072,46 @@ pub fn main() {
         .len()
         > 0
     {
-        passable_brshtop_box.get().unwrap().lock().unwrap().set_clock_on(true);
+        passable_brshtop_box
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .set_clock_on(true);
     }
     if DEBUG {
-        timeit.stop("Init".to_owned());
+        passable_timeit
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .stop("Init".to_owned());
     }
 
     // Main loop ------------------------------------------------------------------------------------->
     run(
         &passable_term,
         &passable_key,
-        &timer,
+        &passable_timer,
         &passable_collector,
         boxes.clone(),
-        &init,
+        &passable_init,
         &passable_cpu_box,
         &passable_draw,
-        &menu,
+        &passable_menu,
         &passable_brshtop_box,
         &passable_CONFIG,
         &THEME,
         ARG_MODE,
         &passable_proc_box,
-        &proc_collector,
-        &net_collector,
-        &cpu_collector,
+        &passable_proc_collector,
+        &passable_net_collector,
+        &passable_cpu_collector,
         &passable_net_box,
-        &updatechecker,
+        &passable_updatechecker,
         collectors.clone(),
-        &mem_collector,
-        &graphs,
+        &passable_mem_collector,
+        &passable_graphs,
         &passable_mem_box,
     );
 }
@@ -1033,26 +1119,26 @@ pub fn main() {
 pub fn run(
     term: &OnceCell<Mutex<Term>>,
     key: &OnceCell<Mutex<Key>>,
-    timer: &Timer,
+    timer: &OnceCell<Mutex<Timer>>,
     collector: &OnceCell<Mutex<Collector>>,
     boxes: Vec<Boxes>,
-    init: &Init,
+    init: &OnceCell<Mutex<Init>>,
     cpu_box: &OnceCell<Mutex<CpuBox>>,
     draw: &OnceCell<Mutex<Draw>>,
-    menu: &Menu,
+    menu: &OnceCell<Mutex<Menu>>,
     brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
     CONFIG: &OnceCell<Mutex<Config>>,
     THEME: &Theme,
     ARG_MODE: ViewMode,
     procbox: &OnceCell<Mutex<ProcBox>>,
-    proccollector: &ProcCollector,
-    netcollector: &NetCollector,
-    cpucollector: &CpuCollector,
+    proccollector: &OnceCell<Mutex<ProcCollector>>,
+    netcollector: &OnceCell<Mutex<NetCollector>>,
+    cpucollector: &OnceCell<Mutex<CpuCollector>>,
     netbox: &OnceCell<Mutex<NetBox>>,
-    update_checker: &UpdateChecker,
+    update_checker: &OnceCell<Mutex<UpdateChecker>>,
     collectors: Vec<Collectors>,
-    memcollector: &MemCollector,
-    graphs: &Graphs,
+    memcollector: &OnceCell<Mutex<MemCollector>>,
+    graphs: &OnceCell<Mutex<Graphs>>,
     mem_box: &OnceCell<Mutex<MemBox>>,
 ) {
     loop {
@@ -1075,11 +1161,17 @@ pub fn run(
             netbox,
             procbox,
         );
-        timer.stamp();
+        timer.get().unwrap().lock().unwrap().stamp();
 
-        while timer.not_zero(&CONFIG) {
+        while timer.get().unwrap().lock().unwrap().not_zero(&CONFIG) {
             if key.get().unwrap().lock().unwrap().input_wait(
-                timer.left(CONFIG).as_secs_f64(),
+                timer
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .left(CONFIG)
+                    .as_secs_f64(),
                 false,
                 draw,
                 term,
@@ -1113,7 +1205,15 @@ pub fn run(
             }
         }
 
-        collector.get().unwrap().lock().unwrap().collect(collectors.clone(), CONFIG, true, false, false, false, false);
+        collector.get().unwrap().lock().unwrap().collect(
+            collectors.clone(),
+            CONFIG,
+            true,
+            false,
+            false,
+            false,
+            false,
+        );
     }
 }
 
@@ -1165,9 +1265,27 @@ pub fn create_box(
             Boxes::BrshtopBox => {
                 wx = brshtop_box.unwrap().get().unwrap().lock().unwrap().get_x();
                 wy = brshtop_box.unwrap().get().unwrap().lock().unwrap().get_y();
-                ww = brshtop_box.unwrap().get().unwrap().lock().unwrap().get_width();
-                wh = brshtop_box.unwrap().get().unwrap().lock().unwrap().get_height();
-                wt = brshtop_box.unwrap().get().unwrap().lock().unwrap().get_name();
+                ww = brshtop_box
+                    .unwrap()
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_width();
+                wh = brshtop_box
+                    .unwrap()
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_height();
+                wt = brshtop_box
+                    .unwrap()
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_name();
             }
             Boxes::CpuBox => {
                 let parent_box = cpu_box.unwrap().get().unwrap().lock().unwrap().get_parent();
@@ -1194,7 +1312,13 @@ pub fn create_box(
                 wt = parent_box.get_name();
             }
             Boxes::ProcBox => {
-                let parent_box = proc_box.unwrap().get().unwrap().lock().unwrap().get_parent();
+                let parent_box = proc_box
+                    .unwrap()
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
@@ -1459,9 +1583,9 @@ pub fn floating_humanizer(
             "{}{}",
             if short { "" } else { " " },
             if short {
-                (unit[selector].as_bytes()[0] as char).to_string()
+                (unit[selector].clone().as_bytes()[0] as char).to_string()
             } else {
-                unit[selector]
+                unit[selector].clone()
             }
         )
         .as_str(),
@@ -1482,46 +1606,48 @@ pub fn units_to_bytes(value: String) -> u64 {
     let mut bit: bool = false;
     let mut value_i: u64 = 0;
     let mut units: HashMap<String, u32> = HashMap::<String, u32>::new();
-    if value.to_ascii_lowercase().ends_with('s') {
-        value = value[..value.len() - 2].to_owned();
+
+    let mut mutable_value: String = value.clone();
+    if mutable_value.to_ascii_lowercase().ends_with('s') {
+        mutable_value = mutable_value[..mutable_value.len() - 2].to_owned();
     }
-    if value.to_ascii_lowercase().ends_with("bit") {
+    if mutable_value.to_ascii_lowercase().ends_with("bit") {
         bit = true;
-        value = value[..value.len() - 4].to_owned();
-    } else if value.to_ascii_lowercase().ends_with("byte") {
-        value = value[..value.len() - 5].to_owned();
+        mutable_value = mutable_value[..mutable_value.len() - 4].to_owned();
+    } else if mutable_value.to_ascii_lowercase().ends_with("byte") {
+        mutable_value = mutable_value[..mutable_value.len() - 5].to_owned();
     }
 
     if units.contains_key(
-        &(value.as_bytes()[value.len() - 2] as char)
+        &(mutable_value.as_bytes()[mutable_value.len() - 2] as char)
             .to_string()
             .to_ascii_lowercase(),
     ) {
         mult = units
             .get(
-                &(value.as_bytes()[value.len() - 2] as char)
+                &(mutable_value.as_bytes()[mutable_value.len() - 2] as char)
                     .to_string()
                     .to_ascii_lowercase(),
             )
             .unwrap()
             .to_owned();
-        value = value[..value.len() - 2].to_owned();
+        mutable_value = mutable_value[..mutable_value.len() - 2].to_owned();
     }
 
-    if value.contains('.')
-        && match value.replace(".", "").parse::<u64>() {
+    if mutable_value.contains('.')
+        && match mutable_value.replace(".", "").parse::<u64>() {
             Ok(_) => true,
             Err(_) => false,
         }
     {
         if mult > 0 {
-            value_i = ((value.parse::<u64>().unwrap() as f64) * 1024.0) as u64;
+            value_i = ((mutable_value.parse::<u64>().unwrap() as f64) * 1024.0) as u64;
             mult -= 1;
         } else {
-            value_i = value.parse::<u64>().unwrap();
+            value_i = mutable_value.parse::<u64>().unwrap();
         }
     } else {
-        match value.parse::<u64>() {
+        match mutable_value.parse::<u64>() {
             Ok(u) => value_i = u,
             Err(_) => (),
         }
@@ -1540,32 +1666,32 @@ pub fn process_keys<'a>(
     key_class: &OnceCell<Mutex<Key>>,
     procbox: &OnceCell<Mutex<ProcBox>>,
     collector: &OnceCell<Mutex<Collector>>,
-    proccollector: &ProcCollector,
+    proccollector: &OnceCell<Mutex<ProcCollector>>,
     CONFIG: &OnceCell<Mutex<Config>>,
     draw: &OnceCell<Mutex<Draw>>,
     term: &OnceCell<Mutex<Term>>,
     brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
     cpu_box: &OnceCell<Mutex<CpuBox>>,
-    menu: &Menu,
+    menu: &OnceCell<Mutex<Menu>>,
     THEME: &Theme,
-    netcollector: &'a NetCollector<'a>,
-    init: &Init,
-    cpucollector: &CpuCollector,
+    netcollector: &OnceCell<Mutex<NetCollector>>,
+    init: &OnceCell<Mutex<Init>>,
+    cpucollector: &OnceCell<Mutex<CpuCollector>>,
     boxes: Vec<Boxes>,
     netbox: &OnceCell<Mutex<NetBox>>,
-    update_checker: &UpdateChecker,
+    update_checker: &OnceCell<Mutex<UpdateChecker>>,
     collectors: Vec<Collectors>,
-    timer: &Timer,
-    memcollector: &MemCollector,
-    graphs: &Graphs,
+    timer: &OnceCell<Mutex<Timer>>,
+    memcollector: &OnceCell<Mutex<MemCollector>>,
+    graphs: &OnceCell<Mutex<Graphs>>,
     mem_box: &OnceCell<Mutex<MemBox>>,
     proc_box: &OnceCell<Mutex<ProcBox>>,
 ) {
     let mut mouse_pos: (i32, i32) = (0, 0);
     let mut filtered: bool = false;
     while key_class.get().unwrap().lock().unwrap().has_key() {
-        let key = match key_class.get().unwrap().lock().unwrap().get() {
-            Some(k) => k,
+        let mut key = match key_class.get().unwrap().lock().unwrap().get() {
+            Some(k) => k.clone(),
             None => return,
         };
         if vec!["mouse_scroll_up", "mouse_scroll_down", "mouse_click"]
@@ -1577,7 +1703,10 @@ pub fn process_keys<'a>(
             mouse_pos = key_class.get().unwrap().lock().unwrap().get_mouse();
             if mouse_pos.0 >= procbox.get().unwrap().lock().unwrap().get_parent().get_x() as i32
                 && procbox.get().unwrap().lock().unwrap().get_current_y() as i32 + 1 <= mouse_pos.1
-                && mouse_pos.1 < procbox.get().unwrap().lock().unwrap().get_current_y() as i32 + procbox.get().unwrap().lock().unwrap().get_current_h() as i32 - 1
+                && mouse_pos.1
+                    < procbox.get().unwrap().lock().unwrap().get_current_y() as i32
+                        + procbox.get().unwrap().lock().unwrap().get_current_h() as i32
+                        - 1
             {
                 ()
             } else if key == "mouse_click".to_owned() {
@@ -1610,13 +1739,36 @@ pub fn process_keys<'a>(
                 .collect::<Vec<String>>()
                 .contains(&key)
             {
-                proccollector.search_filter = String::default();
+                proccollector.get().unwrap().lock().unwrap().search_filter = String::default();
                 procbox.get().unwrap().lock().unwrap().set_filtering(false);
             } else if key.len() == 1 {
-                proccollector.search_filter.push_str(key.as_str());
-            } else if key == "backspace".to_owned() && proccollector.search_filter.len() > 0 {
-                proccollector.search_filter =
-                    proccollector.search_filter[..proccollector.search_filter.len() - 2].to_owned();
+                proccollector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .search_filter
+                    .push_str(key.as_str());
+            } else if key == "backspace".to_owned()
+                && proccollector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .search_filter
+                    .len()
+                    > 0
+            {
+                proccollector.get().unwrap().lock().unwrap().search_filter =
+                    proccollector.get().unwrap().lock().unwrap().search_filter[..proccollector
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .search_filter
+                        .len()
+                        - 2]
+                        .to_owned();
             } else {
                 continue;
             }
@@ -1630,9 +1782,25 @@ pub fn process_keys<'a>(
                 false,
             );
             if filtered {
-                collector.get().unwrap().lock().unwrap().set_collect_done(Event::Wait);
-                collector.get().unwrap().lock().unwrap().get_collect_done_reference().wait(0.1);
-                collector.get().unwrap().lock().unwrap().set_collect_done(Event::Flag(false));
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_collect_done(Event::Wait);
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_collect_done_reference()
+                    .wait(0.1);
+                collector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_collect_done(Event::Flag(false));
             }
             filtered = true;
             continue;
@@ -1644,26 +1812,41 @@ pub fn process_keys<'a>(
             clean_quit(None, None, key_class, collector, draw, term, CONFIG, None);
         } else if key == "+" && CONFIG.get().unwrap().lock().unwrap().update_ms + 100 <= 86399900 {
             CONFIG.get().unwrap().lock().unwrap().update_ms += 100;
-            brshtop_box.get().unwrap().lock().unwrap().draw_update_ms(false, CONFIG, cpu_box, key_class, draw, menu, THEME, &term);
+            brshtop_box
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .draw_update_ms(false, CONFIG, cpu_box, key_class, draw, menu, THEME, &term);
         } else if key == "-".to_owned()
             && CONFIG.get().unwrap().lock().unwrap().update_ms - 100 >= 100
         {
             CONFIG.get().unwrap().lock().unwrap().update_ms -= 100;
-            brshtop_box.get().unwrap().lock().unwrap().draw_update_ms(false, CONFIG, cpu_box, key_class, draw, menu, THEME, &term);
+            brshtop_box
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .draw_update_ms(false, CONFIG, cpu_box, key_class, draw, menu, THEME, &term);
         } else if vec!["b", "n"]
             .iter()
             .map(|s| s.to_owned().to_owned())
             .collect::<Vec<String>>()
             .contains(&key)
         {
-            netcollector.switch(key, collector, CONFIG);
+            netcollector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .switch(key, collector, CONFIG);
         } else if vec!["M", "escape"]
             .iter()
             .map(|s| s.to_owned().to_owned())
             .collect::<Vec<String>>()
             .contains(&key)
         {
-            menu.main(
+            menu.get().unwrap().lock().unwrap().main(
                 &THEME,
                 &draw,
                 term,
@@ -1672,7 +1855,7 @@ pub fn process_keys<'a>(
                 &key_class,
                 &timer,
                 &collector,
-                collectors,
+                collectors.clone(),
                 &CONFIG,
                 ARG_MODE,
                 &netcollector,
@@ -1680,11 +1863,12 @@ pub fn process_keys<'a>(
                 &init,
                 &cpu_box,
                 &cpucollector,
-                boxes,
+                boxes.clone(),
                 &netbox,
                 &proccollector,
                 mem_box,
                 &proc_box,
+                &menu,
             );
         } else if vec!["o", "f2"]
             .iter()
@@ -1692,7 +1876,7 @@ pub fn process_keys<'a>(
             .collect::<Vec<String>>()
             .contains(&key)
         {
-            menu.options(
+            menu.get().unwrap().lock().unwrap().options(
                 ARG_MODE,
                 THEME,
                 THEME,
@@ -1713,6 +1897,7 @@ pub fn process_keys<'a>(
                 collectors,
                 proc_box,
                 mem_box,
+                &menu,
             );
         } else if vec!["h", "f1"]
             .iter()
@@ -1720,11 +1905,12 @@ pub fn process_keys<'a>(
             .collect::<Vec<String>>()
             .contains(&key)
         {
-            menu.help(
+            menu.get().unwrap().lock().unwrap().help(
                 THEME, draw, term, key_class, collector, collectors, CONFIG, timer,
             );
         } else if key == "z".to_owned() {
-            netcollector.reset = !netcollector.reset;
+            netcollector.get().unwrap().lock().unwrap().reset =
+                !netcollector.get().unwrap().lock().unwrap().reset;
             collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::NetCollector],
                 CONFIG,
@@ -1747,11 +1933,13 @@ pub fn process_keys<'a>(
                 false,
             );
         } else if key == "a".to_owned() {
-            netcollector.auto_min = !netcollector.auto_min;
-            netcollector.net_min = vec![("download", -1), ("upload", -1)]
-                .iter()
-                .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
-                .collect::<HashMap<String, i32>>();
+            netcollector.get().unwrap().lock().unwrap().auto_min =
+                !netcollector.get().unwrap().lock().unwrap().auto_min;
+            netcollector.get().unwrap().lock().unwrap().net_min =
+                vec![("download", -1), ("upload", -1)]
+                    .iter()
+                    .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
+                    .collect::<HashMap<String, i32>>();
             collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::NetCollector],
                 CONFIG,
@@ -1768,17 +1956,23 @@ pub fn process_keys<'a>(
             .contains(&key)
         {
             // TODO : Fix this...
-            //proccollector.sorting(key);
+            //proccollector.get().unwrap().lock().unwrap().sorting(key);
         } else if key == " ".to_owned()
             && CONFIG.get().unwrap().lock().unwrap().proc_tree
             && procbox.get().unwrap().lock().unwrap().get_selected() > 0
         {
             if proccollector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
                 .collapsed
                 .contains_key(&procbox.get().unwrap().lock().unwrap().get_selected_pid())
             {
-                proccollector.collapsed[&procbox.get().unwrap().lock().unwrap().get_selected_pid()] =
-                    !proccollector.collapsed[&procbox.get().unwrap().lock().unwrap().get_selected_pid()];
+                proccollector.get().unwrap().lock().unwrap().collapsed
+                    [&procbox.get().unwrap().lock().unwrap().get_selected_pid()] =
+                    !proccollector.get().unwrap().lock().unwrap().collapsed
+                        [&procbox.get().unwrap().lock().unwrap().get_selected_pid()];
             }
             collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::ProcCollector],
@@ -1838,8 +2032,19 @@ pub fn process_keys<'a>(
                 false,
             );
         } else if key == "s".to_owned() {
-            collector.get().unwrap().lock().unwrap().set_collect_idle(Event::Wait);
-            collector.get().unwrap().lock().unwrap().get_collect_idle_reference().wait(-1.0);
+            collector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .set_collect_idle(Event::Wait);
+            collector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .get_collect_idle_reference()
+                .wait(-1.0);
             CONFIG.get().unwrap().lock().unwrap().swap_disk =
                 !CONFIG.get().unwrap().lock().unwrap().swap_disk;
             collector.get().unwrap().lock().unwrap().collect(
@@ -1853,7 +2058,15 @@ pub fn process_keys<'a>(
             );
         } else if key == "f".to_owned() {
             procbox.get().unwrap().lock().unwrap().set_filtering(true);
-            if proccollector.search_filter.len() == 0 {
+            if proccollector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .search_filter
+                .len()
+                == 0
+            {
                 procbox.get().unwrap().lock().unwrap().set_start(0);
             }
             collector.get().unwrap().lock().unwrap().collect(
@@ -1930,7 +2143,13 @@ pub fn process_keys<'a>(
             let pid: u32 = if procbox.get().unwrap().lock().unwrap().get_selected() > 0 {
                 procbox.get().unwrap().lock().unwrap().get_selected_pid()
             } else {
-                proccollector.detailed_pid.unwrap()
+                proccollector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .detailed_pid
+                    .unwrap()
             };
             let lower = key.to_ascii_lowercase();
             if psutil::process::pid_exists(pid) {
@@ -1949,8 +2168,17 @@ pub fn process_keys<'a>(
                     )),
                 };
             }
-        } else if key == "delete".to_owned() && proccollector.search_filter.len() > 0 {
-            proccollector.search_filter = String::default();
+        } else if key == "delete".to_owned()
+            && proccollector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .search_filter
+                .len()
+                > 0
+        {
+            proccollector.get().unwrap().lock().unwrap().search_filter = String::default();
             collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::ProcCollector],
                 CONFIG,
@@ -1962,28 +2190,71 @@ pub fn process_keys<'a>(
             );
         } else if key == "enter".to_owned() {
             if procbox.get().unwrap().lock().unwrap().get_selected() > 0
-                && proccollector.detailed_pid.unwrap_or(0) != procbox.get().unwrap().lock().unwrap().get_selected_pid()
-                && psutil::process::pid_exists(procbox.get().unwrap().lock().unwrap().get_selected_pid())
+                && proccollector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .detailed_pid
+                    .unwrap_or(0)
+                    != procbox.get().unwrap().lock().unwrap().get_selected_pid()
+                && psutil::process::pid_exists(
+                    procbox.get().unwrap().lock().unwrap().get_selected_pid(),
+                )
             {
-                proccollector.detailed = true;
-                procbox.get().unwrap().lock().unwrap().set_last_selection(procbox.get().unwrap().lock().unwrap().get_selected());
+                proccollector.get().unwrap().lock().unwrap().detailed = true;
+                procbox
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_last_selection(procbox.get().unwrap().lock().unwrap().get_selected());
                 procbox.get().unwrap().lock().unwrap().set_selected(0);
-                proccollector.detailed_pid = Some(procbox.get().unwrap().lock().unwrap().get_selected_pid());
-                procbox.get().unwrap().lock().unwrap().set_parent_resized(true);
-            } else if proccollector.detailed {
-                procbox.get().unwrap().lock().unwrap().set_selected(procbox.get().unwrap().lock().unwrap().get_last_selection());
+                proccollector.get().unwrap().lock().unwrap().detailed_pid =
+                    Some(procbox.get().unwrap().lock().unwrap().get_selected_pid());
+                procbox
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_parent_resized(true);
+            } else if proccollector.get().unwrap().lock().unwrap().detailed {
+                procbox
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_selected(procbox.get().unwrap().lock().unwrap().get_last_selection());
                 procbox.get().unwrap().lock().unwrap().set_last_selection(0);
-                proccollector.detailed = false;
-                proccollector.detailed_pid = None;
-                procbox.get().unwrap().lock().unwrap().set_parent_resized(true);
+                proccollector.get().unwrap().lock().unwrap().detailed = false;
+                proccollector.get().unwrap().lock().unwrap().detailed_pid = None;
+                procbox
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_parent_resized(true);
             } else {
                 continue;
             }
-            proccollector.details = HashMap::<String, ProcCollectorDetails>::new();
-            proccollector.details_cpu = vec![];
-            proccollector.details_mem = vec![];
-            graphs.detailed_cpu.NotImplemented = true;
-            graphs.detailed_mem.NotImplemented = true;
+            proccollector.get().unwrap().lock().unwrap().details =
+                HashMap::<String, ProcCollectorDetails>::new();
+            proccollector.get().unwrap().lock().unwrap().details_cpu = vec![];
+            proccollector.get().unwrap().lock().unwrap().details_mem = vec![];
+            graphs
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .detailed_cpu
+                .NotImplemented = true;
+            graphs
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .detailed_mem
+                .NotImplemented = true;
             collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::ProcCollector],
                 CONFIG,
@@ -2010,7 +2281,14 @@ pub fn process_keys<'a>(
         .collect::<Vec<String>>()
         .contains(&key)
         {
-            procbox.get().unwrap().lock().unwrap().selector(key, mouse_pos, proccollector, key_class, collector, CONFIG);
+            procbox.get().unwrap().lock().unwrap().selector(
+                key,
+                mouse_pos,
+                proccollector,
+                key_class,
+                collector,
+                CONFIG,
+            );
         }
     }
 }
@@ -2102,27 +2380,26 @@ pub fn now_awake(
     brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
     collector: &OnceCell<Mutex<Collector>>,
     boxes: Vec<Boxes>,
-    init: &Init,
+    init: &OnceCell<Mutex<Init>>,
     cpu_box: &OnceCell<Mutex<CpuBox>>,
-    menu: &Menu,
-    timer: &Timer,
+    menu: &OnceCell<Mutex<Menu>>,
+    timer: &OnceCell<Mutex<Timer>>,
     CONFIG: &OnceCell<Mutex<Config>>,
     THEME: &Theme,
     DEBUG: bool,
     collectors: Vec<Collectors>,
-    timeit: &TimeIt,
+    timeit: &OnceCell<Mutex<TimeIt>>,
     ARG_MODE: ViewMode,
-    graphs: &Graphs,
-    meters: &Meters,
+    graphs: &OnceCell<Mutex<Graphs>>,
+    meters: &OnceCell<Mutex<Meters>>,
     netbox: &OnceCell<Mutex<NetBox>>,
     procbox: &OnceCell<Mutex<ProcBox>>,
     membox: &OnceCell<Mutex<MemBox>>,
-    cpu_collector: &CpuCollector,
-    mem_collector: &MemCollector,
-    net_collector: &NetCollector,
-    proc_collector: &ProcCollector,
+    cpu_collector: &OnceCell<Mutex<CpuCollector>>,
+    mem_collector: &OnceCell<Mutex<MemCollector>>,
+    net_collector: &OnceCell<Mutex<NetCollector>>,
+    proc_collector: &OnceCell<Mutex<ProcCollector>>,
     mem_box: &OnceCell<Mutex<MemBox>>,
-    proc_box: &OnceCell<Mutex<ProcBox>>,
 ) {
     draw.get().unwrap().lock().unwrap().now(
         vec![
@@ -2153,7 +2430,7 @@ pub fn now_awake(
         cpu_collector,
         mem_box,
         netbox,
-        proc_box,
+        procbox,
     );
     brshtop_box.get().unwrap().lock().unwrap().calc_sizes(
         boxes,

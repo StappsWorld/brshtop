@@ -121,7 +121,7 @@ impl BrshtopBox {
         boxes: Vec<Boxes>,
         term: &OnceCell<Mutex<Term>>,
         CONFIG: &OnceCell<Mutex<Config>>,
-        cpu: &CpuCollector,
+        cpu: &OnceCell<Mutex<CpuCollector>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         mem_box: &OnceCell<Mutex<MemBox>>,
         net_box: &OnceCell<Mutex<NetBox>>,
@@ -158,7 +158,7 @@ impl BrshtopBox {
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         key: &OnceCell<Mutex<Key>>,
         draw: &OnceCell<Mutex<Draw>>,
-        menu: &Menu,
+        menu: &OnceCell<Mutex<Menu>>,
         theme: &Theme,
         term: &OnceCell<Mutex<Term>>,
     ) {
@@ -207,7 +207,7 @@ impl BrshtopBox {
         }
 
         draw.get().unwrap().lock().unwrap().buffer(
-            if now && !menu.active {
+            if now && !menu.get().unwrap().lock().unwrap().active {
                 String::from("update_ms!")
             } else {
                 String::from("update_ms")
@@ -237,13 +237,13 @@ impl BrshtopBox {
             false,
             false,
             100,
-            menu.active,
+            menu.get().unwrap().lock().unwrap().active,
             false,
             true,
             key,
         );
 
-        if now && !menu.active {
+        if now && !menu.get().unwrap().lock().unwrap().active {
             draw.get()
                 .unwrap()
                 .lock()
@@ -275,7 +275,7 @@ impl BrshtopBox {
         term: &OnceCell<Mutex<Term>>,
         config: &OnceCell<Mutex<Config>>,
         theme: &Theme,
-        menu: &Menu,
+        menu: &OnceCell<Mutex<Menu>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         draw: &OnceCell<Mutex<Draw>>,
         key: &OnceCell<Mutex<Key>>,
@@ -322,7 +322,7 @@ impl BrshtopBox {
             );
         }
         self.clock_len = clock_len.clone() as u32;
-        let now: bool = if menu.active { false } else { !force };
+        let now: bool = if menu.get().unwrap().lock().unwrap().active { false } else { !force };
 
         out.push_str(
             format!(
@@ -353,13 +353,13 @@ impl BrshtopBox {
             false,
             now,
             100,
-            menu.active,
+            menu.get().unwrap().lock().unwrap().active,
             false,
             !force,
             key,
         );
 
-        if now && !menu.active && config.get().unwrap().lock().unwrap().show_battery {
+        if now && !menu.get().unwrap().lock().unwrap().active && config.get().unwrap().lock().unwrap().show_battery {
             match Manager::new() {
                 Ok(m) => match m.batteries() {
                     Ok(b) => match b.into_iter().size_hint() {
@@ -383,7 +383,7 @@ impl BrshtopBox {
         now: bool,
         draw: &OnceCell<Mutex<Draw>>,
         subclasses: Vec<Boxes>,
-        menu: &Menu,
+        menu: &OnceCell<Mutex<Menu>>,
         config: &OnceCell<Mutex<Config>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         mem_box: &OnceCell<Mutex<MemBox>>,
@@ -408,7 +408,7 @@ impl BrshtopBox {
             false,
             now,
             1000,
-            menu.active,
+            menu.get().unwrap().lock().unwrap().active,
             false,
             true,
             key,

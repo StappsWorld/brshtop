@@ -96,7 +96,7 @@ impl Key {
         }
     }
 
-    pub fn start(&mut self, draw: &OnceCell<Mutex<Draw>>, menu: &Menu) {
+    pub fn start(&mut self, draw: &OnceCell<Mutex<Draw>>, menu: &OnceCell<Mutex<Menu>>) {
         self.stopping = false;
         crossbeam::thread::scope(|s| {
             s.spawn(|_| self.get_key(draw, menu));
@@ -201,7 +201,7 @@ impl Key {
     }
 
     /// Get a key or escape sequence from stdin, convert to readable format and save to keys list. Meant to be run in it's own thread
-    pub fn get_key(&mut self, draw: &OnceCell<Mutex<Draw>>, menu: &Menu) {
+    pub fn get_key(&mut self, draw: &OnceCell<Mutex<Draw>>, menu: &OnceCell<Mutex<Menu>>) {
         let mut input_key: String = String::default();
         let mut clean_key: String = String::default();
 
@@ -271,7 +271,7 @@ impl Key {
                                     } else if input_key.starts_with("\033[<0;")
                                         && input_key.ends_with("m")
                                     {
-                                        if menu.active {
+                                        if menu.get().unwrap().lock().unwrap().active {
                                             clean_key = "mouse_click".to_owned();
                                         } else {
                                             let mut broke: bool = false;

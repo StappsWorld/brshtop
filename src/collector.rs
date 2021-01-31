@@ -119,23 +119,23 @@ impl Collector {
         DEBUG: bool,
         collectors: Vec<Collectors>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        timeit: &TimeIt,
-        menu: &Menu,
+        timeit: &OnceCell<Mutex<TimeIt>>,
+        menu: &OnceCell<Mutex<Menu>>,
         draw: &OnceCell<Mutex<Draw>>,
         term: &OnceCell<Mutex<Term>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         key: &OnceCell<Mutex<Key>>,
         THEME: &Theme,
         ARG_MODE: ViewMode,
-        graphs: &Graphs,
-        meters: &Meters,
+        graphs: &OnceCell<Mutex<Graphs>>,
+        meters: &OnceCell<Mutex<Meters>>,
         netbox: &OnceCell<Mutex<NetBox>>,
         procbox: &OnceCell<Mutex<ProcBox>>,
         membox: &OnceCell<Mutex<MemBox>>,
-        cpu_collector : &CpuCollector,
-        mem_collector : &MemCollector,
-        net_collector : &NetCollector,
-        proc_collector : &ProcCollector,
+        cpu_collector : &OnceCell<Mutex<CpuCollector>>,
+        mem_collector : &OnceCell<Mutex<MemCollector>>,
+        net_collector : &OnceCell<Mutex<NetCollector>>,
+        proc_collector : &OnceCell<Mutex<ProcCollector>>,
         passable_self : &OnceCell<Mutex<Collector>>,
     ) {
         self.set_stopping(false);
@@ -197,23 +197,23 @@ impl Collector {
         CONFIG: &OnceCell<Mutex<Config>>,
         DEBUG: bool,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        timeit: &TimeIt,
-        menu: &Menu,
+        timeit: &OnceCell<Mutex<TimeIt>>,
+        menu: &OnceCell<Mutex<Menu>>,
         draw: &OnceCell<Mutex<Draw>>,
         term: &OnceCell<Mutex<Term>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         key: &OnceCell<Mutex<Key>>,
         THEME: &Theme,
         ARG_MODE: ViewMode,
-        graphs: &Graphs,
-        meters: &Meters,
+        graphs: &OnceCell<Mutex<Graphs>>,
+        meters: &OnceCell<Mutex<Meters>>,
         netbox: &OnceCell<Mutex<NetBox>>,
         procbox: &OnceCell<Mutex<ProcBox>>,
         membox: &OnceCell<Mutex<MemBox>>,
-        cpu_collector : &CpuCollector,
-        net_collector : &NetCollector,
-        proc_collector : &ProcCollector,
-        mem_collector : &MemCollector,
+        cpu_collector : &OnceCell<Mutex<CpuCollector>>,
+        net_collector : &OnceCell<Mutex<NetCollector>>,
+        proc_collector : &OnceCell<Mutex<ProcCollector>>,
+        mem_collector : &OnceCell<Mutex<MemCollector>>,
         passable_self : &OnceCell<Mutex<Collector>>,
     ) {
         let mut draw_buffers = Vec::<String>::new();
@@ -236,7 +236,7 @@ impl Collector {
             self.set_collect_done(Event::Flag(false));
 
             if DEBUG && !debugged {
-                timeit.start("Collect and draw".to_owned());
+                timeit.get().unwrap().lock().unwrap().start("Collect and draw".to_owned());
             }
 
             while self.get_collect_queue().len() > 0 {
@@ -244,24 +244,24 @@ impl Collector {
                 if !self.get_only_draw() {
                     match collector {
                         Collectors::CpuCollector => {
-                            cpu_collector.collect(CONFIG, term, cpu_box, brshtop_box)
+                            cpu_collector.get().unwrap().lock().unwrap().collect(CONFIG, term, cpu_box, brshtop_box, cpu_collector)
                         }
-                        Collectors::NetCollector => net_collector.collect(CONFIG, netbox),
-                        Collectors::ProcCollector => proc_collector.collect(brshtop_box, CONFIG, procbox),
-                        Collectors::MemCollector => mem_collector.collect(CONFIG, membox),
+                        Collectors::NetCollector => net_collector.get().unwrap().lock().unwrap().collect(CONFIG, netbox),
+                        Collectors::ProcCollector => proc_collector.get().unwrap().lock().unwrap().collect(brshtop_box, CONFIG, procbox),
+                        Collectors::MemCollector => mem_collector.get().unwrap().lock().unwrap().collect(CONFIG, membox),
                     }
                 }
                 match collector {
-                    Collectors::CpuCollector => cpu_collector.draw(
-                        cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu,
+                    Collectors::CpuCollector => cpu_collector.get().unwrap().lock().unwrap().draw(
+                        cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu, cpu_collector,
                     ),
                     Collectors::NetCollector => {
-                        net_collector.draw(netbox, THEME, key, term, CONFIG, draw, graphs, menu, netbox)
+                        net_collector.get().unwrap().lock().unwrap().draw(netbox, THEME, key, term, CONFIG, draw, graphs, menu, net_collector)
                     }
                     Collectors::ProcCollector => {
-                        proc_collector.draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu)
+                        proc_collector.get().unwrap().lock().unwrap().draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu, proc_collector)
                     }
-                    Collectors::MemCollector => mem_collector.draw(
+                    Collectors::MemCollector => mem_collector.get().unwrap().lock().unwrap().draw(
                         membox,
                         term,
                         brshtop_box,
@@ -272,15 +272,16 @@ impl Collector {
                         passable_self,
                         draw,
                         menu,
+                        mem_collector,
                     ),
                 }
 
                 if self.get_use_draw_list() {
                     draw_buffers.push(match collector {
-                        Collectors::CpuCollector => cpu_collector.buffer.clone(),
-                        Collectors::NetCollector => net_collector.buffer.clone(),
-                        Collectors::ProcCollector => proc_collector.buffer.clone(),
-                        Collectors::MemCollector => mem_collector.get_buffer().clone(),
+                        Collectors::CpuCollector => cpu_collector.get().unwrap().lock().unwrap().buffer.clone(),
+                        Collectors::NetCollector => net_collector.get().unwrap().lock().unwrap().buffer.clone(),
+                        Collectors::ProcCollector => proc_collector.get().unwrap().lock().unwrap().buffer.clone(),
+                        Collectors::MemCollector => mem_collector.get().unwrap().lock().unwrap().get_buffer().clone(),
                     });
                 }
 
@@ -290,11 +291,11 @@ impl Collector {
             }
 
             if DEBUG && !debugged {
-                timeit.stop("Collect and draw".to_owned());
+                timeit.get().unwrap().lock().unwrap().stop("Collect and draw".to_owned());
                 debugged = true;
             }
 
-            if self.get_draw_now() && !menu.active && !self.get_collect_interrupt() {
+            if self.get_draw_now() && !menu.get().unwrap().lock().unwrap().active && !self.get_collect_interrupt() {
                 if self.get_use_draw_list() {
                     draw.get().unwrap().lock().unwrap().out(draw_buffers, false, key);
                 } else {
