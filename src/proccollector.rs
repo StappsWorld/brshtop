@@ -21,7 +21,7 @@ use {
         process::{os::unix::ProcessExt, *},
         Bytes, Count, Pid,
     },
-    std::{cmp::Ordering, collections::HashMap, convert::TryFrom, fmt::Display, sync::Mutex,},
+    std::{cmp::Ordering, collections::HashMap, convert::TryFrom, fmt::Display, sync::Mutex},
 };
 
 #[derive(Clone)]
@@ -42,7 +42,7 @@ pub enum ProcCollectorDetails {
 }
 impl Display for ProcCollectorDetails {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
-        match *self {
+        match self {
             ProcCollectorDetails::Bool(b) => f.write_str(b.to_string().as_str()),
             ProcCollectorDetails::Status(s) => match s {
                 Status::Running => f.write_str("Running"),
@@ -167,7 +167,12 @@ impl ProcCollector {
     }
 
     /// List all processess with pid, name, arguments, threads, username, memory percent and cpu percent
-    pub fn collect(&mut self, brshtop_box: &OnceCell<Mutex<BrshtopBox>>, CONFIG: &OnceCell<Mutex<Config>>, procbox: &OnceCell<Mutex<ProcBox>>) {
+    pub fn collect(
+        &mut self,
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
+        CONFIG: &OnceCell<Mutex<Config>>,
+        procbox: &OnceCell<Mutex<ProcBox>>,
+    ) {
         if brshtop_box.get().unwrap().lock().unwrap().get_stat_mode() {
             return;
         }
@@ -175,12 +180,12 @@ impl ProcCollector {
         let mut out: HashMap<Pid, HashMap<String, ProcessInfo>> =
             HashMap::<Pid, HashMap<String, ProcessInfo>>::new();
         self.det_cpu = 0.0;
-        let sorting: SortingOption = CONFIG.get().unwrap().lock().unwrap().proc_sorting;
+        let mut sorting: SortingOption = CONFIG.get().unwrap().lock().unwrap().proc_sorting;
         let reverse = !CONFIG.get().unwrap().lock().unwrap().proc_reversed;
         let proc_per_cpu: bool = CONFIG.get().unwrap().lock().unwrap().proc_per_core;
-        let search: String = self.search_filter;
+        let search: String = self.search_filter.clone();
         let err: f64 = 0.0;
-        let n: usize = 0;
+        let mut n: usize = 0;
 
         if CONFIG.get().unwrap().lock().unwrap().proc_tree && sorting == SortingOption::Arguments {
             sorting = SortingOption::Program;
@@ -189,9 +194,9 @@ impl ProcCollector {
         if CONFIG.get().unwrap().lock().unwrap().proc_tree {
             self.tree(sorting, reverse, proc_per_cpu, search, CONFIG);
         } else {
-            let processes = ProcCollector::get_sorted_processes(sorting, reverse);
+            let mut processes = ProcCollector::get_sorted_processes(sorting, reverse);
 
-            for p in processes {
+            for p in processes.as_mut_slice() {
                 if self.parent.get_collect_interrupt() || self.parent.get_proc_interrupt() {
                     return;
                 }
@@ -298,26 +303,29 @@ impl ProcCollector {
                     }
                 };
 
-                out[&p.pid()] = vec![
-                    (
-                        "name",
-                        ProcessInfo::String(p.name().unwrap_or(String::default())),
-                    ),
-                    (
-                        "cmd",
-                        ProcessInfo::String(
-                            cmd.replace("\n", "").replace("\t", "").replace("\\", ""),
+                out.insert(
+                    p.pid(),
+                    vec![
+                        (
+                            "name",
+                            ProcessInfo::String(p.name().unwrap_or(String::default())),
                         ),
-                    ),
-                    ("threads", ProcessInfo::Count(p.num_threads())),
-                    ("username", ProcessInfo::String(p.username())),
-                    ("mem", ProcessInfo::MemoryInfo(mem)),
-                    ("mem_b", ProcessInfo::U64(mem_b)),
-                    ("cpu", ProcessInfo::F32(cpu)),
-                ]
-                .iter()
-                .map(|(s, p)| (s.to_owned().to_owned(), p.clone()))
-                .collect::<HashMap<String, ProcessInfo>>();
+                        (
+                            "cmd",
+                            ProcessInfo::String(
+                                cmd.replace("\n", "").replace("\t", "").replace("\\", ""),
+                            ),
+                        ),
+                        ("threads", ProcessInfo::Count(p.num_threads())),
+                        ("username", ProcessInfo::String(p.username())),
+                        ("mem", ProcessInfo::MemoryInfo(mem)),
+                        ("mem_b", ProcessInfo::U64(mem_b)),
+                        ("cpu", ProcessInfo::F32(cpu)),
+                    ]
+                    .iter()
+                    .map(|(s, p)| (s.to_owned().to_owned(), p.clone()))
+                    .collect::<HashMap<String, ProcessInfo>>(),
+                );
 
                 n += 1;
             }
@@ -327,8 +335,23 @@ impl ProcCollector {
 
         if self.detailed {
             self.expand = u32::try_from(
-                ((procbox.get().unwrap().lock().unwrap().get_parent().get_width() as i32 - 2)
-                    - ((procbox.get().unwrap().lock().unwrap().get_parent().get_width() as i32 - 2) / 3)
+                ((procbox
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_parent()
+                    .get_width() as i32
+                    - 2)
+                    - ((procbox
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_parent()
+                        .get_width() as i32
+                        - 2)
+                        / 3)
                     - 40)
                     / 10,
             )
@@ -353,8 +376,12 @@ impl ProcCollector {
             let c_pid = match self.detailed_pid {
                 Some(p) => p,
                 None => {
-                    self.details[&"killed".to_owned()] = ProcCollectorDetails::Bool(true);
-                    self.details[&"status".to_owned()] = ProcCollectorDetails::Status(Status::Dead);
+                    self.details
+                        .insert("killed".to_owned(), ProcCollectorDetails::Bool(true));
+                    self.details.insert(
+                        "status".to_owned(),
+                        ProcCollectorDetails::Status(Status::Dead),
+                    );
                     procbox.get().unwrap().lock().unwrap().set_redraw(true);
                     return;
                 }
@@ -363,14 +390,18 @@ impl ProcCollector {
                 Ok(d) => d,
                 Err(e) => {
                     errlog(format!("Unable find process {} (error {:?})", c_pid, e));
-                    self.details[&"killed".to_owned()] = ProcCollectorDetails::Bool(true);
-                    self.details[&"status".to_owned()] = ProcCollectorDetails::Status(Status::Dead);
+                    self.details
+                        .insert("killed".to_owned(), ProcCollectorDetails::Bool(true));
+                    self.details.insert(
+                        "status".to_owned(),
+                        ProcCollectorDetails::Status(Status::Dead),
+                    );
                     procbox.get().unwrap().lock().unwrap().set_redraw(true);
                     return;
                 }
             };
 
-            let attrs: Vec<String> = vec!["status", "memory_info", "create_time"]
+            let mut attrs: Vec<String> = vec!["status", "memory_info", "create_time"]
                 .iter()
                 .map(|s| s.to_owned().to_owned())
                 .collect();
@@ -499,16 +530,26 @@ impl ProcCollector {
                 .insert("pid".to_owned(), ProcCollectorDetails::U32(c_pid));
             if self.processes.contains_key(&c_pid) {
                 let current_process: HashMap<String, ProcessInfo> = self.processes[&c_pid].clone();
-                self.details[&"name".to_owned()] =
-                    ProcCollectorDetails::from(current_process[&"name".to_owned()]);
-                self.details[&"cmdline".to_owned()] =
-                    ProcCollectorDetails::from(current_process[&"cmd".to_owned()]);
-                self.details[&"threads".to_owned()] =
-                    ProcCollectorDetails::from(current_process[&"threads".to_owned()]);
-                self.details[&"username".to_owned()] =
-                    ProcCollectorDetails::from(current_process[&"username".to_owned()]);
-                self.details[&"memory_percent".to_owned()] =
-                    ProcCollectorDetails::from(current_process[&"mem".to_owned()]);
+                self.details.insert(
+                    "name".to_owned(),
+                    ProcCollectorDetails::from(current_process[&"name".to_owned()].clone()),
+                );
+                self.details.insert(
+                    "cmdline".to_owned(),
+                    ProcCollectorDetails::from(current_process[&"cmd".to_owned()].clone()),
+                );
+                self.details.insert(
+                    "threads".to_owned(),
+                    ProcCollectorDetails::from(current_process[&"threads".to_owned()].clone()),
+                );
+                self.details.insert(
+                    "username".to_owned(),
+                    ProcCollectorDetails::from(current_process[&"username".to_owned()].clone()),
+                );
+                self.details.insert(
+                    "memory_percent".to_owned(),
+                    ProcCollectorDetails::from(current_process[&"mem".to_owned()].clone()),
+                );
                 let cpu_percent_push = match current_process[&"cpu".to_owned()] {
                     ProcessInfo::F32(f) => f,
                     _ => {
@@ -532,21 +573,26 @@ impl ProcCollector {
                 );
             } else {
                 let cmdline_pusher: String = " ".to_owned()
-                    + match self.details[&"cmdline".to_owned()] {
+                    + match self.details.get(&"cmdline".to_owned()).unwrap() {
                         ProcCollectorDetails::String(s) => s.as_str(),
                         _ => "",
                     };
 
-                self.details[&"cmdline".to_owned()] =
+                self.details.insert(
+                    "cmdline".to_owned(),
                     ProcCollectorDetails::String(if cmdline_pusher.len() > 0 {
                         cmdline_pusher
                     } else {
                         "[".to_owned() + self.details[&"name".to_owned()].to_string().as_str() + "]"
-                    });
+                    }),
+                );
 
                 self.details.insert(
                     "threads".to_owned(),
-                    self.details[&"num_threads".to_owned()],
+                    self.details
+                        .get(&"num_threads".to_owned())
+                        .unwrap()
+                        .to_owned(),
                 );
                 self.details.insert(
                     "cpu_percent".to_owned(),
@@ -557,13 +603,15 @@ impl ProcCollector {
             self.details
                 .insert("killed".to_owned(), ProcCollectorDetails::Bool(false));
             if SYSTEM.to_owned() == "MacOS".to_owned() {
-                self.details["cpu_num"] = ProcCollectorDetails::None;
-                self.details["io_counters"] = ProcCollectorDetails::None;
+                self.details
+                    .insert("cpu_num".to_owned(), ProcCollectorDetails::None);
+                self.details
+                    .insert("io_counters".to_owned(), ProcCollectorDetails::None);
             }
 
             self.details.insert(
                 "memory_info".to_owned(),
-                match self.details[&"memory_info".to_owned()] {
+                match self.details.get(&"memory_info".to_owned()).unwrap() {
                     ProcCollectorDetails::MemoryInfo(m) => ProcCollectorDetails::String(
                         floating_humanizer(m.rss() as f64, false, false, 0, false),
                     ),
@@ -575,14 +623,14 @@ impl ProcCollector {
                 "uptime".to_owned(),
                 match self.details[&"create_time".to_owned()] {
                     ProcCollectorDetails::Duration(d) => {
-                        let total_seconds = d.as_secs();
-                        let days = total_seconds / (24 * 60 * 60);
+                        let mut total_seconds = d.as_secs();
+                        let mut days = total_seconds / (24 * 60 * 60);
                         total_seconds -= total_seconds / (24 * 60 * 60);
-                        let hours = total_seconds / (60 * 60);
+                        let mut hours = total_seconds / (60 * 60);
                         total_seconds -= total_seconds / (60 * 60);
-                        let minutes = total_seconds / 60;
+                        let mut minutes = total_seconds / 60;
                         total_seconds -= total_seconds / 60;
-                        let seconds = total_seconds;
+                        let mut seconds = total_seconds;
 
                         if days > 0 {
                             ProcCollectorDetails::String(format!(
@@ -602,8 +650,10 @@ impl ProcCollector {
 
             if self.expand > 0 {
                 if self.expand > 1 {
-                    self.details["nice"] =
-                        ProcCollectorDetails::String(self.details["nice"].to_string());
+                    self.details.insert(
+                        "nice".to_owned(),
+                        ProcCollectorDetails::String(self.details["nice"].to_string()),
+                    );
                 }
                 if SYSTEM.to_owned() == "BSD".to_owned() {
                     if self.expand > 2 {
@@ -645,7 +695,7 @@ impl ProcCollector {
             }
 
             self.details_cpu
-                .push(match self.details[&"cpu_percent".to_owned()] {
+                .push(match self.details.get(&"cpu_percent".to_owned()).unwrap() {
                     ProcCollectorDetails::String(s) => s.parse::<u32>().unwrap_or(0),
                     _ => {
                         errlog("Malformed cpu_percentage".to_owned());
@@ -676,10 +726,26 @@ impl ProcCollector {
                     20.0
                 },
             ) as u32);
-            if self.details_cpu.len() as u32 > procbox.get().unwrap().lock().unwrap().get_parent().get_width() {
+            if self.details_cpu.len() as u32
+                > procbox
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_parent()
+                    .get_width()
+            {
                 self.details_cpu.remove(0);
             }
-            if self.details_mem.len() as u32 > procbox.get().unwrap().lock().unwrap().get_parent().get_width() {
+            if self.details_mem.len() as u32
+                > procbox
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_parent()
+                    .get_width()
+            {
                 self.details_mem.remove(0);
             }
         }
@@ -745,9 +811,10 @@ impl ProcCollector {
                     });
                 } else {
                     sorting.sort_by(|p1, p2| {
-                        p1.cpu_percent()
+                        p1.to_owned()
+                            .cpu_percent()
                             .unwrap()
-                            .partial_cmp(&p2.cpu_percent().unwrap())
+                            .partial_cmp(&p2.to_owned().cpu_percent().unwrap())
                             .unwrap()
                     });
                 }
@@ -786,19 +853,19 @@ impl ProcCollector {
                 Ok(o) => {
                     match o {
                         Some(pid) => {
-                            match tree.get(&pid) {
+                            match tree.get_mut(&pid) {
                                 Some(v) => v.push(p.pid()),
                                 None => {
                                     tree.insert(pid, vec![p.pid()]);
                                     ()
                                 }
                             }
-                            let info: HashMap<String, ProcCollectorDetails> =
+                            let mut info: HashMap<String, ProcCollectorDetails> =
                                 HashMap::<String, ProcCollectorDetails>::new();
 
                             if self.p_values.contains(&"cpu_percent".to_owned()) {
                                 info.insert("cpu_percent".to_owned(),
-                                match p.cpu_percent() {
+                                match p.to_owned().cpu_percent() {
                                     Ok(f) =>  ProcCollectorDetails::F32(f),
                                     Err(e) => {
                                         errlog(format!("Error getting cpu_percent from process (error {:?})", e));
@@ -885,8 +952,7 @@ impl ProcCollector {
         }
 
         if tree.len() > 0 {
-            ProcCollector::create_tree(
-                self,
+            det_cpu = self.create_tree(
                 tree.iter().map(|(s, _)| s.to_owned()).min().unwrap(),
                 tree,
                 String::default(),
@@ -895,10 +961,10 @@ impl ProcCollector {
                 0,
                 None,
                 &mut infolist,
-                &mut proc_per_cpu,
-                &mut search,
+                proc_per_cpu,
+                search.clone(),
                 &mut out,
-                &mut det_cpu,
+                det_cpu,
                 CONFIG,
             )
         }
@@ -909,7 +975,7 @@ impl ProcCollector {
         }
         if self.tree_counter >= 100 {
             self.tree_counter = 0;
-            for (pid, _) in self.collapsed {
+            for (pid, _) in self.collapsed.clone() {
                 if !psutil::process::pid_exists(pid) {
                     self.collapsed.remove_entry(&pid);
                 }
@@ -936,17 +1002,17 @@ impl ProcCollector {
         pid: Pid,
         tree: HashMap<Pid, Vec<Pid>>,
         indent: String,
-        inindent: String,
-        found: bool,
+        inindent_p: String,
+        found_p: bool,
         depth: u32,
-        collapse_to: Option<Pid>,
+        collapse_to_p: Option<Pid>,
         infolist: &HashMap<Pid, HashMap<String, ProcCollectorDetails>>,
-        proc_per_cpu: &bool,
-        search: &String,
-        out: &HashMap<Pid, HashMap<String, ProcCollectorDetails>>,
-        det_cpu: &f64,
+        proc_per_cpu: bool,
+        search: String,
+        out: &mut HashMap<Pid, HashMap<String, ProcCollectorDetails>>,
+        det_cpu_p: f64,
         CONFIG: &OnceCell<Mutex<Config>>,
-    ) {
+    ) -> f64 {
         let mut name: String = String::default();
         let mut threads: u64 = 0;
         let mut username: String = String::default();
@@ -958,8 +1024,12 @@ impl ProcCollector {
             HashMap::<String, ProcCollectorDetails>::new();
         let mut mem_b: Bytes = 0;
         let mut cmd: String = String::default();
+        let mut det_cpu = det_cpu_p.clone();
+        let mut found = found_p.clone();
+        let mut inindent = inindent_p.clone();
+        let mut collapse_to = collapse_to_p.clone();
         if self.parent.get_collect_interrupt() {
-            return;
+            return det_cpu;
         }
         let name: String = match psutil::process::Process::new(pid) {
             Ok(p) => match p.name() {
@@ -974,11 +1044,11 @@ impl ProcCollector {
                     "Unable to get process from PID : {} (error {})",
                     pid, e
                 ));
-                return;
+                return det_cpu;
             }
         };
         if name == "idle".to_owned() {
-            return;
+            return det_cpu;
         }
         if infolist.contains_key(&pid) {
             getinfo = infolist.get(&pid).unwrap().clone();
@@ -988,15 +1058,15 @@ impl ProcCollector {
             if self.detailed && pid == self.detailed_pid.unwrap_or(0) {
                 det_cpu = match getinfo.get(&"cpu_percent".to_owned()) {
                     Some(p) => match p {
-                        ProcCollectorDetails::F64(f) => &mut f,
+                        ProcCollectorDetails::F64(f) => f.to_owned(),
                         _ => {
                             errlog("Malformed information found in cpu_percent".to_owned());
-                            &mut 0.0
+                            0.0
                         }
                     },
                     None => {
                         errlog("getinfo doesn't have cpu_percent!!!!".to_owned());
-                        &mut 0.0
+                        0.0
                     }
                 };
             }
@@ -1010,12 +1080,12 @@ impl ProcCollector {
                     getinfo.insert(key, ProcCollectorDetails::String(String::default()));
                     adder.push_str("");
                 } else {
-                    adder.push_str((adder + " ").as_str());
+                    adder.push_str((adder.clone() + " ").as_str());
                 }
             }
-            adder = adder.trim().to_owned();
+            adder = adder.clone().trim().to_owned();
             let mut broke1: bool = false;
-            for value in vec![name, pid.to_string(), adder] {
+            for value in vec![name.clone(), pid.to_string(), adder.clone()] {
                 let mut broke2: bool = false;
                 for s in search.split(',') {
                     if value.contains(s.trim()) {
@@ -1094,16 +1164,17 @@ impl ProcCollector {
                                 ("[".to_owned()
                                     + match getinfo.get(&"name".to_owned()) {
                                         Some(p) => match p {
-                                            ProcCollectorDetails::String(s) => s.clone().as_str(),
+                                            ProcCollectorDetails::String(s) => s.clone(),
                                             _ => {
                                                 errlog(
                                                     "Malformed type in getinfo['name']".to_owned(),
                                                 );
-                                                ""
+                                                "".to_owned()
                                             }
                                         },
-                                        None => "",
+                                        None => "".to_owned(),
                                     }
+                                    .as_str()
                                     + "]")
                                     .to_owned()
                             }
@@ -1149,34 +1220,45 @@ impl ProcCollector {
             match collapse_to {
                 Some(u) => {
                     if search.len() == 0 {
-                        out[&u][&"threads".to_owned()] = match out[&u][&"threads".to_owned()] {
+                        let threads_get = match out[&u][&"threads".to_owned()] {
                             ProcCollectorDetails::U64(n) => ProcCollectorDetails::U64(n + threads),
                             _ => {
                                 errlog(format!("Malformed type in out[{}]['threads']", u));
                                 ProcCollectorDetails::U64(0)
                             }
                         };
-                        out[&u][&"mem".to_owned()] = match out[&u][&"mem".to_owned()] {
+                        out.get_mut(&u)
+                            .unwrap()
+                            .insert("threads".to_owned(), threads_get);
+
+                        let mem_get = match out[&u][&"mem".to_owned()] {
                             ProcCollectorDetails::F32(f) => ProcCollectorDetails::F32(f + mem),
                             _ => {
                                 errlog(format!("Malformed type in out[{}]['mem']", u));
                                 ProcCollectorDetails::F32(0.0)
                             }
                         };
-                        out[&u][&"mem_b".to_owned()] = match out[&u][&"mem_b".to_owned()] {
+                        out.get_mut(&u).unwrap().insert("mem".to_owned(), mem_get);
+
+                        let mem_b_get = match out[&u][&"mem_b".to_owned()] {
                             ProcCollectorDetails::U64(n) => ProcCollectorDetails::U64(n + mem_b),
                             _ => {
                                 errlog(format!("Malformed type in out[{}]['mem_b']", u));
                                 ProcCollectorDetails::U64(0)
                             }
                         };
-                        out[&u][&"cpu".to_owned()] = match out[&u][&"cpu".to_owned()] {
+                        out.get_mut(&u)
+                            .unwrap()
+                            .insert("mem_b".to_owned(), mem_b_get);
+
+                        let cpu_get = match out[&u][&"cpu".to_owned()] {
                             ProcCollectorDetails::F32(f) => ProcCollectorDetails::F32(f + cpu),
                             _ => {
                                 errlog(format!("Malformed type in out[{}]['cpu']", u));
                                 ProcCollectorDetails::F32(0.0)
                             }
                         };
+                        out.get_mut(&u).unwrap().insert("cpu".to_owned(), cpu_get);
                     } else {
                         elser = true;
                     }
@@ -1192,7 +1274,7 @@ impl ProcCollector {
                     pid,
                     vec![
                         ("indent", ProcCollectorDetails::String(inindent)),
-                        ("name", ProcCollectorDetails::String(name)),
+                        ("name", ProcCollectorDetails::String(name.clone())),
                         (
                             "cmd",
                             ProcCollectorDetails::String(
@@ -1227,7 +1309,7 @@ impl ProcCollector {
         }
 
         if !tree.contains_key(&pid) {
-            return;
+            return det_cpu;
         }
         let children: Vec<u32> = tree[&pid][..tree[&pid].len() - 2]
             .iter()
@@ -1235,29 +1317,29 @@ impl ProcCollector {
             .collect::<Vec<u32>>();
 
         for child in children {
-            ProcCollector::create_tree(
+            det_cpu = ProcCollector::create_tree(
                 self,
                 child,
-                tree,
-                indent + " | ",
-                indent + " ├─ ",
+                tree.clone(),
+                indent.clone() + " | ",
+                indent.clone() + " ├─ ",
                 found,
                 depth + 1,
                 collapse_to,
                 infolist,
                 proc_per_cpu,
-                search,
+                search.clone(),
                 out,
                 det_cpu,
                 CONFIG,
-            )
+            );
         }
-        ProcCollector::create_tree(
+        det_cpu = ProcCollector::create_tree(
             self,
             tree[&pid][tree[&pid].len() - 2].to_owned(),
             tree,
-            indent + " ",
-            indent + " └─ ",
+            indent.clone() + " ",
+            indent.clone() + " └─ ",
             false,
             depth + 1,
             collapse_to,
@@ -1268,6 +1350,7 @@ impl ProcCollector {
             det_cpu,
             CONFIG,
         );
+        det_cpu
     }
 
     /// JUST CALL ProcBox.draw_fg()
@@ -1276,13 +1359,22 @@ impl ProcCollector {
         procbox: &OnceCell<Mutex<ProcBox>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         key: &OnceCell<Mutex<Key>>,
-        THEME: &Theme,
+        THEME: &OnceCell<Mutex<Theme>>,
         graphs: &OnceCell<Mutex<Graphs>>,
         term: &OnceCell<Mutex<Term>>,
         draw: &OnceCell<Mutex<Draw>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self : &OnceCell<Mutex<ProcCollector>>,
+        passable_self: &OnceCell<Mutex<ProcCollector>>,
     ) {
-        procbox.get().unwrap().lock().unwrap().draw_fg(CONFIG, key, THEME, graphs, term, draw, passable_self, menu)
+        procbox.get().unwrap().lock().unwrap().draw_fg(
+            CONFIG,
+            key,
+            THEME,
+            graphs,
+            term,
+            draw,
+            passable_self,
+            menu,
+        )
     }
 }

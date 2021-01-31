@@ -26,7 +26,14 @@ use {
         },
         Bytes,
     },
-    std::{collections::HashMap, convert::TryFrom, fmt, path::Path, sync::{Arc, Mutex}, time::SystemTime},
+    std::{
+        collections::HashMap,
+        convert::TryFrom,
+        fmt,
+        path::Path,
+        sync::{Arc, Mutex},
+        time::SystemTime,
+    },
 };
 
 #[derive(Clone)]
@@ -67,7 +74,7 @@ pub struct MemCollector {
 }
 impl MemCollector {
     pub fn new(membox: &OnceCell<Mutex<MemBox>>) -> Self {
-        let mem = MemCollector {
+        let mut mem = MemCollector {
             parent: Collector::new(),
             values: HashMap::<String, Bytes>::new(),
             vlist: HashMap::<String, Vec<Bytes>>::new(),
@@ -108,19 +115,7 @@ impl MemCollector {
                     "There was a problem collecting the virtual memory! (error {:?})",
                     e
                 ));
-                VirtualMemory {
-                    total: 0,
-                    available: 0,
-                    used: 0,
-                    free: 0,
-                    percent: 0.0,
-                    active: 0,
-                    inactive: 0,
-                    buffers: 0,
-                    cached: 0,
-                    shared: 0,
-                    slab: 0,
-                }
+                return;
             }
         };
 
@@ -135,10 +130,10 @@ impl MemCollector {
 
         for (key, value) in self.get_values() {
             self.set_string_index(
-                key,
+                key.clone(),
                 floating_humanizer(value as f64, false, false, 0, false),
             );
-            if key == "total".to_owned() {
+            if key.clone() == "total".to_owned() {
                 continue;
             }
             self.set_percent_index(
@@ -147,14 +142,20 @@ impl MemCollector {
             );
             if CONFIG.get().unwrap().lock().unwrap().mem_graphs {
                 if !self.get_vlist().contains_key(&key.clone()) {
-                    self.vlist.insert(key, vec![]);
+                    self.vlist.insert(key.clone(), vec![]);
                 }
                 self.push_vlist_inner_index(
                     key.clone(),
                     self.get_percent_index(key.clone()).unwrap_or(0),
                 );
                 if self.get_vlist_index(key.clone()).unwrap_or(vec![]).len() as u32
-                    > membox.get().unwrap().lock().unwrap().get_parent().get_width()
+                    > membox
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_parent()
+                        .get_width()
                 {
                     match self.remove_vlist_inner_index(key.clone(), 0) {
                         Err(s) => errlog(format!(
@@ -178,14 +179,7 @@ impl MemCollector {
                         "There was a problem collecting the swap memory! (error {:?})",
                         e
                     ));
-                    SwapMemory {
-                        total: 0,
-                        used: 0,
-                        free: 0,
-                        percent: 0.0,
-                        swapped_in: 0,
-                        swapped_out: 0,
-                    }
+                    return;
                 }
             };
 
@@ -222,7 +216,13 @@ impl MemCollector {
                             .get_swap_vlist_index(key.clone())
                             .unwrap_or(vec![])
                             .len() as u32
-                            > membox.get().unwrap().lock().unwrap().get_parent().get_width()
+                            > membox
+                                .get()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .get_parent()
+                                .get_width()
                         {
                             self.remove_vlist_inner_index(key.clone(), 0);
                         }
@@ -299,7 +299,7 @@ impl MemCollector {
         }
 
         let io_stream = io_counters();
-        let io_counters: HashMap<String, IoCounters> = HashMap::<String, IoCounters>::new();
+        let mut io_counters: HashMap<String, IoCounters> = HashMap::<String, IoCounters>::new();
         io_stream.for_each(|o| match o {
             Ok(counter) => {
                 io_counters.insert(counter.device_name().to_str().unwrap().to_owned(), counter);
@@ -322,11 +322,11 @@ impl MemCollector {
                         "root".to_owned()
                     };
 
-                    while disk_list.contains(&disk_name) {
+                    while disk_list.contains(&disk_name.clone()) {
                         disk_name.push_str("_");
                     }
 
-                    disk_list.push(disk_name);
+                    disk_list.push(disk_name.clone());
                     if self.get_excludes().len() > 0
                         && self.get_excludes().contains(disk.clone().filesystem())
                     {
@@ -334,7 +334,7 @@ impl MemCollector {
                     }
 
                     let mut ender: String = String::default();
-                    for s in filtering {
+                    for s in filtering.clone() {
                         ender.push_str(s.as_str());
                     }
                     if filtering.len() > 0
@@ -353,12 +353,7 @@ impl MemCollector {
                             Ok(d) => d,
                             Err(e) => {
                                 errlog(format!("Unable to get disk usage of disk {:?}", e));
-                                DiskUsage {
-                                    total: 0,
-                                    used: 0,
-                                    free: 0,
-                                    percent: 0.0,
-                                }
+                                return;
                             }
                         };
                     let u_percent: u32 = disk_u.clone().percent().round() as u32;
@@ -413,7 +408,8 @@ impl MemCollector {
                             //Not sure if this is called with the heim library :/
                             disk_io = io_counters.get(&"/".to_owned()).unwrap();
                         } else {
-                            throw_error("OS disk IO issue... Please post this as a problem in the GitHub with your current OS!!!")
+                            throw_error("OS disk IO issue... Please post this as a problem in the GitHub with your current OS!!!");
+                            return;
                         }
                         match self.get_timestamp().elapsed() {
                             Ok(d) => {
@@ -451,8 +447,7 @@ impl MemCollector {
                         };
                     } else {
                         errlog("No disks???".to_owned());
-                        disk_read = 0;
-                        disk_write = 0;
+                        return;
                     }
 
                     self.set_disk_hist_index(
@@ -514,7 +509,9 @@ impl MemCollector {
                     );
                 }
 
-                if CONFIG.get().unwrap().lock().unwrap().swap_disk && membox.get().unwrap().lock().unwrap().get_swap_on() {
+                if CONFIG.get().unwrap().lock().unwrap().swap_disk
+                    && membox.get().unwrap().lock().unwrap().get_swap_on()
+                {
                     self.set_disks_index("__swap".to_owned(), {
                         let mut h = vec![
                             ("name", DiskInfo::String("swap".to_owned())),
@@ -538,7 +535,7 @@ impl MemCollector {
                             .collect::<Vec<String>>()
                         {
                             h.insert(
-                                name,
+                                name.clone(),
                                 DiskInfo::String(
                                     self.get_swap_string_index(name.clone())
                                         .unwrap_or(String::default())
@@ -547,33 +544,38 @@ impl MemCollector {
                             );
                         }
 
-                        if self.get_disks().len() > 2 {
-                            let new: HashMap<String, HashMap<String, DiskInfo>> = vec![(
-                                self.get_disks().keys().cloned().collect::<Vec<String>>()[0]
-                                    .clone(),
-                                self.get_disks_index(
-                                    self.get_disks()
-                                        .keys()
-                                        .map(|k| k.to_string())
-                                        .collect::<Vec<String>>()[0]
-                                        .clone(),
-                                )
-                                .unwrap(),
-                            )]
-                            .iter()
-                            .cloned()
-                            .collect::<HashMap<String, HashMap<String, DiskInfo>>>();
-
-                            new.insert("__swap".to_owned(), h.clone());
-                            self.remove_disks_index("__swap".to_owned());
-
-                            for (key, map) in self.get_disks() {
-                                new.insert(key, map);
-                            }
-                            self.set_disks(new.clone());
-                        }
                         h
                     });
+                    if self.get_disks().len() > 2 {
+                        let mut new: HashMap<String, HashMap<String, DiskInfo>> = vec![(
+                            self.get_disks().keys().cloned().collect::<Vec<String>>()[0].clone(),
+                            self.get_disks_index(
+                                self.get_disks()
+                                    .keys()
+                                    .map(|k| k.to_string())
+                                    .collect::<Vec<String>>()[0]
+                                    .clone(),
+                            )
+                            .unwrap(),
+                        )]
+                        .iter()
+                        .cloned()
+                        .collect::<HashMap<String, HashMap<String, DiskInfo>>>();
+
+                        new.insert(
+                            "__swap".to_owned(),
+                            self.get_disks_index("__swap".to_owned()).unwrap().clone(),
+                        );
+
+                        let remover = "__swap".to_owned();
+
+                        self.remove_disks_index(remover);
+
+                        for (key, map) in self.get_disks() {
+                            new.insert(key, map);
+                        }
+                        self.set_disks(new.clone());
+                    }
                 }
 
                 if disk_list != self.get_old_disks() {
@@ -598,12 +600,12 @@ impl MemCollector {
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         meters: &OnceCell<Mutex<Meters>>,
-        THEME: &Theme,
+        THEME: &OnceCell<Mutex<Theme>>,
         key: &OnceCell<Mutex<Key>>,
         collector: &OnceCell<Mutex<Collector>>,
         draw: &OnceCell<Mutex<Draw>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self : &OnceCell<Mutex<MemCollector>>,
+        passable_self: &OnceCell<Mutex<MemCollector>>,
     ) {
         membox.get().unwrap().lock().unwrap().draw_fg(
             passable_self,

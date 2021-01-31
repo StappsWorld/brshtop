@@ -23,7 +23,7 @@ use {
     },
     math::round::ceil,
     once_cell::sync::OnceCell,
-    std::{collections::HashMap, convert::TryFrom, fs::File, path::Path, sync::Mutex,},
+    std::{collections::HashMap, convert::TryFrom, fs::File, path::Path, sync::Mutex},
 };
 
 pub struct CpuBox {
@@ -42,7 +42,11 @@ pub struct CpuBox {
     clock_block: bool,
 }
 impl CpuBox {
-    pub fn new(brshtop_box: &OnceCell<Mutex<BrshtopBox>>, config: &OnceCell<Mutex<Config>>, ARG_MODE: ViewMode) -> Self {
+    pub fn new(
+        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
+        config: &OnceCell<Mutex<Config>>,
+        ARG_MODE: ViewMode,
+    ) -> Self {
         let mut bsm: HashMap<String, String> = HashMap::<String, String>::new();
         bsm.insert("Charging".to_owned(), "▲".to_owned());
         bsm.insert("Discharging".to_owned(), "▼".to_owned());
@@ -51,9 +55,14 @@ impl CpuBox {
 
         let buffer_mut: String = "cpu".to_owned();
 
-        brshtop_box.get().unwrap().lock().unwrap().push_buffers(buffer_mut.clone());
+        brshtop_box
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .push_buffers(buffer_mut.clone());
 
-        let cpu_box = CpuBox {
+        let mut cpu_box = CpuBox {
             parent: BrshtopBox::new(config, ARG_MODE),
             sub: SubBox::new(),
             redraw: false,
@@ -80,56 +89,100 @@ impl CpuBox {
     pub fn calc_size(
         &mut self,
         term: &OnceCell<Mutex<Term>>,
-        set_b_cpu_h : &mut i32,
+        _b_cpu_h: i32,
         cpu: &OnceCell<Mutex<CpuCollector>>,
-    ) {
+    ) -> i32 {
         let mut height_p: u32 = if self.get_parent().get_proc_mode() {
             20
         } else {
             self.get_parent().get_height_p()
         };
 
-        self.set_parent_width((term.get().unwrap().lock().unwrap().get_width() as u32 * self.get_parent().get_width_p() / 100) as u32);
+        self.set_parent_width(
+            (term.get().unwrap().lock().unwrap().get_width() as u32
+                * self.get_parent().get_width_p()
+                / 100) as u32,
+        );
         self.set_parent_height(
-            (term.get().unwrap().lock().unwrap().get_height() as u32 * self.get_parent().get_height_p() / 100) as u32,
+            (term.get().unwrap().lock().unwrap().get_height() as u32
+                * self.get_parent().get_height_p()
+                / 100) as u32,
         );
 
         if self.get_parent().get_height() < 8 {
             self.set_parent_height(8);
         }
-
-        set_b_cpu_h = &mut (self.get_parent().get_height() as i32);
+        let mut set_b_cpu_h = _b_cpu_h.clone();
+        set_b_cpu_h = self.get_parent().get_height() as i32;
 
         self.set_sub_box_columns(ceil(
             ((THREADS.to_owned() + 1) / (self.get_parent().get_height() - 5) as u64) as f64,
             0,
         ) as u32);
 
-        if self.get_sub().get_box_columns() * (20 + if cpu.get().unwrap().lock().unwrap().got_sensors { 13 } else { 21 })
+        if self.get_sub().get_box_columns()
+            * (20
+                + if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
+                    13
+                } else {
+                    21
+                })
             < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
             self.set_sub_column_size(2);
-            self.set_sub_box_width(20 + if cpu.get().unwrap().lock().unwrap().got_sensors { 13 } else { 21 });
-        } else if self.get_sub().get_box_columns() * (15 + if cpu.get().unwrap().lock().unwrap().got_sensors { 6 } else { 15 })
+            self.set_sub_box_width(
+                20 + if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
+                    13
+                } else {
+                    21
+                },
+            );
+        } else if self.get_sub().get_box_columns()
+            * (15
+                + if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
+                    6
+                } else {
+                    15
+                })
             < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
             self.set_sub_column_size(1);
-            self.set_sub_box_width(15 + if cpu.get().unwrap().lock().unwrap().got_sensors { 6 } else { 15 });
-        } else if self.get_sub().get_box_columns() * (8 + if cpu.get().unwrap().lock().unwrap().got_sensors { 6 } else { 8 })
+            self.set_sub_box_width(
+                15 + if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
+                    6
+                } else {
+                    15
+                },
+            );
+        } else if self.get_sub().get_box_columns()
+            * (8 + if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
+                6
+            } else {
+                8
+            })
             < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
             self.set_sub_column_size(0);
         } else {
             self.set_sub_box_columns(
                 (self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32)
-                    / (8 + if cpu.get().unwrap().lock().unwrap().got_sensors { 6 } else { 8 }),
+                    / (8 + if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
+                        6
+                    } else {
+                        8
+                    }),
             );
             self.set_sub_column_size(0);
         }
 
         if self.get_sub().get_column_size() == 0 {
             self.set_sub_box_width(
-                8 + if cpu.get().unwrap().lock().unwrap().got_sensors { 6 } else { 8 } * self.get_sub().get_box_columns() + 1,
+                8 + if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
+                    6
+                } else {
+                    8
+                } * self.get_sub().get_box_columns()
+                    + 1,
             );
         }
 
@@ -169,17 +222,25 @@ impl CpuBox {
                 }
             },
         );
+        set_b_cpu_h
     }
 
     pub fn draw_bg(
         &mut self,
         key: &OnceCell<Mutex<Key>>,
-        theme: &Theme,
+        theme: &OnceCell<Mutex<Theme>>,
         term: &OnceCell<Mutex<Term>>,
         config: &OnceCell<Mutex<Config>>,
-        passable_self : &OnceCell<Mutex<CpuBox>>,
+        passable_self: &OnceCell<Mutex<CpuBox>>,
     ) -> String {
-        if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"M".to_owned()) {
+        if !key
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .mouse
+            .contains_key(&"M".to_owned())
+        {
             let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
             for i in 0..6 {
                 let mut pusher: Vec<i32> = Vec::<i32>::new();
@@ -187,7 +248,12 @@ impl CpuBox {
                 pusher.push(self.get_parent().get_y() as i32);
                 top.push(pusher);
             }
-            key.get().unwrap().lock().unwrap().mouse.insert("M".to_owned(), top);
+            key.get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .mouse
+                .insert("M".to_owned(), top);
         }
 
         return format!(
@@ -199,7 +265,7 @@ impl CpuBox {
                 0,
                 Some(String::default()),
                 Some(String::default()),
-                Some(theme.colors.cpu_box),
+                Some(theme.get().unwrap().lock().unwrap().colors.cpu_box),
                 None,
                 true,
                 Some(Boxes::CpuBox),
@@ -213,14 +279,36 @@ impl CpuBox {
             ),
             mv::to(self.get_parent().get_y(), self.get_parent().get_x() + 10),
             theme
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
                 .colors
                 .cpu_box
                 .call(symbol::title_left.to_owned(), term),
             fx::b,
-            theme.colors.hi_fg.call("M".to_owned(), term),
-            theme.colors.title.call("enu".to_owned(), term),
+            theme
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .colors
+                .hi_fg
+                .call("M".to_owned(), term),
+            theme
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .colors
+                .title
+                .call("enu".to_owned(), term),
             fx::ub,
             theme
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
                 .colors
                 .cpu_box
                 .call(symbol::title_right.to_owned(), term),
@@ -229,17 +317,23 @@ impl CpuBox {
                 self.get_sub().get_box_y(),
                 self.get_sub().get_box_width(),
                 self.get_sub().get_box_height(),
-                Some(if config.get().unwrap().lock().unwrap().custom_cpu_name != String::default() {
-                    CPU_NAME.to_owned()
-                        [..usize::try_from(self.get_sub().get_box_width() as i32 - 14).unwrap_or(0)]
-                        .to_owned()
-                } else {
-                    config.get().unwrap().lock().unwrap().custom_cpu_name
-                        [..usize::try_from(self.get_sub().get_box_width() as i32 - 14).unwrap_or(0)]
-                        .to_owned()
-                }),
+                Some(
+                    if config.get().unwrap().lock().unwrap().custom_cpu_name != String::default() {
+                        CPU_NAME.to_owned()[..usize::try_from(
+                            self.get_sub().get_box_width() as i32 - 14,
+                        )
+                        .unwrap_or(0)]
+                            .to_owned()
+                    } else {
+                        config.get().unwrap().lock().unwrap().custom_cpu_name[..usize::try_from(
+                            self.get_sub().get_box_width() as i32 - 14,
+                        )
+                        .unwrap_or(0)]
+                            .to_owned()
+                    }
+                ),
                 None,
-                Some(theme.colors.div_line),
+                Some(theme.get().unwrap().lock().unwrap().colors.div_line),
                 None,
                 true,
                 Some(Boxes::CpuBox),
@@ -254,7 +348,7 @@ impl CpuBox {
         );
     }
 
-    pub fn battery_activity(&self, menu: &OnceCell<Mutex<Menu>>) -> bool {
+    pub fn battery_activity(&mut self, menu: &OnceCell<Mutex<Menu>>) -> bool {
         let battery_manager = match Manager::new() {
             Ok(m) => m,
             Err(_) => {
@@ -265,7 +359,7 @@ impl CpuBox {
             }
         };
 
-        let batteries = match battery_manager.batteries() {
+        let mut batteries = match battery_manager.batteries() {
             Ok(b) => b,
             Err(_) => {
                 if self.get_battery_percent() != 1000.0 {
@@ -350,7 +444,7 @@ impl CpuBox {
             return_true = true;
         }
 
-        let status: String = "not_set".to_owned();
+        let mut status: String = "not_set".to_owned();
 
         if self.get_battery_path().is_some() {
             status = match File::open(self.get_battery_path().unwrap() + "status") {
@@ -376,25 +470,28 @@ impl CpuBox {
             return_true = true;
         }
 
-        return return_true || self.get_parent().get_resized() || self.get_redraw() || menu.get().unwrap().lock().unwrap().active;
+        return return_true
+            || self.get_parent().get_resized()
+            || self.get_redraw()
+            || menu.get().unwrap().lock().unwrap().active;
     }
 
     pub fn draw_fg(
-        &self,
+        &mut self,
         cpu: &OnceCell<Mutex<CpuCollector>>,
         config: &OnceCell<Mutex<Config>>,
         key: &OnceCell<Mutex<Key>>,
-        theme: &Theme,
+        theme: &OnceCell<Mutex<Theme>>,
         term: &OnceCell<Mutex<Term>>,
         draw: &OnceCell<Mutex<Draw>>,
         ARG_MODE: ViewMode,
         graphs: &OnceCell<Mutex<Graphs>>,
         meters: &OnceCell<Mutex<Meters>>,
         menu: &OnceCell<Mutex<Menu>>,
-        THEME: &Theme,
+        THEME: &OnceCell<Mutex<Theme>>,
     ) {
-        if cpu.get().unwrap().lock().unwrap().parent.get_redraw() {
-            self.redraw = true;
+        if cpu.get().unwrap().lock().unwrap().get_parent().get_redraw() {
+            self.set_redraw(true);
         }
 
         let mut out: String = String::default();
@@ -413,7 +510,9 @@ impl CpuBox {
         let mut bw: u32 = sub.get_box_width() - 2;
         let mut bh: u32 = sub.get_box_height() - 2;
         let mut hh: u32 = ceil((h / 2) as f64, 0) as u32;
-        let mut hide_cores: bool = (cpu.get().unwrap().lock().unwrap().cpu_temp_only || !config.get().unwrap().lock().unwrap().show_coretemp) && cpu.get().unwrap().lock().unwrap().got_sensors;
+        let mut hide_cores: bool = (cpu.get().unwrap().lock().unwrap().get_cpu_temp_only()
+            || !config.get().unwrap().lock().unwrap().show_coretemp)
+            && cpu.get().unwrap().lock().unwrap().get_got_sensors();
         let mut ct_width: u32 = if hide_cores {
             if 6 * sub.get_column_size() > 6 {
                 6 * sub.get_column_size()
@@ -425,7 +524,14 @@ impl CpuBox {
         };
 
         if parent_box.get_resized() || self.get_redraw() {
-            if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"m".to_owned()) {
+            if !key
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .mouse
+                .contains_key(&"m".to_owned())
+            {
                 let mut parent = Vec::<Vec<i32>>::new();
                 for i in 0..12 {
                     let mut adder = Vec::<i32>::new();
@@ -433,21 +539,42 @@ impl CpuBox {
                     adder.push(self.get_parent().get_y() as i32);
                     parent.push(adder);
                 }
-                key.get().unwrap().lock().unwrap().mouse.insert("m".to_owned(), parent);
+                key.get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .mouse
+                    .insert("m".to_owned(), parent);
             }
             out_misc += format!(
                 "{}{}{}{}{}ode:{}{}{}",
                 mv::to(self.get_parent().get_y(), self.get_parent().get_x() + 16),
                 theme
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
                     .colors
                     .cpu_box
                     .call(symbol::title_left.to_owned(), term),
                 fx::b,
-                theme.colors.hi_fg.call("m".to_owned(), term),
-                theme.colors.title,
-                ARG_MODE.t != ViewModeEnum::None || config.get().unwrap().lock().unwrap().view_mode.t != ViewModeEnum::None,
+                theme
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .colors
+                    .hi_fg
+                    .call("m".to_owned(), term),
+                theme.get().unwrap().lock().unwrap().colors.title,
+                ARG_MODE.t != ViewModeEnum::None
+                    || config.get().unwrap().lock().unwrap().view_mode.t != ViewModeEnum::None,
                 fx::ub,
                 theme
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
                     .colors
                     .cpu_box
                     .call(symbol::title_right.to_owned(), term)
@@ -458,8 +585,24 @@ impl CpuBox {
                 Graph::new_with_vec::<Color>(
                     (w - bw - 3) as u32,
                     hh as u32,
-                    theme.gradient.get(&"cpu".to_owned()).unwrap().clone(),
-                    cpu.get().unwrap().lock().unwrap().cpu_usage[0].iter().map(|u| *u as i32).collect(),
+                    theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .gradient
+                        .get(&"cpu".to_owned())
+                        .unwrap()
+                        .clone(),
+                    cpu.get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_cpu_usage_index(0)
+                        .unwrap()
+                        .iter()
+                        .map(|u| *u as i32)
+                        .collect(),
                     term,
                     false,
                     0,
@@ -472,8 +615,24 @@ impl CpuBox {
                 Graph::new_with_vec::<Color>(
                     (w - bw - 3) as u32,
                     hh as u32,
-                    theme.gradient.get(&"cpu".to_owned()).unwrap().clone(),
-                    cpu.get().unwrap().lock().unwrap().cpu_usage[0].iter().map(|u| *u as i32).collect(),
+                    theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .gradient
+                        .get(&"cpu".to_owned())
+                        .unwrap()
+                        .clone(),
+                    cpu.get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_cpu_usage_index(0)
+                        .unwrap()
+                        .iter()
+                        .map(|u| *u as i32)
+                        .collect(),
                     term,
                     true,
                     0,
@@ -482,8 +641,27 @@ impl CpuBox {
                 ),
             );
             meters.get().unwrap().lock().unwrap().set_cpu(Meter::new(
-                cpu.get().unwrap().lock().unwrap().cpu_usage[0][cpu.get().unwrap().lock().unwrap().cpu_usage[0].len() - 2] as i32,
-                bw - (if cpu.get().unwrap().lock().unwrap().got_sensors { 21 } else { 9 }),
+                cpu.get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_cpu_usage_inner_index(
+                        0,
+                        cpu.get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_usage_index(0)
+                            .unwrap()
+                            .len()
+                            - 2,
+                    )
+                    .unwrap() as i32,
+                bw - (if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
+                    21
+                } else {
+                    9
+                }),
                 "cpu".to_owned(),
                 false,
                 THEME,
@@ -496,40 +674,73 @@ impl CpuBox {
                         5,
                         1,
                         None,
-                        cpu.get().unwrap().lock().unwrap().cpu_temp[0].iter().map(|u| *u as i32).collect(),
+                        cpu.get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_temp_index(0)
+                            .unwrap()
+                            .iter()
+                            .map(|u| *u as i32)
+                            .collect(),
                         term,
                         false,
-                        cpu.get().unwrap().lock().unwrap().cpu_temp_crit,
+                        cpu.get().unwrap().lock().unwrap().get_cpu_temp_crit(),
                         -23,
                         None,
                     );
                 }
             }
-            if cpu.get().unwrap().lock().unwrap().got_sensors {
+            if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
                 graphs.get().unwrap().lock().unwrap().temps[0] = Graph::new(
                     5,
                     1,
                     None,
-                    cpu.get().unwrap().lock().unwrap().cpu_temp[0].iter().map(|u| *u as i32).collect(),
+                    cpu.get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_cpu_temp_index(0)
+                        .unwrap()
+                        .iter()
+                        .map(|u| *u as i32)
+                        .collect(),
                     term,
                     false,
-                    cpu.get().unwrap().lock().unwrap().cpu_temp_crit,
+                    cpu.get().unwrap().lock().unwrap().get_cpu_temp_crit(),
                     -23,
                     None,
                 );
                 if sub.get_column_size() > 1 {
                     for n in 1..(THREADS.to_owned() + 1) as usize {
-                        if cpu.get().unwrap().lock().unwrap().cpu_temp[n].len() == 0 {
+                        if cpu
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_temp_index(n)
+                            .unwrap()
+                            .len()
+                            == 0
+                        {
                             continue;
                         }
                         graphs.get().unwrap().lock().unwrap().temps[n] = Graph::new(
                             5,
                             1,
                             None,
-                            cpu.get().unwrap().lock().unwrap().cpu_temp[0].iter().map(|u| *u as i32).collect(),
+                            cpu.get()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .get_cpu_temp_index(0)
+                                .unwrap()
+                                .iter()
+                                .map(|u| *u as i32)
+                                .collect(),
                             term,
                             false,
-                            cpu.get().unwrap().lock().unwrap().cpu_temp_crit,
+                            cpu.get().unwrap().lock().unwrap().get_cpu_temp_crit(),
                             -23,
                             None,
                         );
@@ -563,14 +774,19 @@ impl CpuBox {
             }
 
             if self.get_parent().get_resized() {
-                meters.get().unwrap().lock().unwrap().set_battery(Meter::new(
-                    self.battery_percent as i32,
-                    10,
-                    "cpu".to_owned(),
-                    true,
-                    THEME,
-                    term,
-                ));
+                meters
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set_battery(Meter::new(
+                        self.battery_percent as i32,
+                        10,
+                        "cpu".to_owned(),
+                        true,
+                        THEME,
+                        term,
+                    ));
             }
 
             let mut battery_symbol: String = self
@@ -578,15 +794,15 @@ impl CpuBox {
                 .get(&self.get_battery_status())
                 .unwrap()
                 .clone();
-            let battery_len: u32 = (format!("{}", config.get().unwrap().lock().unwrap().update_ms).len()
-                + if self.get_parent().get_width() >= 100 {
-                    11
-                } else {
-                    0
-                }
-                + battery_time.len()
-                + format!("{}", self.battery_percent).len())
-                as u32;
+            let battery_len: u32 =
+                (format!("{}", config.get().unwrap().lock().unwrap().update_ms).len()
+                    + if self.get_parent().get_width() >= 100 {
+                        11
+                    } else {
+                        0
+                    }
+                    + battery_time.len()
+                    + format!("{}", self.battery_percent).len()) as u32;
             let battery_pos: u32 = self.get_parent().get_width() - battery_len - 17;
 
             if (battery_pos != self.get_old_battery_pos()
@@ -599,6 +815,10 @@ impl CpuBox {
                         "{}{}",
                         mv::to(y - 1, self.old_battery_pos),
                         theme
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
                             .colors
                             .cpu_box
                             .call(symbol::h_line.repeat(self.old_battery_len + 4), term)
@@ -615,11 +835,15 @@ impl CpuBox {
                     "{}{}{}{}BAT{} {}%{}{}{}{}{}",
                     mv::to(y - 1, battery_pos),
                     theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .colors
                         .cpu_box
                         .call(symbol::title_left.to_owned(), term),
                     fx::b,
-                    theme.colors.title,
+                    theme.get().unwrap().lock().unwrap().colors.title,
                     battery_symbol,
                     self.battery_percent,
                     if self.get_parent().get_width() < 100 {
@@ -628,16 +852,24 @@ impl CpuBox {
                         format!(
                             " {}{}{}",
                             fx::ub,
-                            meters.get().unwrap().lock().unwrap()
+                            meters
+                                .get()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
                                 .get_battery()
                                 .call(Some(self.get_battery_percent() as i32), term),
                             fx::b,
                         )
                     },
-                    theme.colors.title,
+                    theme.get().unwrap().lock().unwrap().colors.title,
                     battery_time,
                     fx::ub,
                     theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .colors
                         .cpu_box
                         .call(symbol::title_right.to_owned(), term),
@@ -647,7 +879,11 @@ impl CpuBox {
 
             draw.get().unwrap().lock().unwrap().buffer(
                 "battery".to_owned(),
-                vec![format!("{}{}", bat_out, term.get().unwrap().lock().unwrap().get_fg(),)],
+                vec![format!(
+                    "{}{}",
+                    bat_out,
+                    term.get().unwrap().lock().unwrap().get_fg(),
+                )],
                 false,
                 false,
                 100,
@@ -662,6 +898,10 @@ impl CpuBox {
                     "{}{}",
                     mv::to(y - 1, self.old_battery_pos),
                     theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .colors
                         .cpu_box
                         .call(symbol::h_line.repeat(self.old_battery_len + 4), term),
@@ -676,7 +916,11 @@ impl CpuBox {
             self.set_old_battery_len(0);
             self.set_battery_path(None);
 
-            draw.get().unwrap().lock().unwrap().clear(vec!["battery".to_owned()], true);
+            draw.get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .clear(vec!["battery".to_owned()], true);
         }
 
         let mut cx: u32 = 0;
@@ -684,11 +928,17 @@ impl CpuBox {
         let mut cc: u32 = 0;
         let mut ccw: u32 = ((bw + 1) / sub.get_box_columns()) as u32;
 
-        if cpu.get().unwrap().lock().unwrap().cpu_freq != 0.0 {
-            let mut freq: String = if cpu.get().unwrap().lock().unwrap().cpu_freq < 1000.0 {
-                format!("{:.0} Mhz", cpu.get().unwrap().lock().unwrap().cpu_freq)
+        if cpu.get().unwrap().lock().unwrap().get_cpu_freq() != 0.0 {
+            let mut freq: String = if cpu.get().unwrap().lock().unwrap().get_cpu_freq() < 1000.0 {
+                format!(
+                    "{:.0} Mhz",
+                    cpu.get().unwrap().lock().unwrap().get_cpu_freq()
+                )
             } else {
-                format!("{:.1}", cpu.get().unwrap().lock().unwrap().cpu_freq / 1000.0)
+                format!(
+                    "{:.1}",
+                    cpu.get().unwrap().lock().unwrap().get_cpu_freq() / 1000.0
+                )
             };
 
             out.push_str(
@@ -696,13 +946,28 @@ impl CpuBox {
                     "{}{}{}{}{}{}",
                     mv::to(by - 1, bx + bw - 9),
                     theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .colors
                         .div_line
                         .call(symbol::title_left.to_owned(), term),
                     fx::b,
-                    theme.colors.title.call(freq, term),
+                    theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .colors
+                        .title
+                        .call(freq, term),
                     fx::ub,
                     theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .colors
                         .div_line
                         .call(symbol::title_right.to_owned(), term),
@@ -715,62 +980,185 @@ impl CpuBox {
             format!(
                 "{}{}{}{}{}{}{}{}{}{}{}{:>4}{}%",
                 mv::to(y, x),
-                graphs.get().unwrap().lock().unwrap().cpu[&"up".to_owned()].call(
-                    if self.get_parent().get_resized() {
-                        None
-                    } else {
-                        Some(cpu.get().unwrap().lock().unwrap().cpu_usage[0][cpu.get().unwrap().lock().unwrap().cpu_usage[0].len() - 2] as i32)
-                    },
-                    term
-                ),
+                graphs
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .cpu
+                    .get_mut(&"up".to_owned())
+                    .unwrap()
+                    .call(
+                        if self.get_parent().get_resized() {
+                            None
+                        } else {
+                            Some(
+                                cpu.get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_usage_index(0)
+                                    .unwrap()[cpu
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_usage_index(0)
+                                    .unwrap()
+                                    .len()
+                                    - 2] as i32,
+                            )
+                        },
+                        term
+                    ),
                 mv::to(y + hh as u32, x),
-                graphs.get().unwrap().lock().unwrap().cpu[&"up".to_owned()].call(
-                    if self.get_parent().get_resized() {
-                        None
-                    } else {
-                        Some(cpu.get().unwrap().lock().unwrap().cpu_usage[0][cpu.get().unwrap().lock().unwrap().cpu_usage[0].len() - 2] as i32)
-                    },
-                    term
-                ),
-                theme.colors.main_fg,
+                graphs
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .cpu
+                    .get_mut(&"up".to_owned())
+                    .unwrap()
+                    .call(
+                        if self.get_parent().get_resized() {
+                            None
+                        } else {
+                            Some(
+                                cpu.get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_usage_index(0)
+                                    .unwrap()[cpu
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_usage_index(0)
+                                    .unwrap()
+                                    .len()
+                                    - 2] as i32,
+                            )
+                        },
+                        term
+                    ),
+                theme.get().unwrap().lock().unwrap().colors.main_fg,
                 mv::to(by + cy, bx + cx),
                 fx::b,
                 "CPU ",
                 fx::ub,
                 meters.get().unwrap().lock().unwrap().get_cpu().call(
-                    Some(cpu.get().unwrap().lock().unwrap().cpu_usage[0][cpu.get().unwrap().lock().unwrap().cpu_usage[0].len() - 2] as i32),
+                    Some(
+                        cpu.get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_usage_index(0)
+                            .unwrap()[cpu
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_usage_index(0)
+                            .unwrap()
+                            .len()
+                            - 2] as i32
+                    ),
                     term
                 ),
-                theme.gradient[&"cpu".to_owned()]
-                    [cpu.get().unwrap().lock().unwrap().cpu_usage[0][cpu.get().unwrap().lock().unwrap().cpu_usage[0].len() - 2] as usize],
-                cpu.get().unwrap().lock().unwrap().cpu_usage[0][cpu.get().unwrap().lock().unwrap().cpu_usage.len() - 2],
-                theme.colors.main_fg
+                theme.get().unwrap().lock().unwrap().gradient[&"cpu".to_owned()][cpu
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_cpu_usage_index(0)
+                    .unwrap()[cpu
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_cpu_usage_index(0)
+                    .unwrap()
+                    .len()
+                    - 2]
+                    as usize],
+                cpu.get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_cpu_usage_index(0)
+                    .unwrap()[cpu.get().unwrap().lock().unwrap().get_cpu_usage().len() - 2],
+                theme.get().unwrap().lock().unwrap().colors.main_fg
             )
             .as_str(),
         );
 
-        if cpu.get().unwrap().lock().unwrap().got_sensors {
+        if cpu.get().unwrap().lock().unwrap().get_got_sensors() {
             out.push_str(
                 format!(
                     "{} . . . . . {}{}{}{:>4}{}°C",
-                    theme.colors.inactive_fg,
+                    theme.get().unwrap().lock().unwrap().colors.inactive_fg,
                     mv::left(5),
-                    theme.gradient[&"temp".to_owned()][(min_max(
-                        cpu.get().unwrap().lock().unwrap().cpu_temp[0][cpu.get().unwrap().lock().unwrap().cpu_temp[0].len() - 2] as i32,
+                    theme.get().unwrap().lock().unwrap().gradient[&"temp".to_owned()][(min_max(
+                        cpu.get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_temp_index(0)
+                            .unwrap()[cpu
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_temp_index(0)
+                            .unwrap()
+                            .len()
+                            - 2] as i32,
                         0,
-                        cpu.get().unwrap().lock().unwrap().cpu_temp_crit
-                    ) * (100 / cpu.get().unwrap().lock().unwrap().cpu_temp_crit) as i32)
+                        cpu.get().unwrap().lock().unwrap().get_cpu_temp_crit()
+                    ) * (100
+                        / cpu.get().unwrap().lock().unwrap().get_cpu_temp_crit())
+                        as i32)
                         as usize],
                     graphs.get().unwrap().lock().unwrap().temps[0].call(
                         if self.get_parent().get_resized() {
                             None
                         } else {
-                            Some(cpu.get().unwrap().lock().unwrap().cpu_temp[0][cpu.get().unwrap().lock().unwrap().cpu_temp[0].len() - 2] as i32)
+                            Some(
+                                cpu.get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_temp_index(0)
+                                    .unwrap()[cpu
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_temp_index(0)
+                                    .unwrap()
+                                    .len()
+                                    - 2] as i32,
+                            )
                         },
                         term
                     ),
-                    cpu.get().unwrap().lock().unwrap().cpu_temp[0][cpu.get().unwrap().lock().unwrap().cpu_temp[0].len() - 2],
-                    theme.colors.main_fg,
+                    cpu.get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_cpu_temp_index(0)
+                        .unwrap()[cpu
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_cpu_temp_index(0)
+                        .unwrap()
+                        .len()
+                        - 2],
+                    theme.get().unwrap().lock().unwrap().colors.main_fg,
                 )
                 .as_str(),
             );
@@ -781,7 +1169,7 @@ impl CpuBox {
             out.push_str(
                 format!(
                     "{}{}{}{:<width$}",
-                    theme.colors.main_fg,
+                    theme.get().unwrap().lock().unwrap().colors.main_fg,
                     mv::to(by + cy, bx + cx),
                     fx::b.to_owned() + "C" + if THREADS.to_owned() < 100 { fx::ub } else { "" },
                     if self.get_sub().get_column_size() == 0 {
@@ -798,16 +1186,45 @@ impl CpuBox {
                 out.push_str(
                     format!(
                         "{}{}{}{}{}",
-                        theme.colors.inactive_fg,
+                        theme.get().unwrap().lock().unwrap().colors.inactive_fg,
                         ".".repeat((5 * self.get_sub().get_column_size() + ct_width) as usize),
                         mv::left((5 * self.get_sub().get_column_size() + ct_width) as u32),
-                        theme.gradient[&"cpu".to_owned()]
-                            [(cpu.get().unwrap().lock().unwrap().cpu_usage[n][cpu.get().unwrap().lock().unwrap().cpu_usage[n].len() - 2]) as usize],
+                        theme.get().unwrap().lock().unwrap().gradient[&"cpu".to_owned()][(cpu
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_usage_index(n)
+                            .unwrap()[cpu
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_usage_index(n)
+                            .unwrap()
+                            .len()
+                            - 2])
+                            as usize],
                         graphs.get().unwrap().lock().unwrap().cores[n - 1].call(
                             if self.get_parent().get_resized() {
                                 None
                             } else {
-                                Some(cpu.get().unwrap().lock().unwrap().cpu_temp[n][cpu.get().unwrap().lock().unwrap().cpu_temp[n].len() - 2] as i32)
+                                Some(
+                                    cpu.get()
+                                        .unwrap()
+                                        .lock()
+                                        .unwrap()
+                                        .get_cpu_temp_index(n)
+                                        .unwrap()[cpu
+                                        .get()
+                                        .unwrap()
+                                        .lock()
+                                        .unwrap()
+                                        .get_cpu_temp_index(n)
+                                        .unwrap()
+                                        .len()
+                                        - 2] as i32,
+                                )
                             },
                             term
                         ),
@@ -818,8 +1235,22 @@ impl CpuBox {
                 out.push_str(
                     format!(
                         "{}",
-                        theme.gradient[&"cpu".to_owned()]
-                            [(cpu.get().unwrap().lock().unwrap().cpu_usage[n][cpu.get().unwrap().lock().unwrap().cpu_usage[n].len() - 2]) as usize]
+                        theme.get().unwrap().lock().unwrap().gradient[&"cpu".to_owned()][(cpu
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_usage_index(n)
+                            .unwrap()[cpu
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_cpu_usage_index(n)
+                            .unwrap()
+                            .len()
+                            - 2])
+                            as usize]
                     )
                     .as_str(),
                 );
@@ -828,8 +1259,21 @@ impl CpuBox {
             out.push_str(
                 format!(
                     "{:width$}{}°C",
-                    cpu.get().unwrap().lock().unwrap().cpu_usage[n][cpu.get().unwrap().lock().unwrap().cpu_usage[n].len() - 2],
-                    theme.colors.main_fg,
+                    cpu.get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_cpu_usage_index(n)
+                        .unwrap()[cpu
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_cpu_usage_index(n)
+                        .unwrap()
+                        .len()
+                        - 2],
+                    theme.get().unwrap().lock().unwrap().colors.main_fg,
                     width = if self.get_sub().get_column_size() < 2 {
                         3
                     } else {
@@ -839,28 +1283,87 @@ impl CpuBox {
                 .as_str(),
             );
 
-            if cpu.get().unwrap().lock().unwrap().got_sensors && cpu.get().unwrap().lock().unwrap().cpu_temp[n].len() != 0 && !hide_cores {
+            if cpu.get().unwrap().lock().unwrap().get_got_sensors()
+                && cpu
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_cpu_temp_index(n)
+                    .unwrap()
+                    .len()
+                    != 0
+                && !hide_cores
+            {
                 if self.get_sub().get_column_size() > 1 {
                     out.push_str(
                         format!(
                             "{} . . . . . {}{}{}",
-                            theme.colors.inactive_fg,
+                            theme.get().unwrap().lock().unwrap().colors.inactive_fg,
                             mv::left(5),
-                            theme.gradient[&"temp".to_owned()][(if cpu.get().unwrap().lock().unwrap().cpu_temp[n]
-                                [cpu.get().unwrap().lock().unwrap().cpu_temp[n].len() - 2]
-                                >= cpu.get().unwrap().lock().unwrap().cpu_temp_crit as u32
-                            {
-                                100
-                            } else {
-                                cpu.get().unwrap().lock().unwrap().cpu_temp[n][cpu.get().unwrap().lock().unwrap().cpu_temp[n].len() - 2]
-                                    * (100 / cpu.get().unwrap().lock().unwrap().cpu_temp_crit) as u32
-                            })
-                                as usize],
+                            theme.get().unwrap().lock().unwrap().gradient[&"temp".to_owned()]
+                                [(if cpu
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_temp_index(n)
+                                    .unwrap()[cpu
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_temp_index(n)
+                                    .unwrap()
+                                    .len()
+                                    - 2]
+                                    >= cpu.get().unwrap().lock().unwrap().get_cpu_temp_crit() as u32
+                                {
+                                    100
+                                } else {
+                                    cpu.get()
+                                        .unwrap()
+                                        .lock()
+                                        .unwrap()
+                                        .get_cpu_temp_index(n)
+                                        .unwrap()[cpu
+                                        .get()
+                                        .unwrap()
+                                        .lock()
+                                        .unwrap()
+                                        .get_cpu_temp_index(n)
+                                        .unwrap()
+                                        .len()
+                                        - 2]
+                                        * (100
+                                            / cpu
+                                                .get()
+                                                .unwrap()
+                                                .lock()
+                                                .unwrap()
+                                                .get_cpu_temp_crit())
+                                            as u32
+                                }) as usize],
                             graphs.get().unwrap().lock().unwrap().temps[n].call(
                                 if self.get_parent().get_resized() {
                                     None
                                 } else {
-                                    Some(cpu.get().unwrap().lock().unwrap().cpu_temp[n][cpu.get().unwrap().lock().unwrap().cpu_temp[n].len() - 2] as i32)
+                                    Some(
+                                        cpu.get()
+                                            .unwrap()
+                                            .lock()
+                                            .unwrap()
+                                            .get_cpu_temp_index(n)
+                                            .unwrap()[cpu
+                                            .get()
+                                            .unwrap()
+                                            .lock()
+                                            .unwrap()
+                                            .get_cpu_temp_index(n)
+                                            .unwrap()
+                                            .len()
+                                            - 2] as i32,
+                                    )
                                 },
                                 term
                             )
@@ -871,21 +1374,47 @@ impl CpuBox {
                     out.push_str(
                         format!(
                             "{}",
-                            theme.gradient[&"temp".to_owned()][if cpu.get().unwrap().lock().unwrap().cpu_temp[n]
-                                [cpu.get().unwrap().lock().unwrap().cpu_temp[n].len() - 2]
-                                >= cpu.get().unwrap().lock().unwrap().cpu_temp_crit as u32
+                            theme.get().unwrap().lock().unwrap().gradient[&"temp".to_owned()][if cpu
+                                .get()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .get_cpu_temp_index(n)
+                                .unwrap()[cpu
+                                .get()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .get_cpu_temp_index(n)
+                                .unwrap()
+                                .len()
+                                - 2]
+                                >= cpu.get().unwrap().lock().unwrap().get_cpu_temp_crit() as u32
                             {
                                 100
                             } else {
-                                (cpu.get().unwrap().lock().unwrap().cpu_temp[n][cpu.get().unwrap().lock().unwrap().cpu_temp[n].len() - 2]
-                                    * (100 / cpu.get().unwrap().lock().unwrap().cpu_temp_crit) as u32)
-                                    as usize
+                                (cpu.get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_temp_index(n)
+                                    .unwrap()[cpu
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_cpu_temp_index(n)
+                                    .unwrap()
+                                    .len()
+                                    - 2]
+                                    * (100 / cpu.get().unwrap().lock().unwrap().get_cpu_temp_crit())
+                                        as u32) as usize
                             }]
                         )
                         .as_str(),
                     );
                 }
-            } else if cpu.get().unwrap().lock().unwrap().got_sensors && !hide_cores {
+            } else if cpu.get().unwrap().lock().unwrap().get_got_sensors() && !hide_cores {
                 out.push_str(
                     format!(
                         "{}",
@@ -901,6 +1430,10 @@ impl CpuBox {
 
             out.push_str(
                 theme
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
                     .colors
                     .div_line
                     .call(symbol::v_line.to_owned(), term)
@@ -930,31 +1463,51 @@ impl CpuBox {
         }
 
         if cy < bh && cc < self.get_sub().get_box_columns() {
-            if self.get_sub().get_box_columns() == 2 && cpu.get().unwrap().lock().unwrap().got_sensors {
+            if self.get_sub().get_box_columns() == 2
+                && cpu.get().unwrap().lock().unwrap().get_got_sensors()
+            {
                 let mut adder: String = "   ".to_owned();
-                cpu.get().unwrap().lock().unwrap().load_avg
+                cpu.get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_load_avg()
                     .iter()
                     .map(|l| adder.push_str(l.to_string().as_str()));
                 lavg = format!(" Load AVG:  {:^19.19}", adder);
             } else if self.get_sub().get_box_columns() == 2
-                || (self.get_sub().get_box_columns() == 1 && cpu.get().unwrap().lock().unwrap().got_sensors)
+                || (self.get_sub().get_box_columns() == 1
+                    && cpu.get().unwrap().lock().unwrap().get_got_sensors())
             {
                 let mut adder: String = " ".to_owned();
-                cpu.get().unwrap().lock().unwrap().load_avg
+                cpu.get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_load_avg()
                     .iter()
                     .map(|l| adder.push_str(l.to_string().as_str()));
                 lavg = format!("LAV: {:^14.14}", adder);
             } else if self.get_sub().get_box_columns() == 1
-                || (self.get_sub().get_box_columns() == 0 && cpu.get().unwrap().lock().unwrap().got_sensors)
+                || (self.get_sub().get_box_columns() == 0
+                    && cpu.get().unwrap().lock().unwrap().get_got_sensors())
             {
                 let mut adder: String = "   ".to_owned();
-                cpu.get().unwrap().lock().unwrap().load_avg
+                cpu.get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_load_avg()
                     .iter()
                     .map(|l| adder.push_str(ceil(*l, 1).to_string().as_str()));
                 lavg = format!("L {:^11.11}", adder);
             } else {
                 let mut adder: String = "   ".to_owned();
-                cpu.get().unwrap().lock().unwrap().load_avg
+                cpu.get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_load_avg()
                     .iter()
                     .map(|l| adder.push_str(ceil(*l, 1).to_string().as_str()));
                 lavg = format!("{:^7.7}", adder);
@@ -963,9 +1516,16 @@ impl CpuBox {
                 format!(
                     "{}{}{}{}",
                     mv::to(by + cy, bx + cx),
-                    theme.colors.main_fg,
+                    theme.get().unwrap().lock().unwrap().colors.main_fg,
                     lavg,
-                    theme.colors.div_line.call(symbol::v_line.to_owned(), term)
+                    theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .colors
+                        .div_line
+                        .call(symbol::v_line.to_owned(), term)
                 )
                 .as_str(),
             );
@@ -975,15 +1535,20 @@ impl CpuBox {
             format!(
                 "{}{}up {}",
                 mv::to(y + h - 1, x + 1),
-                theme.colors.graph_text,
-                cpu.get().unwrap().lock().unwrap().uptime
+                theme.get().unwrap().lock().unwrap().colors.graph_text,
+                cpu.get().unwrap().lock().unwrap().get_uptime()
             )
             .as_str(),
         );
 
         draw.get().unwrap().lock().unwrap().buffer(
             self.get_buffer(),
-            vec![format!("{}{}{}", out_misc, out, term.get().unwrap().lock().unwrap().get_fg())],
+            vec![format!(
+                "{}{}{}",
+                out_misc,
+                out,
+                term.get().unwrap().lock().unwrap().get_fg()
+            )],
             false,
             false,
             100,
@@ -1127,7 +1692,7 @@ impl CpuBox {
     }
 
     pub fn get_battery_path(&self) -> Option<String> {
-        match self.battery_path {
+        match &self.battery_path {
             Some(s) => Some(s.clone()),
             None => None,
         }

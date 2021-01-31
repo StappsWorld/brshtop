@@ -75,9 +75,15 @@ impl ConfigItem {
 
     fn view_mode(s: &String) -> Result<Self, String> {
         Ok(match s.to_string().as_str() {
-            "full" => ConfigItem::ViewMode(ViewMode {t : ViewModeEnum::Full}),
-            "proc" => ConfigItem::ViewMode(ViewMode {t : ViewModeEnum::Proc}),
-            "stat" => ConfigItem::ViewMode(ViewMode {t : ViewModeEnum::Stat}),
+            "full" => ConfigItem::ViewMode(ViewMode {
+                t: ViewModeEnum::Full,
+            }),
+            "proc" => ConfigItem::ViewMode(ViewMode {
+                t: ViewModeEnum::Proc,
+            }),
+            "stat" => ConfigItem::ViewMode(ViewMode {
+                t: ViewModeEnum::Stat,
+            }),
             bad => {
                 return Err(format!(
                     r#"Config key "view_mode" had an unknown value: {}"#,
@@ -345,7 +351,9 @@ impl Config {
             net_sync: false,
             show_battery: true,
             show_init: true,
-            view_mode: ViewMode { t : ViewModeEnum::Full},
+            view_mode: ViewMode {
+                t: ViewModeEnum::Full,
+            },
             log_level: LogLevel::Warning,
             warnings: Vec::<String>::new(),
             info: Vec::<String>::new(),
@@ -366,7 +374,17 @@ impl Config {
                 LogLevel::Error,
                 LogLevel::Debug,
             ],
-            view_modes: vec![ViewMode { t : ViewModeEnum::Full}, ViewMode { t : ViewModeEnum::Proc}, ViewMode { t : ViewModeEnum::Stat}],
+            view_modes: vec![
+                ViewMode {
+                    t: ViewModeEnum::Full,
+                },
+                ViewMode {
+                    t: ViewModeEnum::Proc,
+                },
+                ViewMode {
+                    t: ViewModeEnum::Stat,
+                },
+            ],
             cpu_sensors: cpu_sensors_mut,
             changed: false,
             recreate: false,
@@ -471,12 +489,9 @@ impl Config {
                     }
 
                     for key in &self.keys {
-                        let mut l_stripped = stripped.clone();
+                        let mut l_stripped: String = stripped.to_owned();
                         if l_stripped.starts_with(key) {
-                            l_stripped = l_stripped
-                                .to_owned()
-                                .replace(&(key.clone() + "="), "")
-                                .as_str();
+                            l_stripped = l_stripped.to_owned().replace(&(key.clone() + "="), "");
                             if l_stripped.starts_with('"') {
                                 l_stripped.to_owned().retain(|c| c != '"');
                             }
@@ -549,33 +564,33 @@ impl Config {
             .map(|s| s.to_owned().to_owned())
             .collect::<Vec<String>>()
         {
-            if new_config.contains_key(&net_name) {
-                match new_config.get(&net_name).unwrap() {
+            if new_config.contains_key(&net_name.clone()) {
+                match new_config.get(&net_name.clone()).unwrap() {
                     ConfigItem::Str(s) => {
                         match s.chars().next() {
                             Some(c) => {
                                 if !c.is_numeric() {
-                                    new_config.insert(net_name, ConfigItem::Error);
+                                    new_config.insert(net_name.clone(), ConfigItem::Error);
                                     self.warnings.push(format!(
                                         "Config key \"{}\" didn\'t get an acceptable value!",
-                                        net_name
+                                        net_name.clone()
                                     ));
                                 }
                             }
                             None => {
-                                new_config.insert(net_name, ConfigItem::Error);
+                                new_config.insert(net_name.clone(), ConfigItem::Error);
                                 self.warnings.push(format!(
                                     "Config key \"{}\" didn\'t get an acceptable value!",
-                                    net_name
+                                    net_name.clone()
                                 ));
                             }
                         };
                     }
                     _ => {
-                        new_config.insert(net_name, ConfigItem::Error);
+                        new_config.insert(net_name.clone(), ConfigItem::Error);
                         self.warnings.push(format!(
                             "Config key \"{}\" didn\'t get an acceptable value!",
-                            net_name
+                            net_name.clone()
                         ));
                     }
                 }
@@ -626,7 +641,7 @@ impl Config {
     }
 
     pub fn getattr(&mut self, attr: String) -> ConfigAttr {
-        match attr.as_str() {
+        match attr.clone().as_str() {
             "color_theme" => ConfigAttr::String(self.color_theme.clone()),
             "theme_background" => ConfigAttr::Bool(self.theme_background),
             "view_mode" => ConfigAttr::ViewMode(self.view_mode),
@@ -659,6 +674,10 @@ impl Config {
             "show_init" => ConfigAttr::Bool(self.show_init),
             "update_check" => ConfigAttr::Bool(self.update_check),
             "log_level" => ConfigAttr::LogLevel(self.log_level),
+            _ => {
+                errlog(format!("Malformed attr {} found in getattr, defaulting...", attr.clone()));
+                ConfigAttr::String(String::default())
+            }
         }
     }
 
@@ -687,7 +706,9 @@ impl Config {
                     ConfigAttr::ViewMode(v) => v.clone(),
                     _ => {
                         throw_error("Illegal attribute set in CONFIG");
-                        ViewMode { t : ViewModeEnum::None}
+                        ViewMode {
+                            t: ViewModeEnum::None,
+                        }
                     }
                 }
             }
@@ -951,6 +972,10 @@ impl Config {
                         LogLevel::Debug
                     }
                 }
+            },
+            _ => {
+                throw_error(format!("Illegal attribute {} to be set on CONFIG", attr.clone()).as_str());
+                return
             }
         }
     }

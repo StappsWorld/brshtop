@@ -166,8 +166,8 @@ impl Init {
         self.initbg_up = Graph::new(
             term.get().unwrap().lock().unwrap().get_width() as i32,
             term.get().unwrap().lock().unwrap().get_height() as i32 / 2,
-            Some(ColorSwitch::VecColor(self.initbg_colors)),
-            self.initbg_data,
+            Some(ColorSwitch::VecColor(self.initbg_colors.clone())),
+            self.initbg_data.clone(),
             term,
             true,
             0,
@@ -177,8 +177,8 @@ impl Init {
         self.initbg_down = Graph::new(
             term.get().unwrap().lock().unwrap().get_width() as i32,
             term.get().unwrap().lock().unwrap().get_height() as i32 / 2,
-            Some(ColorSwitch::VecColor(self.initbg_colors)),
-            self.initbg_data,
+            Some(ColorSwitch::VecColor(self.initbg_colors.clone())),
+            self.initbg_data.clone(),
             term,
             false,
             0,

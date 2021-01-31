@@ -18,5 +18,5 @@ pub fn to(line: u32, col: u32) -> String {
     format!("\033[{};{}f", line, col)
 }
 
-pub const save : String = String::from("\033[s");
-pub const restore : String = String::from("\033[u");
+pub const save : &'static str = "\033[s";
+pub const restore : &'static str = "\033[u";

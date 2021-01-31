@@ -1,10 +1,13 @@
 use {
-    crate::{event::Event, key::Key},
+    crate::{
+        event::{Event, EventEnum},
+        key::Key,
+    },
     once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         io::{self, Write},
-        sync::Mutex
+        sync::Mutex,
     },
 };
 
@@ -24,22 +27,24 @@ impl Draw {
             saved: HashMap::<String, String>::new(),
             save: HashMap::<String, bool>::new(),
             once: HashMap::<String, bool>::new(),
-            idle: Event::Flag(true),
+            idle: Event {
+                t: EventEnum::Flag(true),
+            },
         }
     }
 
     /// Wait for input reader and self to be idle then print to screen
     pub fn now(&mut self, args: Vec<String>, idle: &mut Event) {
-        idle = &mut Event::Wait;
+        idle.replace_self(EventEnum::Wait);
         idle.wait(-1.0);
-        idle = &mut Event::Flag(false);
+        idle.replace_self(EventEnum::Flag(false));
 
         io::stdout().flush().unwrap();
         for s in args {
             print!("{}", s);
         }
 
-        idle = &mut Event::Flag(true);
+        idle.replace_self(EventEnum::Flag(true));
     }
 
     /// Defaults append: bool = False, now: bool = False, z: int = 100, only_save: bool = False, no_save: bool = False, once: bool = False
@@ -55,38 +60,45 @@ impl Draw {
         once: bool,
         key: &OnceCell<Mutex<Key>>,
     ) {
-        let string: String = String::default();
+        let mut string: String = String::default();
         let mut append_mut: bool = append.clone();
-        if name.starts_with("+") {
-            name = name.strip_prefix("+").unwrap().to_owned();
+        let mut mutable_name = name.clone();
+        if mutable_name.starts_with("+") {
+            mutable_name = mutable_name.strip_prefix("+").unwrap().to_owned();
             append_mut = true;
         }
         let mut now_mut: bool = now.clone();
-        if name.ends_with("!") {
-            name = name.strip_suffix("!").unwrap().to_owned();
+        if mutable_name.ends_with("!") {
+            mutable_name = mutable_name.strip_suffix("!").unwrap().to_owned();
             now_mut = true;
         }
-        self.save[&name] = !no_save;
-        self.once[&name] = once;
+        self.save.insert(mutable_name.clone(), !no_save);
+        self.once.insert(mutable_name.clone(), once);
 
-        if !self.z_order.contains_key(&name) || z != 100 {
-            self.z_order[&name] = z;
+        if !self.z_order.contains_key(&mutable_name.clone().clone()) || z != 100 {
+            self.z_order.insert(mutable_name.clone(), z);
         }
         if args.len() > 0 {
             args.iter().map(|s| string.push_str(s));
         }
         if only_save {
-            if !self.saved.contains_key(&name) || !append_mut {
-                self.saved[&name] = String::default();
+            if !self.saved.contains_key(&mutable_name.clone()) || !append_mut {
+                self.saved.insert(mutable_name.clone(), String::default());
             }
-            self.saved[&name].push_str(string.as_str());
+            self.saved
+                .get_mut(&mutable_name.clone())
+                .unwrap()
+                .push_str(string.as_str());
         } else {
-            if !self.strings.contains_key(&name) || !append_mut {
-                self.strings[&name] = String::default();
+            if !self.strings.contains_key(&mutable_name.clone()) || !append_mut {
+                self.strings.insert(mutable_name.clone(), String::default());
             }
-            self.strings[&name].push_str(string.as_str());
+            self.strings
+                .get_mut(&mutable_name.clone())
+                .unwrap()
+                .push_str(string.as_str());
             if now_mut {
-                self.out(vec![name], false, key);
+                self.out(vec![mutable_name.clone()], false, key);
             }
         }
     }
@@ -98,13 +110,17 @@ impl Draw {
             return;
         }
         if names.len() > 0 {
-            let mut z_order_sort: Vec<(&String, &i32)> = self.z_order.iter().collect();
+            let z_order_save = self.z_order.clone();
+            let mut z_order_sort: Vec<(&String, &i32)> = z_order_save.iter().collect();
             z_order_sort.sort_by(|a, b| b.1.cmp(a.1));
             for (name, value) in z_order_sort {
                 if names.contains(name) && self.strings.contains_key(name) {
                     out.push_str(self.strings[name].as_str());
                     if self.save[name] {
-                        self.saved[name] = self.strings[name];
+                        self.saved.insert(
+                            name.clone(),
+                            self.strings.get(&name.clone()).unwrap().clone(),
+                        );
                     }
                     if clear || self.once[name] {
                         self.clear(vec![name.clone()], false);

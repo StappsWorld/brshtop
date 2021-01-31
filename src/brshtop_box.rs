@@ -64,10 +64,12 @@ pub struct BrshtopBox {
 }
 impl BrshtopBox {
     pub fn new(config: &OnceCell<Mutex<Config>>, ARG_MODE: ViewMode) -> Self {
-        let proc_mode_mut = (config.get().unwrap().lock().unwrap().view_mode.t == ViewModeEnum::Proc
+        let proc_mode_mut = (config.get().unwrap().lock().unwrap().view_mode.t
+            == ViewModeEnum::Proc
             && ARG_MODE.t == ViewModeEnum::None)
             || ARG_MODE.t == ViewModeEnum::Proc;
-        let stat_mode_mut = (config.get().unwrap().lock().unwrap().view_mode.t == ViewModeEnum::Stat
+        let stat_mode_mut = (config.get().unwrap().lock().unwrap().view_mode.t
+            == ViewModeEnum::Stat
             && ARG_MODE.t == ViewModeEnum::None)
             || ARG_MODE.t == ViewModeEnum::Stat;
 
@@ -131,20 +133,60 @@ impl BrshtopBox {
             match sub {
                 Boxes::BrshtopBox => (),
                 Boxes::CpuBox => {
-                    cpu_box.get().unwrap().lock().unwrap().calc_size(term, &mut self._b_cpu_h, cpu);
-                    cpu_box.get().unwrap().lock().unwrap().set_parent_resized(true);
+                    self._b_cpu_h = cpu_box.get().unwrap().lock().unwrap().calc_size(
+                        term,
+                        self._b_cpu_h.clone(),
+                        cpu,
+                    );
+                    cpu_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set_parent_resized(true);
                 }
                 Boxes::MemBox => {
-                    mem_box.get().unwrap().lock().unwrap().calc_size(term, &mut self._b_mem_h, self.get_b_cpu_h(), CONFIG);
-                    mem_box.get().unwrap().lock().unwrap().set_parent_resized(true);
+                    let mut _b_mem_h_mutable: i32 = self._b_mem_h.clone();
+                    _b_mem_h_mutable = mem_box.get().unwrap().lock().unwrap().calc_size(
+                        term,
+                        _b_mem_h_mutable,
+                        self.get_b_cpu_h(),
+                        CONFIG,
+                    );
+                    self._b_mem_h = _b_mem_h_mutable.clone();
+                    mem_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set_parent_resized(true);
                 }
                 Boxes::NetBox => {
-                    net_box.get().unwrap().lock().unwrap().calc_size(term, self.get_b_cpu_h(), self.get_b_mem_h());
-                    net_box.get().unwrap().lock().unwrap().set_parent_resized(true);
+                    net_box.get().unwrap().lock().unwrap().calc_size(
+                        term,
+                        self.get_b_cpu_h(),
+                        self.get_b_mem_h(),
+                    );
+                    net_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set_parent_resized(true);
                 }
                 Boxes::ProcBox => {
-                    proc_box.get().unwrap().lock().unwrap().calc_size(term, self.get_b_cpu_h());
-                    proc_box.get().unwrap().lock().unwrap().set_parent_resized(true);
+                    proc_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .calc_size(term, self.get_b_cpu_h());
+                    proc_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set_parent_resized(true);
                 }
             }
         }
@@ -159,11 +201,19 @@ impl BrshtopBox {
         key: &OnceCell<Mutex<Key>>,
         draw: &OnceCell<Mutex<Draw>>,
         menu: &OnceCell<Mutex<Menu>>,
-        theme: &Theme,
+        theme: &OnceCell<Mutex<Theme>>,
         term: &OnceCell<Mutex<Term>>,
     ) {
-        let mut update_string: String = format!("{}ms", config.get().unwrap().lock().unwrap().update_ms);
-        let xpos: u32 = cpu_box.get().unwrap().lock().unwrap().get_parent().get_x() + cpu_box.get().unwrap().lock().unwrap().get_parent().get_width()
+        let mut update_string: String =
+            format!("{}ms", config.get().unwrap().lock().unwrap().update_ms);
+        let xpos: u32 = cpu_box.get().unwrap().lock().unwrap().get_parent().get_x()
+            + cpu_box
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .get_parent()
+                .get_width()
             - (update_string.len() as u32)
             - 15;
 
@@ -179,7 +229,8 @@ impl BrshtopBox {
             let mut add_for_mouse = Vec::<i32>::new();
             for i in 0..3 {
                 add_for_mouse.push((xpos + 7 + i) as i32);
-                add_for_mouse.push((cpu_box.get().unwrap().lock().unwrap().get_parent().get_y()) as i32);
+                add_for_mouse
+                    .push((cpu_box.get().unwrap().lock().unwrap().get_parent().get_y()) as i32);
             }
             add_for_mouse_parent.push(add_for_mouse);
             key.get()
@@ -192,10 +243,19 @@ impl BrshtopBox {
             let mut sub_for_mouse = Vec::<i32>::new();
             for i in 0..3 {
                 sub_for_mouse.push(
-                    (cpu_box.get().unwrap().lock().unwrap().get_parent().get_x() + cpu_box.get().unwrap().lock().unwrap().get_parent().get_width() - 4 + i)
-                        as i32,
+                    (cpu_box.get().unwrap().lock().unwrap().get_parent().get_x()
+                        + cpu_box
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_parent()
+                            .get_width()
+                        - 4
+                        + i) as i32,
                 );
-                sub_for_mouse.push(cpu_box.get().unwrap().lock().unwrap().get_parent().get_y() as i32);
+                sub_for_mouse
+                    .push(cpu_box.get().unwrap().lock().unwrap().get_parent().get_y() as i32);
             }
             sub_for_mouse_parent.push(sub_for_mouse);
             key.get()
@@ -215,20 +275,48 @@ impl BrshtopBox {
             vec![
                 format!(
                     "{}{}{}{} ",
-                    mv::to(cpu_box.get().unwrap().lock().unwrap().get_parent().get_y(), xpos),
-                    theme.colors.cpu_box.call(
+                    mv::to(
+                        cpu_box.get().unwrap().lock().unwrap().get_parent().get_y(),
+                        xpos
+                    ),
+                    theme.get().unwrap().lock().unwrap().colors.cpu_box.call(
                         format!("{}{}", symbol::h_line.repeat(7), symbol::title_left),
                         term
                     ),
                     fx::b,
-                    theme.colors.hi_fg.call("+".to_owned(), term)
+                    theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .colors
+                        .hi_fg
+                        .call("+".to_owned(), term)
                 ),
                 format!(
                     "{} {}{}{}",
-                    theme.colors.title.call(update_string, term),
-                    theme.colors.hi_fg.call("-".to_owned(), term),
+                    theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .colors
+                        .title
+                        .call(update_string, term),
+                    theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .colors
+                        .hi_fg
+                        .call("-".to_owned(), term),
                     fx::ub,
                     theme
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .colors
                         .cpu_box
                         .call(symbol::title_right.to_owned(), term)
@@ -274,7 +362,7 @@ impl BrshtopBox {
         force: bool,
         term: &OnceCell<Mutex<Term>>,
         config: &OnceCell<Mutex<Config>>,
-        theme: &Theme,
+        theme: &OnceCell<Mutex<Theme>>,
         menu: &OnceCell<Mutex<Menu>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         draw: &OnceCell<Mutex<Draw>>,
@@ -288,7 +376,10 @@ impl BrshtopBox {
         if !force
             && (!self.get_clock_on()
                 || term.get().unwrap().lock().unwrap().get_resized()
-                || datetime.format(config.get().unwrap().lock().unwrap().draw_clock.as_str()).to_string() == self.get_clock())
+                || datetime
+                    .format(config.get().unwrap().lock().unwrap().draw_clock.as_str())
+                    .to_string()
+                    == self.get_clock())
         {
             return;
         }
@@ -301,46 +392,86 @@ impl BrshtopBox {
             .format(config.get().unwrap().lock().unwrap().draw_clock.as_str())
             .to_string()
             .clone();
-        for (custom, value) in self.clock_custom_format {
+        for (custom, value) in self.clock_custom_format.clone() {
             if clock_string.contains(custom.as_str()) {
                 clock_string = clock_string.replace(custom.as_str(), value.as_str())
             }
         }
 
-        let clock_len = clock_string[..cpu_box.get().unwrap().lock().unwrap().get_parent().get_width() as usize - 56].len();
+        let clock_len = clock_string[..cpu_box
+            .get()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .get_parent()
+            .get_width() as usize
+            - 56]
+            .len();
 
-        if self.clock_len != clock_len as u32 && !cpu_box.get().unwrap().lock().unwrap().get_parent().get_resized() {
+        if self.clock_len != clock_len as u32
+            && !cpu_box
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .get_parent()
+                .get_resized()
+        {
             out = format!(
                 "{}{}{}{}",
                 mv::to(
                     cpu_box.get().unwrap().lock().unwrap().get_parent().get_y(),
-                    ((cpu_box.get().unwrap().lock().unwrap().get_parent().get_width()) / 2) as u32 - (clock_len / 2) as u32
+                    ((cpu_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_parent()
+                        .get_width())
+                        / 2) as u32
+                        - (clock_len / 2) as u32
                 ),
                 fx::ub,
-                theme.colors.cpu_box,
+                theme.get().unwrap().lock().unwrap().colors.cpu_box,
                 symbol::h_line.repeat(self.clock_len as usize)
             );
         }
         self.clock_len = clock_len.clone() as u32;
-        let now: bool = if menu.get().unwrap().lock().unwrap().active { false } else { !force };
+        let now: bool = if menu.get().unwrap().lock().unwrap().active {
+            false
+        } else {
+            !force
+        };
 
         out.push_str(
             format!(
                 "{}{}{}{}{}{}{}{}{}{}",
                 mv::to(
                     cpu_box.get().unwrap().lock().unwrap().get_parent().get_y(),
-                    (cpu_box.get().unwrap().lock().unwrap().get_parent().get_width() / 2) as u32 - (clock_len / 2) as u32
+                    (cpu_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .get_parent()
+                        .get_width()
+                        / 2) as u32
+                        - (clock_len / 2) as u32
                 ),
                 fx::ub,
-                theme.colors.cpu_box,
+                theme.get().unwrap().lock().unwrap().colors.cpu_box,
                 symbol::title_left,
                 fx::b,
                 theme
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
                     .colors
                     .title
                     .call(clock_string[..clock_len as usize].to_string(), term),
                 fx::ub,
-                theme.colors.cpu_box,
+                theme.get().unwrap().lock().unwrap().colors.cpu_box,
                 symbol::title_right,
                 term.get().unwrap().lock().unwrap().get_fg()
             )
@@ -359,7 +490,10 @@ impl BrshtopBox {
             key,
         );
 
-        if now && !menu.get().unwrap().lock().unwrap().active && config.get().unwrap().lock().unwrap().show_battery {
+        if now
+            && !menu.get().unwrap().lock().unwrap().active
+            && config.get().unwrap().lock().unwrap().show_battery
+        {
             match Manager::new() {
                 Ok(m) => match m.batteries() {
                     Ok(b) => match b.into_iter().size_hint() {
@@ -390,7 +524,7 @@ impl BrshtopBox {
         net_box: &OnceCell<Mutex<NetBox>>,
         proc_box: &OnceCell<Mutex<ProcBox>>,
         key: &OnceCell<Mutex<Key>>,
-        theme: &Theme,
+        theme: &OnceCell<Mutex<Theme>>,
         term: &OnceCell<Mutex<Term>>,
     ) {
         draw.get().unwrap().lock().unwrap().buffer(
@@ -398,10 +532,30 @@ impl BrshtopBox {
             subclasses
                 .into_iter()
                 .map(|b| match b {
-                    Boxes::CpuBox => cpu_box.get().unwrap().lock().unwrap().draw_bg(key, theme, term, config, cpu_box),
-                    Boxes::MemBox => mem_box.get().unwrap().lock().unwrap().draw_bg(theme, config, term, mem_box),
-                    Boxes::NetBox => net_box.get().unwrap().lock().unwrap().draw_bg(theme, term, net_box),
-                    Boxes::ProcBox => proc_box.get().unwrap().lock().unwrap().draw_bg(theme, term, proc_box),
+                    Boxes::CpuBox => cpu_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .draw_bg(key, theme, term, config, cpu_box),
+                    Boxes::MemBox => mem_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .draw_bg(theme, config, term, mem_box),
+                    Boxes::NetBox => net_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .draw_bg(theme, term, net_box),
+                    Boxes::ProcBox => proc_box
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .draw_bg(theme, term, proc_box),
                     _ => String::default(),
                 })
                 .collect(),

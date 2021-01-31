@@ -134,7 +134,7 @@ impl Graph {
                 Some(c) => c,
                 None => max_value,
             },
-            _data: real_data,
+            _data: real_data.clone(),
             graphs,
             current: false,
             last: 0,
@@ -152,13 +152,13 @@ impl Graph {
             filler = graph.symbol[&(0 as u32)].repeat((width - value_width) as usize);
         }
 
-        if real_data.len() % 2 != 0 {
+        if real_data.clone().len() % 2 != 0 {
             real_data.insert(0, 0);
         }
 
         for _ in 0..height {
             for b in vec![true, false] {
-                graph.graphs[&b].push(filler);
+                graph.graphs.get_mut(&b.clone()).unwrap().push(filler.clone());
             }
         }
 
@@ -215,7 +215,7 @@ impl Graph {
             }
         }
 
-        let colors: Vec<Color> = Vec::<Color>::new();
+        let mut colors: Vec<Color> = Vec::<Color>::new();
         if height > 1 {
             for i in 1..height + 1 {
                 colors.insert(

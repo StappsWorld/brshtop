@@ -8,20 +8,20 @@ use {
         create_box,
         draw::Draw,
         error,
-        event::Event,
+        event::{Event, EventEnum},
         fx,
         init::Init,
         key::Key,
         membox::MemBox,
         menu::Menu,
-        netbox::NetBox,
         mv,
+        netbox::NetBox,
         procbox::ProcBox,
         theme::{Color, Theme},
         timer::Timer,
     },
     once_cell::sync::OnceCell,
-    std::{collections::HashMap, io, os::unix::io::AsRawFd, sync::Mutex,},
+    std::{collections::HashMap, io, os::unix::io::AsRawFd, sync::Mutex},
     terminal_size::{terminal_size, Height, Width},
     termios::*,
 };
@@ -67,7 +67,9 @@ impl Term {
             // Enable reporting of mouse position at any movement,
             mouse_direct_on: String::from("\033[?1003h"),
             mouse_direct_off: String::from("\033[?1003l"), // Disable direct mouse reporting,
-            winch: Event::Flag(false),
+            winch: Event {
+                t: EventEnum::Flag(false),
+            },
         }
     }
 
@@ -81,19 +83,19 @@ impl Term {
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         draw: &OnceCell<Mutex<Draw>>,
         force: bool,
-        key: & OnceCell<Mutex<Key>>,
+        key: &OnceCell<Mutex<Key>>,
         menu: &OnceCell<Mutex<Menu>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         timer: &OnceCell<Mutex<Timer>>,
         config: &OnceCell<Mutex<Config>>,
-        theme: &Theme,
+        theme: &OnceCell<Mutex<Theme>>,
         cpu: &OnceCell<Mutex<CpuCollector>>,
-        mem_box : &OnceCell<Mutex<MemBox>>,
-        net_box : &OnceCell<Mutex<NetBox>>,
-        proc_box : &OnceCell<Mutex<ProcBox>>,
+        mem_box: &OnceCell<Mutex<MemBox>>,
+        net_box: &OnceCell<Mutex<NetBox>>,
+        proc_box: &OnceCell<Mutex<ProcBox>>,
     ) {
         if self.resized {
-            self.winch = Event::Flag(true);
+            self.winch.replace_self(EventEnum::Flag(true));
             return;
         }
 
@@ -110,7 +112,12 @@ impl Term {
             return;
         }
         if force {
-            collector.get().unwrap().lock().unwrap().set_collect_interrupt(true);
+            collector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .set_collect_interrupt(true);
         }
 
         while (self._w != self.width && self._h != self.height) || (self._w < 80 || self._h < 24) {
@@ -120,12 +127,20 @@ impl Term {
 
             cpu_box.get().unwrap().lock().unwrap().set_clock_block(true);
             self.resized = true;
-            collector.get().unwrap().lock().unwrap().set_collect_interrupt(true);
+            collector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .set_collect_interrupt(true);
             self.width = self._w;
             self.height = self._h;
-            draw.get().unwrap().lock().unwrap().now(vec![self.clear], &mut key.get().unwrap().lock().unwrap().idle);
-            let mut mutex_self : Mutex<Term> = Mutex::new(self.clone());
-            let mut passable_self : OnceCell<Mutex<Term>> = OnceCell::new();
+            draw.get().unwrap().lock().unwrap().now(
+                vec![self.clear.clone()],
+                &mut key.get().unwrap().lock().unwrap().idle,
+            );
+            let mut mutex_self: Mutex<Term> = Mutex::new(self.clone());
+            let mut passable_self: OnceCell<Mutex<Term>> = OnceCell::new();
             passable_self.set(mutex_self);
             draw.get().unwrap().lock().unwrap().now(
                 vec![
@@ -165,7 +180,10 @@ impl Term {
             );
 
             while self._w < 80 || self._h < 24 {
-                draw.get().unwrap().lock().unwrap().now(vec![self.clear], &mut key.get().unwrap().lock().unwrap().idle);
+                draw.get().unwrap().lock().unwrap().now(
+                    vec![self.clear.clone()],
+                    &mut key.get().unwrap().lock().unwrap().idle,
+                );
                 draw.get().unwrap().lock().unwrap().now(
                     vec![
                         create_box(
@@ -224,9 +242,9 @@ impl Term {
                     ],
                     &mut key.get().unwrap().lock().unwrap().idle,
                 );
-                self.winch = Event::Wait;
+                self.winch.replace_self(EventEnum::Wait);
                 self.winch.wait(0.3);
-                self.winch = Event::Flag(false);
+                self.winch.replace_self(EventEnum::Flag(false));
 
                 let term_size_check = terminal_size();
                 match term_size_check {
@@ -237,9 +255,9 @@ impl Term {
                     None => error::throw_error("Unable to get size of terminal!"),
                 };
             }
-            self.winch = Event::Wait;
+            self.winch.replace_self(EventEnum::Wait);
             self.winch.wait(0.3);
-            self.winch = Event::Flag(false);
+            self.winch.replace_self(EventEnum::Flag(false));
 
             let term_size_check = terminal_size();
             match term_size_check {
@@ -252,10 +270,19 @@ impl Term {
         }
 
         key.get().unwrap().lock().unwrap().mouse = HashMap::<String, Vec<Vec<i32>>>::new();
-        let mut mutex_self : Mutex<Term> = Mutex::new(self.clone());
-        let mut passable_self : OnceCell<Mutex<Term>> = OnceCell::new();
+        let mut mutex_self: Mutex<Term> = Mutex::new(self.clone());
+        let mut passable_self: OnceCell<Mutex<Term>> = OnceCell::new();
         passable_self.set(mutex_self);
-        brshtop_box.get().unwrap().lock().unwrap().calc_sizes(boxes, &passable_self, config, cpu, cpu_box, mem_box, net_box, proc_box);
+        brshtop_box.get().unwrap().lock().unwrap().calc_sizes(
+            boxes.clone(),
+            &passable_self,
+            config,
+            cpu,
+            cpu_box,
+            mem_box,
+            net_box,
+            proc_box,
+        );
         if init.get().unwrap().lock().unwrap().running {
             self.resized = false;
             return;
@@ -265,7 +292,20 @@ impl Term {
             menu.get().unwrap().lock().unwrap().resized = true;
         }
 
-        brshtop_box.get().unwrap().lock().unwrap().draw_bg(false, draw, boxes, menu, config, cpu_box,  mem_box, net_box, proc_box, key, theme, &passable_self);
+        brshtop_box.get().unwrap().lock().unwrap().draw_bg(
+            false,
+            draw,
+            boxes.clone(),
+            menu,
+            config,
+            cpu_box,
+            mem_box,
+            net_box,
+            proc_box,
+            key,
+            theme,
+            &passable_self,
+        );
         self.resized = false;
         timer.get().unwrap().lock().unwrap().finish(key, config);
 
@@ -297,7 +337,7 @@ impl Term {
     }
 
     pub fn title(text: String) -> String {
-        let out: String = match std::env::var("TERMINAL_TITLE") {
+        let mut out: String = match std::env::var("TERMINAL_TITLE") {
             Ok(o) => o,
             Err(e) => {
                 error::errlog(format!("Error setting Termios data... (error {})", e));
@@ -317,15 +357,15 @@ impl Term {
         self.width.clone()
     }
 
-    pub fn set_width(&mut self, width : u16) {
+    pub fn set_width(&mut self, width: u16) {
         self.width = width.clone()
-    }  
+    }
 
     pub fn get_height(&self) -> u16 {
         self.height.clone()
     }
 
-    pub fn set_height(&mut self, height : u16) {
+    pub fn set_height(&mut self, height: u16) {
         self.height = height.clone()
     }
 
@@ -333,7 +373,7 @@ impl Term {
         self.resized.clone()
     }
 
-    pub fn set_resized(&mut self, resized : bool) {
+    pub fn set_resized(&mut self, resized: bool) {
         self.resized = resized.clone()
     }
 
@@ -341,7 +381,7 @@ impl Term {
         self._w.clone()
     }
 
-    pub fn set_w(&mut self, _w : u16) {
+    pub fn set_w(&mut self, _w: u16) {
         self._w = _w.clone()
     }
 
@@ -349,7 +389,7 @@ impl Term {
         self._h.clone()
     }
 
-    pub fn set_h(&mut self, _h : u16) {
+    pub fn set_h(&mut self, _h: u16) {
         self._h = _h.clone()
     }
 
@@ -357,7 +397,7 @@ impl Term {
         self.fg.clone()
     }
 
-    pub fn set_fg(&mut self, fg : Color) {
+    pub fn set_fg(&mut self, fg: Color) {
         self.fg = fg.clone()
     }
 
@@ -365,7 +405,7 @@ impl Term {
         self.bg.clone()
     }
 
-    pub fn set_bg(&mut self, bg : Color) {
+    pub fn set_bg(&mut self, bg: Color) {
         self.bg = bg.clone()
     }
 
@@ -373,7 +413,7 @@ impl Term {
         self.hide_cursor.clone()
     }
 
-    pub fn set_hide_cursor(&mut self, hide_cursor : String) {
+    pub fn set_hide_cursor(&mut self, hide_cursor: String) {
         self.hide_cursor = hide_cursor.clone()
     }
 
@@ -381,7 +421,7 @@ impl Term {
         self.show_cursor.clone()
     }
 
-    pub fn set_show_cursor(&mut self, show_cursor : String) {
+    pub fn set_show_cursor(&mut self, show_cursor: String) {
         self.show_cursor = show_cursor.clone()
     }
 
@@ -389,7 +429,7 @@ impl Term {
         self.alt_screen.clone()
     }
 
-    pub fn set_alt_screen(&mut self, alt_screen : String) {
+    pub fn set_alt_screen(&mut self, alt_screen: String) {
         self.alt_screen = alt_screen.clone()
     }
 
@@ -397,7 +437,7 @@ impl Term {
         self.normal_screen.clone()
     }
 
-    pub fn set_normal_screen(&mut self, normal_screen : String) {
+    pub fn set_normal_screen(&mut self, normal_screen: String) {
         self.normal_screen = normal_screen.clone()
     }
 
@@ -405,7 +445,7 @@ impl Term {
         self.clear.clone()
     }
 
-    pub fn set_clear(&mut self, clear : String) {
+    pub fn set_clear(&mut self, clear: String) {
         self.clear = clear.clone()
     }
 
@@ -413,15 +453,15 @@ impl Term {
         self.mouse_on.clone()
     }
 
-    pub fn set_mouse_on(&mut self, mouse_on : String) {
+    pub fn set_mouse_on(&mut self, mouse_on: String) {
         self.mouse_on = mouse_on.clone()
     }
-    
+
     pub fn get_mouse_off(&self) -> String {
         self.mouse_off.clone()
     }
 
-    pub fn set_mouse_off(&mut self, mouse_off : String) {
+    pub fn set_mouse_off(&mut self, mouse_off: String) {
         self.mouse_off = mouse_off.clone()
     }
 
@@ -429,7 +469,7 @@ impl Term {
         self.mouse_direct_on.clone()
     }
 
-    pub fn set_mouse_direct_on(&mut self, mouse_direct_on : String) {
+    pub fn set_mouse_direct_on(&mut self, mouse_direct_on: String) {
         self.mouse_direct_on = mouse_direct_on.clone()
     }
 
@@ -437,7 +477,7 @@ impl Term {
         self.mouse_direct_off.clone()
     }
 
-    pub fn set_mouse_direct_off(&mut self, mouse_direct_off : String) {
+    pub fn set_mouse_direct_off(&mut self, mouse_direct_off: String) {
         self.mouse_direct_off = mouse_direct_off.clone()
     }
 
@@ -445,9 +485,7 @@ impl Term {
         self.winch.clone()
     }
 
-    pub fn set_winch(&mut self, winch : Event) {
+    pub fn set_winch(&mut self, winch: Event) {
         self.winch = winch.clone()
     }
-
-
 }

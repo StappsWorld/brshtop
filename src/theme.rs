@@ -1,11 +1,5 @@
 use {
-    crate::{
-        DEFAULT_THEME,
-        term::Term,
-        error::errlog,
-        THEME_DIR,
-        USER_THEME_DIR,
-    },
+    crate::{error::errlog, term::Term, DEFAULT_THEME, THEME_DIR, USER_THEME_DIR},
     from_map::{FromMap, FromMapDefault},
     gradient::Gradient,
     lazy_static::lazy_static,
@@ -13,11 +7,11 @@ use {
     regex::Regex,
     std::{
         collections::HashMap,
+        ffi::OsString,
         fs::File,
         io::{self, BufRead, Read},
         iter::FromIterator,
         path::{Path, PathBuf},
-        ffi::OsString,
         sync::Mutex,
     },
 };
@@ -131,7 +125,7 @@ impl Color {
         }
     }
 
-    pub fn call(&mut self, adder: String, term: &OnceCell<Mutex<Term>>) -> Color {
+    pub fn call(&self, adder: String, term: &OnceCell<Mutex<Term>>) -> Color {
         if adder.len() < 1 {
             return Color::default();
         }
@@ -169,14 +163,12 @@ impl From<String> for Color {
     }
 }
 impl From<&Color> for Color {
-
-    fn from(c : &Color) -> Self {
+    fn from(c: &Color) -> Self {
         c.to_owned()
     }
 }
 impl From<Vec<String>> for Color {
-
-    fn from(v : Vec<String>) -> Self {
+    fn from(v: Vec<String>) -> Self {
         Self::new(v.join(" ")).unwrap()
     }
 }
@@ -321,22 +313,24 @@ impl Colors {
 
 #[derive(Clone, Default)]
 pub struct Theme {
-    pub themes : HashMap<String, String>,
-    pub cached : HashMap<String, HashMap<String, String>>,
-    pub current : String,
-    pub gradient : HashMap<String, Vec<String>>,
-    pub colors : Colors,
-} impl Theme {
+    pub themes: HashMap<String, String>,
+    pub cached: HashMap<String, HashMap<String, String>>,
+    pub current: String,
+    pub gradient: HashMap<String, Vec<String>>,
+    pub colors: Colors,
+}
+impl Theme {
     pub fn from_str<S: ToString>(s: S) -> Result<Self, String> {
-        let colors_mut : Colors = match Colors::from_str(s) {
+        let colors_mut: Colors = match Colors::from_str(s) {
             Ok(c) => c,
             _ => return Err(String::from("Error in Color parsing")),
         };
 
-        let mut cached_mut : HashMap<String, HashMap<String, String>> = HashMap::<String, HashMap<String, String>>::new();
+        let mut cached_mut: HashMap<String, HashMap<String, String>> =
+            HashMap::<String, HashMap<String, String>>::new();
         cached_mut.insert("Default".to_owned(), DEFAULT_THEME.to_owned());
 
-        let mut gradient_mut : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
+        let mut gradient_mut: HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
         gradient_mut.insert("temp".to_owned(), Vec::<String>::new());
         gradient_mut.insert("cpu".to_owned(), Vec::<String>::new());
         gradient_mut.insert("free".to_owned(), Vec::<String>::new());
@@ -350,11 +344,11 @@ pub struct Theme {
         gradient_mut.insert("process".to_owned(), Vec::<String>::new());
 
         Ok(Theme {
-            themes : HashMap::<String, String>::new(),
-            cached : cached_mut,
-            current : String::default(),
-            gradient : gradient_mut,
-            colors : colors_mut,
+            themes: HashMap::<String, String>::new(),
+            cached: cached_mut,
+            current: String::default(),
+            gradient: gradient_mut,
+            colors: colors_mut,
         })
     }
 
@@ -362,15 +356,16 @@ pub struct Theme {
     where
         R: Read,
     {
-        let colors_mut : Colors = match Colors::new(reader) {
+        let colors_mut: Colors = match Colors::new(reader) {
             Ok(c) => c,
             _ => return Err(String::from("Error in Color parsing")),
         };
 
-        let mut cached_mut : HashMap<String, HashMap<String, String>> = HashMap::<String, HashMap<String, String>>::new();
+        let mut cached_mut: HashMap<String, HashMap<String, String>> =
+            HashMap::<String, HashMap<String, String>>::new();
         cached_mut.insert("Default".to_owned(), DEFAULT_THEME.to_owned());
 
-        let mut gradient_mut : HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
+        let mut gradient_mut: HashMap<String, Vec<String>> = HashMap::<String, Vec<String>>::new();
         gradient_mut.insert("temp".to_owned(), Vec::<String>::new());
         gradient_mut.insert("cpu".to_owned(), Vec::<String>::new());
         gradient_mut.insert("free".to_owned(), Vec::<String>::new());
@@ -384,11 +379,11 @@ pub struct Theme {
         gradient_mut.insert("process".to_owned(), Vec::<String>::new());
 
         Ok(Theme {
-            themes : HashMap::<String, String>::new(),
-            cached : cached_mut,
-            current : String::default(),
-            gradient : gradient_mut,
-            colors : colors_mut,
+            themes: HashMap::<String, String>::new(),
+            cached: cached_mut,
+            current: String::default(),
+            gradient: gradient_mut,
+            colors: colors_mut,
         })
     }
 
@@ -397,9 +392,16 @@ pub struct Theme {
     }
 
     pub fn refresh(&mut self) {
-        self.themes = vec![("Default", "Default")].iter().map(|(s1, s2)| (s1.clone().to_owned(), s2.clone().to_owned())).collect();
-    
-        for d in vec![THEME_DIR.to_owned(), USER_THEME_DIR.to_owned()].iter().map(|s| s.as_path()).collect::<Vec<&Path>>() {
+        self.themes = vec![("Default", "Default")]
+            .iter()
+            .map(|(s1, s2)| (s1.clone().to_owned(), s2.clone().to_owned()))
+            .collect();
+
+        for d in vec![THEME_DIR.to_owned(), USER_THEME_DIR.to_owned()]
+            .iter()
+            .map(|s| s.as_path())
+            .collect::<Vec<&Path>>()
+        {
             if !d.exists() {
                 continue;
             }
@@ -407,70 +409,88 @@ pub struct Theme {
                 Ok(dir) => dir,
                 Err(e) => {
                     errlog(format!("Unable to read theme directory ({})", e));
-                    return;  
-                },
+                    return;
+                }
             } {
                 let f_unwrap = match f {
                     Ok(f) => f,
                     Err(e) => {
                         errlog(format!("Unable to read theme files ({})", e));
-                        return;  
-                    },
+                        return;
+                    }
                 };
 
-                match f_unwrap.path().file_name(){
+                match f_unwrap.path().file_name() {
                     Some(path) => match path.to_str() {
-                        Some(path_str) => if path_str.ends_with(".theme") {
-                            let index = format!("{}{}", if d == THEME_DIR.to_owned() {"".to_owned()} else {"+".to_owned()}, path_str[..path_str.len() - 7].to_owned());
-                            self.themes[&index] = format!("{}/{:?}", d.to_str().unwrap(), f_unwrap.file_name());
-                        },
+                        Some(path_str) => {
+                            if path_str.ends_with(".theme") {
+                                let index = format!(
+                                    "{}{}",
+                                    if d == THEME_DIR.to_owned() {
+                                        "".to_owned()
+                                    } else {
+                                        "+".to_owned()
+                                    },
+                                    path_str[..path_str.len() - 7].to_owned()
+                                );
+                                self.themes.insert(
+                                    index.clone(),
+                                    format!("{}/{:?}", d.to_str().unwrap(), f_unwrap.file_name()),
+                                );
+                            }
+                        }
                         None => {
                             errlog(format!("Unable to convert path to str"));
-                            return;  
-                        },
+                            return;
+                        }
                     },
                     None => {
                         errlog(format!("Unable to read file name"));
-                        return;  
-                    },
-                } 
+                        return;
+                    }
+                }
             }
         }
     }
-        
-    pub fn _load_file<P: AsRef<Path>>(path : P) -> Result<HashMap<String, String>, String> {
-        let mut new_theme : HashMap<String, String> = HashMap::<String, String>::new();
+
+    pub fn _load_file<P: AsRef<Path>>(path: P) -> Result<HashMap<String, String>, String> {
+        let mut new_theme: HashMap<String, String> = HashMap::<String, String>::new();
         let file = match File::open(path) {
             Ok(f) => f,
             Err(e) => {
                 let error_string = format!("Unable to open path provided ({})", e);
                 errlog(error_string.clone());
-                return Err(error_string.clone());  
-            },
+                return Err(error_string.clone());
+            }
         };
         let reader = io::BufReader::new(file).lines();
 
-        for Ok(line) in reader {
+        for liner in reader {
+            let line: String = match liner {
+                Ok(s) => s.clone(),
+                Err(_) => continue,
+            };
+
             if !line.starts_with("theme[") {
                 continue;
             }
-            let key : String = line[6..line.chars().position(|c| c == ']').unwrap()].to_owned();
-            let s : usize = line.chars().position(|c| c == '"').unwrap();
-            let value : String = line[s + 1..line[s + 1..].chars().position(|c| c == '"').unwrap()].to_owned();
+            let key: String = line[6..line.chars().position(|c| c == ']').unwrap()].to_owned();
+            let s: usize = line.chars().position(|c| c == '"').unwrap();
+            let value: String =
+                line[s + 1..line[s + 1..].chars().position(|c| c == '"').unwrap()].to_owned();
             new_theme.insert(key, value);
         }
 
         Ok(new_theme)
     }
 
-    pub fn replace_self(&mut self, theme : Theme) {
+    pub fn replace_self(&mut self, theme: Theme) {
         self.themes = theme.themes.clone();
         self.cached = theme.cached.clone();
         self.current = theme.current.clone();
         self.gradient = theme.gradient.clone();
         self.colors = theme.colors.clone();
     }
-    
 }
 
 /*

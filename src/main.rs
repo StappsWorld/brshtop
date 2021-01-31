@@ -40,7 +40,7 @@ use {
         cpubox::CpuBox,
         cpucollector::CpuCollector,
         draw::Draw,
-        event::Event,
+        event::EventEnum,
         fx::Fx,
         graph::Graphs,
         init::Init,
@@ -444,6 +444,9 @@ pub fn main() {
             Theme::default()
         }
     };
+    let mut mutex_THEME: Mutex<Theme> = Mutex::new(THEME);
+    let mut passable_THEME: OnceCell<Mutex<Theme>> = OnceCell::new();
+    passable_THEME.set(mutex_THEME);
 
     // Pre main ---------------------------------------------------------------------------------------------
     let mut term: Term = Term::new();
@@ -612,7 +615,7 @@ pub fn main() {
         &passable_brshtop_box,
         &passable_timer,
         &passable_CONFIG,
-        &THEME,
+        &passable_THEME,
         &passable_cpu_collector,
         &passable_mem_box,
         &passable_net_box,
@@ -738,7 +741,7 @@ pub fn main() {
             &passable_net_box,
             &passable_proc_box,
             &passable_key,
-            &THEME,
+            &passable_THEME,
             &passable_term,
         );
         passable_init.get().unwrap().lock().unwrap().success(
@@ -819,7 +822,7 @@ pub fn main() {
                         &passable_menu,
                         &passable_timer,
                         &passable_CONFIG,
-                        &THEME,
+                        &passable_THEME,
                         DEBUG,
                         collectors.clone(),
                         &passable_timeit,
@@ -858,7 +861,7 @@ pub fn main() {
                         &passable_brshtop_box,
                         &passable_timer,
                         &passable_CONFIG,
-                        &THEME,
+                        &passable_THEME,
                         &passable_cpu_collector,
                         &passable_mem_box,
                         &passable_net_box,
@@ -938,7 +941,7 @@ pub fn main() {
         &passable_term,
         &passable_cpu_box,
         &passable_key,
-        &THEME,
+        &passable_THEME,
         ARG_MODE,
         &passable_graphs,
         &passable_meters,
@@ -1017,7 +1020,7 @@ pub fn main() {
         .unwrap()
         .lock()
         .unwrap()
-        .set_collect_done(Event::Wait);
+        .set_collect_done(EventEnum::Wait);
     passable_collector
         .get()
         .unwrap()
@@ -1051,7 +1054,7 @@ pub fn main() {
         &passable_brshtop_box,
         &passable_timer,
         &passable_CONFIG,
-        &THEME,
+        &passable_THEME,
         &passable_cpu_collector,
         &passable_mem_box,
         &passable_net_box,
@@ -1090,7 +1093,7 @@ pub fn main() {
 
     // Main loop ------------------------------------------------------------------------------------->
     run(
-        &passable_term,
+        &mut passable_term,
         &passable_key,
         &passable_timer,
         &passable_collector,
@@ -1101,8 +1104,8 @@ pub fn main() {
         &passable_menu,
         &passable_brshtop_box,
         &passable_CONFIG,
-        &THEME,
-        ARG_MODE,
+        &passable_THEME,
+        &mut ARG_MODE,
         &passable_proc_box,
         &passable_proc_collector,
         &passable_net_collector,
@@ -1117,7 +1120,7 @@ pub fn main() {
 }
 
 pub fn run(
-    term: &OnceCell<Mutex<Term>>,
+    term: &mut OnceCell<Mutex<Term>>,
     key: &OnceCell<Mutex<Key>>,
     timer: &OnceCell<Mutex<Timer>>,
     collector: &OnceCell<Mutex<Collector>>,
@@ -1128,8 +1131,8 @@ pub fn run(
     menu: &OnceCell<Mutex<Menu>>,
     brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
     CONFIG: &OnceCell<Mutex<Config>>,
-    THEME: &Theme,
-    ARG_MODE: ViewMode,
+    THEME: &OnceCell<Mutex<Theme>>,
+    ARG_MODE: &mut ViewMode,
     procbox: &OnceCell<Mutex<ProcBox>>,
     proccollector: &OnceCell<Mutex<ProcCollector>>,
     netcollector: &OnceCell<Mutex<NetCollector>>,
@@ -1184,7 +1187,7 @@ pub fn run(
                     proccollector,
                     CONFIG,
                     draw,
-                    &term,
+                    term,
                     brshtop_box,
                     cpu_box,
                     menu,
@@ -1230,7 +1233,7 @@ pub fn create_box(
     fill: bool,
     box_to_use: Option<Boxes>,
     term: &OnceCell<Mutex<Term>>,
-    THEME: &Theme,
+    THEME: &OnceCell<Mutex<Theme>>,
     brshtop_box: Option<&OnceCell<Mutex<BrshtopBox>>>,
     cpu_box: Option<&OnceCell<Mutex<CpuBox>>>,
     mem_box: Option<&OnceCell<Mutex<MemBox>>>,
@@ -1244,11 +1247,11 @@ pub fn create_box(
     );
     let mut lc: Color = match line_color {
         Some(c) => c,
-        None => THEME.colors.div_line,
+        None => THEME.get().unwrap().lock().unwrap().colors.div_line,
     };
     let mut tc: Color = match title_color {
         Some(c) => c,
-        None => THEME.colors.title,
+        None => THEME.get().unwrap().lock().unwrap().colors.title,
     };
 
     let mut wx: u32 = x;
@@ -1662,18 +1665,18 @@ pub fn units_to_bytes(value: String) -> u64 {
 }
 
 pub fn process_keys<'a>(
-    ARG_MODE: ViewMode,
+    ARG_MODE: &mut ViewMode,
     key_class: &OnceCell<Mutex<Key>>,
     procbox: &OnceCell<Mutex<ProcBox>>,
     collector: &OnceCell<Mutex<Collector>>,
     proccollector: &OnceCell<Mutex<ProcCollector>>,
     CONFIG: &OnceCell<Mutex<Config>>,
     draw: &OnceCell<Mutex<Draw>>,
-    term: &OnceCell<Mutex<Term>>,
+    term: &mut OnceCell<Mutex<Term>>,
     brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
     cpu_box: &OnceCell<Mutex<CpuBox>>,
     menu: &OnceCell<Mutex<Menu>>,
-    THEME: &Theme,
+    THEME: &OnceCell<Mutex<Theme>>,
     netcollector: &OnceCell<Mutex<NetCollector>>,
     init: &OnceCell<Mutex<Init>>,
     cpucollector: &OnceCell<Mutex<CpuCollector>>,
@@ -1787,7 +1790,7 @@ pub fn process_keys<'a>(
                     .unwrap()
                     .lock()
                     .unwrap()
-                    .set_collect_done(Event::Wait);
+                    .set_collect_done(EventEnum::Wait);
                 collector
                     .get()
                     .unwrap()
@@ -1800,7 +1803,7 @@ pub fn process_keys<'a>(
                     .unwrap()
                     .lock()
                     .unwrap()
-                    .set_collect_done(Event::Flag(false));
+                    .set_collect_done(EventEnum::Flag(false));
             }
             filtered = true;
             continue;
@@ -1887,14 +1890,14 @@ pub fn process_keys<'a>(
                 timer,
                 netcollector,
                 brshtop_box,
-                boxes,
+                boxes.clone(),
                 collector,
                 init,
                 cpu_box,
                 cpucollector,
                 netbox,
                 proccollector,
-                collectors,
+                collectors.clone(),
                 proc_box,
                 mem_box,
                 &menu,
@@ -1906,11 +1909,22 @@ pub fn process_keys<'a>(
             .contains(&key)
         {
             menu.get().unwrap().lock().unwrap().help(
-                THEME, draw, term, key_class, collector, collectors, CONFIG, timer,
+                THEME,
+                draw,
+                term,
+                key_class,
+                collector,
+                collectors.clone(),
+                CONFIG,
+                timer,
             );
         } else if key == "z".to_owned() {
-            netcollector.get().unwrap().lock().unwrap().reset =
-                !netcollector.get().unwrap().lock().unwrap().reset;
+            netcollector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .set_reset(!netcollector.get().unwrap().lock().unwrap().get_reset());
             collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::NetCollector],
                 CONFIG,
@@ -1933,13 +1947,18 @@ pub fn process_keys<'a>(
                 false,
             );
         } else if key == "a".to_owned() {
-            netcollector.get().unwrap().lock().unwrap().auto_min =
-                !netcollector.get().unwrap().lock().unwrap().auto_min;
-            netcollector.get().unwrap().lock().unwrap().net_min =
+            netcollector
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .set_auto_min(!netcollector.get().unwrap().lock().unwrap().get_auto_min());
+            netcollector.get().unwrap().lock().unwrap().set_net_min(
                 vec![("download", -1), ("upload", -1)]
                     .iter()
                     .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
-                    .collect::<HashMap<String, i32>>();
+                    .collect::<HashMap<String, i32>>(),
+            );
             collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::NetCollector],
                 CONFIG,
@@ -1969,10 +1988,38 @@ pub fn process_keys<'a>(
                 .collapsed
                 .contains_key(&procbox.get().unwrap().lock().unwrap().get_selected_pid())
             {
-                proccollector.get().unwrap().lock().unwrap().collapsed
-                    [&procbox.get().unwrap().lock().unwrap().get_selected_pid()] =
-                    !proccollector.get().unwrap().lock().unwrap().collapsed
-                        [&procbox.get().unwrap().lock().unwrap().get_selected_pid()];
+                proccollector
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .collapsed
+                    .insert(
+                        procbox
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_selected_pid()
+                            .clone(),
+                        !proccollector
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .collapsed
+                            .get(
+                                &procbox
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .get_selected_pid()
+                                    .clone(),
+                            )
+                            .unwrap()
+                            .to_owned(),
+                    );
             }
             collector.get().unwrap().lock().unwrap().collect(
                 vec![Collectors::ProcCollector],
@@ -2037,7 +2084,7 @@ pub fn process_keys<'a>(
                 .unwrap()
                 .lock()
                 .unwrap()
-                .set_collect_idle(Event::Wait);
+                .set_collect_idle(EventEnum::Wait);
             collector
                 .get()
                 .unwrap()
@@ -2385,7 +2432,7 @@ pub fn now_awake(
     menu: &OnceCell<Mutex<Menu>>,
     timer: &OnceCell<Mutex<Timer>>,
     CONFIG: &OnceCell<Mutex<Config>>,
-    THEME: &Theme,
+    THEME: &OnceCell<Mutex<Theme>>,
     DEBUG: bool,
     collectors: Vec<Collectors>,
     timeit: &OnceCell<Mutex<TimeIt>>,
@@ -2415,7 +2462,7 @@ pub fn now_awake(
     key.get().unwrap().lock().unwrap().start(draw, menu);
     term.get().unwrap().lock().unwrap().refresh(
         vec![],
-        boxes,
+        boxes.clone(),
         collector,
         init,
         cpu_box,
@@ -2433,7 +2480,7 @@ pub fn now_awake(
         procbox,
     );
     brshtop_box.get().unwrap().lock().unwrap().calc_sizes(
-        boxes,
+        boxes.clone(),
         term,
         CONFIG,
         cpu_collector,
@@ -2443,7 +2490,18 @@ pub fn now_awake(
         procbox,
     );
     brshtop_box.get().unwrap().lock().unwrap().draw_bg(
-        true, draw, boxes, menu, CONFIG, cpu_box, membox, netbox, procbox, key, THEME, term,
+        true,
+        draw,
+        boxes.clone(),
+        menu,
+        CONFIG,
+        cpu_box,
+        membox,
+        netbox,
+        procbox,
+        key,
+        THEME,
+        term,
     );
     collector.get().unwrap().lock().unwrap().start(
         CONFIG,

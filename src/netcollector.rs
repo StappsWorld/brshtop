@@ -19,8 +19,8 @@ use {
     std::{
         collections::HashMap,
         fmt,
-        time::{Duration, SystemTime},
         sync::Mutex,
+        time::{Duration, SystemTime},
     },
 };
 
@@ -51,32 +51,33 @@ impl fmt::Display for NetCollectorStat {
     }
 }
 
-#[derive(Clone)]
 pub struct NetCollector<'a> {
-    pub parent: Collector,
-    pub buffer: String,
+    parent: Collector,
+    buffer: String,
+    pub up_stat: HashMap<String, Nic>,
     pub nics: Vec<&'a Nic>,
-    pub nic_i: i32,
+    nic_i: i32,
     pub nic: Option<&'a Nic>,
     pub new_nic: Option<&'a Nic>,
-    pub nic_error: bool,
-    pub reset: bool,
-    pub graph_raise: HashMap<String, i32>,
-    pub graph_lower: HashMap<String, i32>,
-    pub stats: HashMap<String, HashMap<String, HashMap<String, NetCollectorStat>>>,
-    pub strings: HashMap<String, HashMap<String, HashMap<String, String>>>,
-    pub switched: bool,
-    pub timestamp: SystemTime,
-    pub net_min: HashMap<String, i32>,
-    pub auto_min: bool,
-    pub sync_top: i32,
-    pub sync_string: String,
+    nic_error: bool,
+    reset: bool,
+    graph_raise: HashMap<String, i32>,
+    graph_lower: HashMap<String, i32>,
+    stats: HashMap<String, HashMap<String, HashMap<String, NetCollectorStat>>>,
+    strings: HashMap<String, HashMap<String, HashMap<String, String>>>,
+    switched: bool,
+    timestamp: SystemTime,
+    net_min: HashMap<String, i32>,
+    auto_min: bool,
+    sync_top: i32,
+    sync_string: String,
 }
 impl<'a> NetCollector<'a> {
     pub fn new(netbox: &OnceCell<Mutex<NetBox>>, CONFIG: &OnceCell<Mutex<Config>>) -> Self {
         NetCollector {
             parent: Collector::new(),
             buffer: netbox.get().unwrap().lock().unwrap().get_buffer().clone(),
+            up_stat: HashMap::<String, Nic>::new(),
             nics: Vec::<&'a Nic>::new(),
             nic_i: 0,
             nic: None,
@@ -131,10 +132,10 @@ impl<'a> NetCollector<'a> {
         }
 
         let up_stat_stream = nic();
-        let mut up_stat: HashMap<String, Nic> = HashMap::<String, Nic>::new();
+        let mut up_stat: HashMap<String, &'a Nic> = HashMap::<String, &'a Nic>::new();
         up_stat_stream.for_each(|o| match o {
             Ok(val) => {
-                up_stat.insert(val.name().to_owned(), val);
+                self.up_stat.insert(val.name().to_owned(), val);
                 future::ready(())
             }
             Err(e) => {
@@ -164,7 +165,12 @@ impl<'a> NetCollector<'a> {
         self.nic = Some(self.nics[self.nic_i as usize]);
     }
 
-    pub fn switch(&mut self, key: String, collector: &OnceCell<Mutex<Collector>>, CONFIG: &OnceCell<Mutex<Config>>) {
+    pub fn switch(
+        &mut self,
+        key: String,
+        collector: &OnceCell<Mutex<Collector>>,
+        CONFIG: &OnceCell<Mutex<Config>>,
+    ) {
         if self.nics.len() < 2 {
             return;
         }
@@ -177,17 +183,15 @@ impl<'a> NetCollector<'a> {
         self.new_nic = Some(self.nics[self.nic_i as usize]);
         self.switched = true;
 
-        unsafe {
-            collector.get().unwrap().lock().unwrap().collect(
-                vec![Collectors::NetCollector],
-                CONFIG,
-                true,
-                false,
-                false,
-                true,
-                false,
-            );
-        }
+        collector.get().unwrap().lock().unwrap().collect(
+            vec![Collectors::NetCollector],
+            CONFIG,
+            true,
+            false,
+            false,
+            true,
+            false,
+        );
     }
 
     pub fn collect(&mut self, CONFIG: &OnceCell<Mutex<Config>>, netbox: &OnceCell<Mutex<NetBox>>) {
@@ -195,10 +199,9 @@ impl<'a> NetCollector<'a> {
         let mut stat: HashMap<String, NetCollectorStat> =
             HashMap::<String, NetCollectorStat>::new();
         let up_stat_stream = nic();
-        let mut up_stat: HashMap<String, &'a Nic> = HashMap::<String, &'a Nic>::new();
         up_stat_stream.for_each(|o| match o {
             Ok(val) => {
-                up_stat.insert(val.name().to_owned(), &val);
+                self.up_stat.insert(val.name().to_owned(), val);
                 future::ready(())
             }
             Err(e) => {
@@ -216,8 +219,8 @@ impl<'a> NetCollector<'a> {
         }
 
         if self.nic.is_none()
-            || !up_stat.contains_key(&self.nic.unwrap().name().to_owned())
-            || !up_stat
+            || !self.up_stat.contains_key(&self.nic.unwrap().name().to_owned())
+            || !self.up_stat
                 .get(&self.nic.unwrap().name().to_owned())
                 .unwrap()
                 .is_up()
@@ -350,21 +353,21 @@ impl<'a> NetCollector<'a> {
                         .collect::<HashMap<String, NetCollectorStat>>()
                         .clone();
                     // * Calculate current speed
-                    let speed_vec = match stat.get(&"speed".to_owned()).unwrap() {
+                    let mut speed_vec = match stat.get(&"speed".to_owned()).unwrap() {
                         NetCollectorStat::Vec(v) => v.clone(),
                         _ => {
                             errlog("Malformed type in stat['speed']".to_owned());
                             vec![]
                         }
                     };
-                    let total = match stat.get(&"total".to_owned()).unwrap() {
+                    let mut total = match stat.get(&"total".to_owned()).unwrap() {
                         NetCollectorStat::U64(u) => u.to_owned(),
                         _ => {
                             errlog("Malformed type in stat['total']".to_owned());
                             0
                         }
                     };
-                    let last = match stat.get(&"last".to_owned()).unwrap() {
+                    let mut last = match stat.get(&"last".to_owned()).unwrap() {
                         NetCollectorStat::U64(u) => u.to_owned(),
                         _ => {
                             errlog("Malformed type in stat['last']".to_owned());
@@ -386,8 +389,9 @@ impl<'a> NetCollector<'a> {
                         self.net_min.insert(
                             direction.clone(),
                             units_to_bytes(match direction.as_str() {
-                                "download" => CONFIG.get().unwrap().lock().unwrap().net_download,
-                                "upload" => CONFIG.get().unwrap().lock().unwrap().net_upload,
+                                "download" => CONFIG.get().unwrap().lock().unwrap().net_download.clone(),
+                                "upload" => CONFIG.get().unwrap().lock().unwrap().net_upload.clone(),
+                                _ => "".to_owned()
                             }) as i32,
                         );
                         stat.insert(
@@ -418,7 +422,7 @@ impl<'a> NetCollector<'a> {
                             );
                         }
                     }
-                    let stat_offset = match stat.get(&"offset".to_owned()) {
+                    let mut stat_offset = match stat.get(&"offset".to_owned()) {
                         Some(n) => match n {
                             NetCollectorStat::I32(i) => i.to_owned() as u64,
                             NetCollectorStat::U64(u) => u.to_owned(),
@@ -448,7 +452,16 @@ impl<'a> NetCollector<'a> {
                         }
                     }
 
-                    if speed_vec.len() as u32 > netbox.get().unwrap().lock().unwrap().get_parent().get_width() * 2 {
+                    if speed_vec.len() as u32
+                        > netbox
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .get_parent()
+                            .get_width()
+                            * 2
+                    {
                         speed_vec.remove(0);
                     }
 
@@ -483,7 +496,7 @@ impl<'a> NetCollector<'a> {
                         )),
                     );
 
-                    let top: i32 = match stat.get(&"top".to_owned()).unwrap() {
+                    let mut top: i32 = match stat.get(&"top".to_owned()).unwrap() {
                         NetCollectorStat::I32(i) => i.to_owned(),
                         NetCollectorStat::U64(u) => u.to_owned() as i32,
                         _ => {
@@ -503,7 +516,7 @@ impl<'a> NetCollector<'a> {
                     }
 
                     if self.auto_min {
-                        let graph_top: i32 = match stat.get(&"graph_top".to_owned()).unwrap() {
+                        let mut graph_top: i32 = match stat.get(&"graph_top".to_owned()).unwrap() {
                             NetCollectorStat::I32(i) => i.to_owned(),
                             NetCollectorStat::U64(u) => u.to_owned() as i32,
                             _ => {
@@ -511,7 +524,7 @@ impl<'a> NetCollector<'a> {
                                 0
                             }
                         };
-                        let graph_raise: i32 = match stat.get(&"graph_raise".to_owned()).unwrap() {
+                        let mut graph_raise: i32 = match stat.get(&"graph_raise".to_owned()).unwrap() {
                             NetCollectorStat::I32(i) => i.to_owned(),
                             NetCollectorStat::U64(u) => u.to_owned() as i32,
                             _ => {
@@ -519,7 +532,7 @@ impl<'a> NetCollector<'a> {
                                 0
                             }
                         };
-                        let graph_lower: i32 = match stat.get(&"graph_lower".to_owned()).unwrap() {
+                        let mut graph_lower: i32 = match stat.get(&"graph_lower".to_owned()).unwrap() {
                             NetCollectorStat::I32(i) => i.to_owned(),
                             NetCollectorStat::U64(u) => u.to_owned() as i32,
                             _ => {
@@ -578,13 +591,13 @@ impl<'a> NetCollector<'a> {
                     stat.insert("offset".to_owned(), NetCollectorStat::U64(stat_offset));
                     stat.insert("last".to_owned(), NetCollectorStat::U64(last));
                     stat.insert("total".to_owned(), NetCollectorStat::U64(total));
-                    stat.insert("speed".to_owned(), NetCollectorStat::Vec(speed_vec));
+                    stat.insert("speed".to_owned(), NetCollectorStat::Vec(speed_vec.clone()));
 
                     self.strings
                         .get_mut(&self.nic.unwrap().name().to_owned())
                         .unwrap()
                         .insert(
-                            direction,
+                            direction.clone(),
                             strings
                                 .clone()
                                 .iter()
@@ -599,7 +612,7 @@ impl<'a> NetCollector<'a> {
                                 })
                                 .collect(),
                         );
-                    h.insert(direction, stat.clone());
+                    h.insert(direction.clone(), stat.clone());
                 }
 
                 self.timestamp = SystemTime::now();
@@ -656,15 +669,343 @@ impl<'a> NetCollector<'a> {
     pub fn draw(
         &mut self,
         netbox: &OnceCell<Mutex<NetBox>>,
-        theme: &Theme,
+        theme: &OnceCell<Mutex<Theme>>,
         key: &OnceCell<Mutex<Key>>,
         term: &OnceCell<Mutex<Term>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         draw: &OnceCell<Mutex<Draw>>,
         graphs: &OnceCell<Mutex<Graphs>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self : &OnceCell<Mutex<NetCollector>>,
+        passable_self: &OnceCell<Mutex<NetCollector>>,
     ) {
-        netbox.get().unwrap().lock().unwrap().draw_fg(theme, key, term, CONFIG, draw, graphs, menu, passable_self, netbox)
+        netbox.get().unwrap().lock().unwrap().draw_fg(
+            theme,
+            key,
+            term,
+            CONFIG,
+            draw,
+            graphs,
+            menu,
+            passable_self,
+            netbox,
+        )
+    }
+
+    pub fn get_parent(&self) -> Collector {
+        self.parent.clone()
+    }
+
+    pub fn set_parent(&mut self, parent: Collector) {
+        self.parent = parent.clone()
+    }
+
+    pub fn get_buffer(&self) -> String {
+        self.buffer.clone()
+    }
+
+    pub fn set_buffer(&mut self, buffer: String) {
+        self.buffer = buffer.clone()
+    }
+
+    pub fn get_nic_error(&self) -> bool {
+        self.nic_error.clone()
+    }
+
+    pub fn set_nic_error(&mut self, nic_error: bool) {
+        self.nic_error = nic_error.clone()
+    }
+
+    pub fn get_reset(&self) -> bool {
+        self.reset.clone()
+    }
+
+    pub fn set_reset(&mut self, reset: bool) {
+        self.reset = reset.clone()
+    }
+
+    pub fn get_graph_raise(&self) -> HashMap<String, i32> {
+        self.graph_raise.clone()
+    }
+
+    pub fn set_graph_raise(&mut self, graph_raise: HashMap<String, i32>) {
+        self.graph_raise = graph_raise.clone()
+    }
+
+    pub fn get_graph_raise_index(&self, index: String) -> Option<i32> {
+        match self.get_graph_raise().get(&index.clone()) {
+            Some(i) => Some(i.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_graph_raise_index(&mut self, index: String, element: i32) {
+        self.graph_raise.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_graph_lower(&self) -> HashMap<String, i32> {
+        self.graph_lower.clone()
+    }
+
+    pub fn set_graph_lower(&mut self, graph_lower: HashMap<String, i32>) {
+        self.graph_lower = graph_lower.clone()
+    }
+
+    pub fn get_graph_lower_index(&self, index: String) -> Option<i32> {
+        match self.get_graph_lower().get(&index.clone()) {
+            Some(i) => Some(i.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_graph_lower_index(&mut self, index: String, element: i32) {
+        self.graph_lower.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_stats(&self) -> HashMap<String, HashMap<String, HashMap<String, NetCollectorStat>>> {
+        self.stats.clone()
+    }
+
+    pub fn set_stats(
+        &mut self,
+        stats: HashMap<String, HashMap<String, HashMap<String, NetCollectorStat>>>,
+    ) {
+        self.stats = stats.clone();
+    }
+
+    pub fn get_stats_index(
+        &self,
+        index: String,
+    ) -> Option<HashMap<String, HashMap<String, NetCollectorStat>>> {
+        match self.stats.get(&index.clone()) {
+            Some(h) => Some(h.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_stats_index(
+        &mut self,
+        index: String,
+        element: HashMap<String, HashMap<String, NetCollectorStat>>,
+    ) {
+        self.stats.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_stats_inner_index(
+        &self,
+        index1: String,
+        index2: String,
+    ) -> Option<HashMap<String, NetCollectorStat>> {
+        match self.stats.get(&index1.clone()) {
+            Some(h1) => match h1.clone().get(&index2.clone()) {
+                Some(h2) => Some(h2.clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn set_stats_inner_index(
+        &mut self,
+        index1: String,
+        index2: String,
+        element: HashMap<String, NetCollectorStat>,
+    ) {
+        let mut inserter = self.get_stats_index(index1.clone()).unwrap();
+        inserter.insert(index2.clone(), element.clone());
+        self.stats.insert(index1.clone(), inserter.clone());
+    }
+
+    pub fn get_stats_inner_inner_index(
+        &self,
+        index1: String,
+        index2: String,
+        index3: String,
+    ) -> NetCollectorStat {
+        self.get_stats_inner_index(index1.clone(), index2.clone())
+            .unwrap()
+            .get(&index3.clone())
+            .unwrap()
+            .clone()
+    }
+
+    pub fn set_stats_inner_inner_index(
+        &mut self,
+        index1: String,
+        index2: String,
+        index3: String,
+        element: NetCollectorStat,
+    ) {
+        let mut setter = self
+            .get_stats_inner_index(index1.clone(), index2.clone())
+            .unwrap();
+        setter.insert(index3.clone(), element.clone());
+        self.set_stats_inner_index(index1.clone(), index2.clone(), setter);
+    }
+
+    ////
+
+    pub fn get_strings(&self) -> HashMap<String, HashMap<String, HashMap<String, String>>> {
+        self.strings.clone()
+    }
+
+    pub fn set_strings(
+        &mut self,
+        strings: HashMap<String, HashMap<String, HashMap<String, String>>>,
+    ) {
+        self.strings = strings.clone();
+    }
+
+    pub fn get_strings_index(
+        &self,
+        index: String,
+    ) -> Option<HashMap<String, HashMap<String, String>>> {
+        match self.strings.get(&index.clone()) {
+            Some(h) => Some(h.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_strings_index(
+        &mut self,
+        index: String,
+        element: HashMap<String, HashMap<String, String>>,
+    ) {
+        self.strings.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_strings_inner_index(
+        &self,
+        index1: String,
+        index2: String,
+    ) -> Option<HashMap<String, String>> {
+        match self.strings.get(&index1.clone()) {
+            Some(h1) => match h1.clone().get(&index2.clone()) {
+                Some(h2) => Some(h2.clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn set_strings_inner_index(
+        &mut self,
+        index1: String,
+        index2: String,
+        element: HashMap<String, String>,
+    ) {
+        let mut inserter = self.get_strings_index(index1.clone()).unwrap();
+        inserter.insert(index2.clone(), element.clone());
+        self.strings.insert(index1.clone(), inserter.clone());
+    }
+
+    pub fn get_strings_inner_inner_index(
+        &self,
+        index1: String,
+        index2: String,
+        index3: String,
+    ) -> String {
+        self.get_strings_inner_index(index1.clone(), index2.clone())
+            .unwrap()
+            .get(&index3.clone())
+            .unwrap()
+            .clone()
+    }
+
+    pub fn set_strings_inner_inner_index(
+        &mut self,
+        index1: String,
+        index2: String,
+        index3: String,
+        element: String,
+    ) {
+        let mut setter = self
+            .get_strings_inner_index(index1.clone(), index2.clone())
+            .unwrap();
+        setter.insert(index3.clone(), element.clone());
+        self.set_strings_inner_index(index1.clone(), index2.clone(), setter);
+    }
+
+    pub fn get_switched(&self) -> bool {
+        self.switched.clone()
+    }
+
+    pub fn set_switched(&mut self, switched: bool) {
+        self.switched = switched.clone()
+    }
+
+    pub fn get_timestamp(&self) -> SystemTime {
+        self.timestamp.clone()
+    }
+
+    pub fn set_timestamp(&mut self, timestamp: SystemTime) {
+        self.timestamp = timestamp.clone()
+    }
+
+    pub fn get_net_min(&self) -> HashMap<String, i32> {
+        self.net_min.clone()
+    }
+
+    pub fn set_net_min(&mut self, net_min: HashMap<String, i32>) {
+        self.net_min = net_min.clone()
+    }
+
+    pub fn get_net_min_index(&self, index: String) -> Option<i32> {
+        match self.net_min.get(&index.clone()) {
+            Some(i) => Some(i.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_net_min_index(&mut self, index: String, element: i32) {
+        self.net_min.insert(index.clone(), element.clone());
+    }
+
+    pub fn get_auto_min(&self) -> bool {
+        self.auto_min.clone()
+    }
+
+    pub fn set_auto_min(&mut self, auto_min: bool) {
+        self.auto_min = auto_min;
+    }
+
+    pub fn get_sync_top(&self) -> i32 {
+        self.sync_top.clone()
+    }
+
+    pub fn set_sync_top(&mut self, sync_top: i32) {
+        self.sync_top = sync_top.clone();
+    }
+
+    pub fn get_sync_string(&self) -> String {
+        self.sync_string.clone()
+    }
+
+    pub fn set_sync_string(&mut self, sync_string: String) {
+        self.sync_string = sync_string.clone();
+    }
+}
+impl<'a> Clone for NetCollector<'a> {
+    fn clone(&self) -> Self {
+        NetCollector {
+            parent: self.get_parent(),
+            buffer: self.get_buffer(),
+            up_stat: HashMap::<String, Nic>::new(),
+            nics: self.nics.clone(),
+            nic_i: self.nic_i.clone(),
+            nic: self.nic.clone(),
+            new_nic: self.new_nic.clone(),
+            nic_error: self.nic_error.clone(),
+            reset: self.get_reset(),
+            graph_raise: self.get_graph_raise(),
+            graph_lower: self.get_graph_lower(),
+            stats: self.get_stats(),
+            strings: self.get_strings(),
+            switched: self.get_switched(),
+            timestamp: self.get_timestamp(),
+            net_min: self.get_net_min(),
+            auto_min: self.get_auto_min(),
+            sync_top: self.get_sync_top(),
+            sync_string: self.get_sync_string(),
+        }
     }
 }

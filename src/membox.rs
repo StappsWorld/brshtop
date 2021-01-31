@@ -43,7 +43,7 @@ impl MemBox {
         CONFIG: &OnceCell<Mutex<Config>>,
         ARG_MODE: ViewMode,
     ) -> Self {
-        let membox = MemBox {
+        let mut membox = MemBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
             mem_meter: 0,
             mem_size: 0,
@@ -81,12 +81,12 @@ impl MemBox {
     }
 
     pub fn calc_size(
-        &self,
+        &mut self,
         term: &OnceCell<Mutex<Term>>,
-        b_mem_h: &mut i32,
+        b_mem_h: i32,
         b_cpu_h: i32,
         CONFIG: &OnceCell<Mutex<Config>>,
-    ) {
+    ) -> i32 {
         let mut width_p: u32 = 0;
         let mut height_p: u32 = 0;
 
@@ -103,7 +103,8 @@ impl MemBox {
         self.set_parent_height(
             (term.get().unwrap().lock().unwrap().get_height() as u32 * height_p / 100) + 1,
         );
-        b_mem_h = &mut (self.get_parent().get_height() as i32);
+        let mut set_b_mem_h = b_mem_h.clone();
+        set_b_mem_h = self.get_parent().get_height() as i32;
         self.set_parent_y(u32::try_from(b_cpu_h + 1).unwrap_or(0));
         if CONFIG.get().unwrap().lock().unwrap().show_disks {
             self.set_mem_width(
@@ -202,11 +203,12 @@ impl MemBox {
                 self.set_disk_meter(0);
             }
         }
+        set_b_mem_h
     }
 
     pub fn draw_bg(
         &self,
-        THEME: &Theme,
+        THEME: &OnceCell<Mutex<Theme>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         term: &OnceCell<Mutex<Term>>,
         passable_self: &OnceCell<Mutex<MemBox>>,
@@ -223,7 +225,7 @@ impl MemBox {
                     0,
                     None,
                     None,
-                    Some(THEME.colors.mem_box),
+                    Some(THEME.get().unwrap().lock().unwrap().colors.mem_box),
                     None,
                     true,
                     Some(Boxes::MemBox),
@@ -258,24 +260,53 @@ impl MemBox {
                         "{}{}{}{}{}{}{}{}{}{}{}{}",
                         mv::to(self.get_parent().get_y(), self.get_divider() as u32 + 2),
                         THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
                             .colors
                             .mem_box
                             .call(symbol::title_left.to_owned(), term),
                         fx::b,
-                        THEME.colors.title.call("disks".to_owned(), term),
+                        THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .colors
+                            .title
+                            .call("disks".to_owned(), term),
                         fx::ub,
                         THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
                             .colors
                             .mem_box
                             .call(symbol::title_right.to_owned(), term),
                         mv::to(self.get_parent().get_y(), self.get_divider() as u32),
-                        THEME.colors.mem_box.call(symbol::div_up.to_owned(), term),
+                        THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .colors
+                            .mem_box
+                            .call(symbol::div_up.to_owned(), term),
                         mv::to(
                             self.get_parent().get_y() as u32 + self.get_parent().get_height() - 1,
                             self.get_divider() as u32
                         ),
-                        THEME.colors.mem_box.call(symbol::div_down.to_owned(), term),
-                        THEME.colors.div_line,
+                        THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .colors
+                            .mem_box
+                            .call(symbol::div_down.to_owned(), term),
+                        THEME.get().unwrap().lock().unwrap().colors.div_line,
                         adder
                     )
                     .as_str(),
@@ -286,13 +317,13 @@ impl MemBox {
     }
 
     pub fn draw_fg(
-        &self,
+        &mut self,
         mem: &OnceCell<Mutex<MemCollector>>,
         term: &OnceCell<Mutex<Term>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         meters: &OnceCell<Mutex<Meters>>,
-        THEME: &Theme,
+        THEME: &OnceCell<Mutex<Theme>>,
         key: &OnceCell<Mutex<Key>>,
         collector: &OnceCell<Mutex<Collector>>,
         draw: &OnceCell<Mutex<Draw>>,
@@ -320,12 +351,17 @@ impl MemBox {
         let mut h = parent_box.get_height() - 2;
 
         if parent_box.get_resized() || self.get_redraw() {
-            self.calc_size(
-                term,
-                brshtop_box.get().unwrap().lock().unwrap().get_b_mem_h_mut(),
-                brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
-                CONFIG,
-            );
+            brshtop_box
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .set_b_mem_h(self.calc_size(
+                    term,
+                    brshtop_box.get().unwrap().lock().unwrap().get_b_mem_h(),
+                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                    CONFIG,
+                ));
             out_misc.push_str(self.draw_bg(THEME, CONFIG, term, passable_self).as_str());
             meters
                 .get()
@@ -359,7 +395,17 @@ impl MemBox {
                             MeterUnion::Graph(Graph::new(
                                 self.get_mem_meter(),
                                 self.get_graph_height() as i32,
-                                Some(ColorSwitch::VecString(THEME.gradient[&name])),
+                                Some(ColorSwitch::VecString(
+                                    THEME
+                                        .get()
+                                        .unwrap()
+                                        .lock()
+                                        .unwrap()
+                                        .gradient
+                                        .get(&name.clone())
+                                        .unwrap()
+                                        .clone(),
+                                )),
                                 mem.get()
                                     .unwrap()
                                     .lock()
@@ -405,7 +451,17 @@ impl MemBox {
                                 MeterUnion::Graph(Graph::new(
                                     self.get_mem_meter(),
                                     self.get_graph_height() as i32,
-                                    Some(ColorSwitch::VecString(THEME.gradient[&name])),
+                                    Some(ColorSwitch::VecString(
+                                        THEME
+                                            .get()
+                                            .unwrap()
+                                            .lock()
+                                            .unwrap()
+                                            .gradient
+                                            .get(&name.clone())
+                                            .unwrap()
+                                            .clone(),
+                                    )),
                                     mem.get()
                                         .unwrap()
                                         .lock()
@@ -574,6 +630,10 @@ impl MemBox {
                     "{}{}{}{}{}{}{}",
                     mv::to(y as u32 - 1, x as u32 + w - 7),
                     THEME
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .colors
                         .mem_box
                         .call(symbol::title_left.to_owned(), term),
@@ -582,10 +642,28 @@ impl MemBox {
                     } else {
                         ""
                     },
-                    THEME.colors.hi_fg.call("g".to_owned(), term),
-                    THEME.colors.title.call("wap".to_owned(), term),
+                    THEME
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .colors
+                        .hi_fg
+                        .call("g".to_owned(), term),
+                    THEME
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .colors
+                        .title
+                        .call("wap".to_owned(), term),
                     fx::ub,
                     THEME
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
                         .colors
                         .mem_box
                         .call(symbol::title_right.to_owned(), term),
@@ -620,6 +698,10 @@ impl MemBox {
                         "{}{}{}{}{}{}{}",
                         mv::to(y as u32 - 1, x as u32 + w - 7),
                         THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
                             .colors
                             .mem_box
                             .call(symbol::title_left.to_owned(), term),
@@ -628,10 +710,28 @@ impl MemBox {
                         } else {
                             ""
                         },
-                        THEME.colors.hi_fg.call("s".to_owned(), term),
-                        THEME.colors.title.call("raph".to_owned(), term),
+                        THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .colors
+                            .hi_fg
+                            .call("s".to_owned(), term),
+                        THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .colors
+                            .title
+                            .call("raph".to_owned(), term),
                         fx::ub,
                         THEME
+                            .get()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
                             .colors
                             .mem_box
                             .call(symbol::title_right.to_owned(), term),
@@ -667,7 +767,7 @@ impl MemBox {
             format!(
                 "{}{}{}Total:{:>width$}{}{}",
                 mv::to(y as u32, x as u32 + 1),
-                THEME.colors.title,
+                THEME.get().unwrap().lock().unwrap().colors.title,
                 fx::b,
                 mem.get()
                     .unwrap()
@@ -676,7 +776,7 @@ impl MemBox {
                     .get_string_index("total".to_owned())
                     .unwrap_or(String::default()),
                 fx::ub,
-                THEME.colors.main_fg,
+                THEME.get().unwrap().lock().unwrap().colors.main_fg,
                 width = self.get_mem_width() as usize - 9,
             )
             .as_str(),
@@ -686,19 +786,30 @@ impl MemBox {
                 "{}{}{}{}{}{}{}{}",
                 mv::left(2),
                 THEME
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
                     .colors
                     .mem_box
                     .call(symbol::title_right.to_owned(), term),
-                THEME.colors.div_line,
+                THEME.get().unwrap().lock().unwrap().colors.div_line,
                 symbol::h_line.repeat(self.get_mem_width() as usize - 1),
                 if CONFIG.get().unwrap().lock().unwrap().show_disks {
                     "".to_owned()
                 } else {
-                    THEME.colors.mem_box.to_string()
+                    THEME
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .colors
+                        .mem_box
+                        .to_string()
                 },
                 symbol::title_left,
                 mv::left(self.get_mem_width() - 1),
-                THEME.colors.title,
+                THEME.get().unwrap().lock().unwrap().colors.title,
             );
             if self.get_graph_height() >= 2 {
                 gbg = mv::left(1);
@@ -763,38 +874,58 @@ impl MemBox {
                             .get_mem_index(name.clone())
                             .unwrap_or(MeterUnion::Meter(Meter::default()))
                         {
-                            MeterUnion::Meter(m) => m.call(
-                                if self.get_parent().get_resized() {
-                                    None
-                                } else {
-                                    Some(
-                                        mem.get()
-                                            .unwrap()
-                                            .lock()
-                                            .unwrap()
-                                            .get_percent_index(name.clone())
-                                            .unwrap_or(0)
-                                            as i32,
-                                    )
-                                },
-                                term
-                            ),
-                            MeterUnion::Graph(g) => g.call(
-                                if self.get_parent().get_resized() {
-                                    None
-                                } else {
-                                    Some(
-                                        mem.get()
-                                            .unwrap()
-                                            .lock()
-                                            .unwrap()
-                                            .get_percent_index(name.clone())
-                                            .unwrap_or(0)
-                                            as i32,
-                                    )
-                                },
-                                term
-                            ),
+                            MeterUnion::Meter(m) => {
+                                let mut m_callable = m.clone(); // TODO : May need to implement mutable references to meters and graphs
+                                let save = m_callable.call(
+                                    if self.get_parent().get_resized() {
+                                        None
+                                    } else {
+                                        Some(
+                                            mem.get()
+                                                .unwrap()
+                                                .lock()
+                                                .unwrap()
+                                                .get_percent_index(name.clone())
+                                                .unwrap_or(0)
+                                                as i32,
+                                        )
+                                    },
+                                    term,
+                                );
+                                meters
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .set_mem_index(name.clone(), MeterUnion::Meter(m_callable));
+                                save
+                            }
+                            MeterUnion::Graph(g) => {
+                                let mut g_callable = g.clone(); // TODO : May need to implement mutable references to meters and graphs
+                                let save = g_callable.call(
+                                    if self.get_parent().get_resized() {
+                                        None
+                                    } else {
+                                        Some(
+                                            mem.get()
+                                                .unwrap()
+                                                .lock()
+                                                .unwrap()
+                                                .get_percent_index(name.clone())
+                                                .unwrap_or(0)
+                                                as i32,
+                                        )
+                                    },
+                                    term,
+                                );
+                                meters
+                                    .get()
+                                    .unwrap()
+                                    .lock()
+                                    .unwrap()
+                                    .set_mem_index(name.clone(), MeterUnion::Graph(g_callable));
+                                save
+                            }
                         },
                         gmv,
                         mem.get()
@@ -831,38 +962,44 @@ impl MemBox {
                             .get_mem_index(name.clone())
                             .unwrap_or(MeterUnion::Meter(Meter::default()))
                         {
-                            MeterUnion::Graph(g) => g.call(
-                                if self.get_parent().get_resized() {
-                                    None
-                                } else {
-                                    Some(
-                                        mem.get()
-                                            .unwrap()
-                                            .lock()
-                                            .unwrap()
-                                            .get_percent_index(name.clone())
-                                            .unwrap_or(0)
-                                            as i32,
-                                    )
-                                },
-                                term
-                            ),
-                            MeterUnion::Meter(m) => m.call(
-                                if self.get_parent().get_resized() {
-                                    None
-                                } else {
-                                    Some(
-                                        mem.get()
-                                            .unwrap()
-                                            .lock()
-                                            .unwrap()
-                                            .get_percent_index(name.clone())
-                                            .unwrap_or(0)
-                                            as i32,
-                                    )
-                                },
-                                term
-                            ),
+                            MeterUnion::Graph(g) => {
+                                let mut g_callable = g.clone();
+                                g_callable.call(
+                                    if self.get_parent().get_resized() {
+                                        None
+                                    } else {
+                                        Some(
+                                            mem.get()
+                                                .unwrap()
+                                                .lock()
+                                                .unwrap()
+                                                .get_percent_index(name.clone())
+                                                .unwrap_or(0)
+                                                as i32,
+                                        )
+                                    },
+                                    term,
+                                )
+                            }
+                            MeterUnion::Meter(m) => {
+                                let mut m_callable = m.clone();
+                                m_callable.call(
+                                    if self.get_parent().get_resized() {
+                                        None
+                                    } else {
+                                        Some(
+                                            mem.get()
+                                                .unwrap()
+                                                .lock()
+                                                .unwrap()
+                                                .get_percent_index(name.clone())
+                                                .unwrap_or(0)
+                                                as i32,
+                                        )
+                                    },
+                                    term,
+                                )
+                            }
                         },
                         match mem
                             .get()
@@ -911,7 +1048,7 @@ impl MemBox {
                 format!(
                     "{}{}{}Swap:{:>width$}{}{}",
                     mv::to(y + cy, x + cx),
-                    THEME.colors.title,
+                    THEME.get().unwrap().lock().unwrap().colors.title,
                     fx::b,
                     mem.get()
                         .unwrap()
@@ -920,7 +1057,7 @@ impl MemBox {
                         .get_swap_string_index("total".to_owned())
                         .unwrap_or(String::default()),
                     fx::ub,
-                    THEME.colors.main_fg,
+                    THEME.get().unwrap().lock().unwrap().colors.main_fg,
                     width = self.get_mem_width() as usize - 8,
                 )
                 .as_str(),
@@ -978,38 +1115,44 @@ impl MemBox {
                                 .get_swap_index(name.clone())
                                 .unwrap_or(MeterUnion::Meter(Meter::default()))
                             {
-                                MeterUnion::Graph(g) => g.call(
-                                    if self.get_parent().get_resized() {
-                                        None
-                                    } else {
-                                        Some(
-                                            mem.get()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
-                                                .get_swap_percent_index(name.clone())
-                                                .unwrap_or(0)
-                                                as i32,
-                                        )
-                                    },
-                                    term
-                                ),
-                                MeterUnion::Meter(m) => m.call(
-                                    if self.get_parent().get_resized() {
-                                        None
-                                    } else {
-                                        Some(
-                                            mem.get()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
-                                                .get_swap_percent_index(name.clone())
-                                                .unwrap_or(0)
-                                                as i32,
-                                        )
-                                    },
-                                    term
-                                ),
+                                MeterUnion::Graph(g) => {
+                                    let mut g_callable = g.clone();
+                                    g_callable.call(
+                                        if self.get_parent().get_resized() {
+                                            None
+                                        } else {
+                                            Some(
+                                                mem.get()
+                                                    .unwrap()
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_swap_percent_index(name.clone())
+                                                    .unwrap_or(0)
+                                                    as i32,
+                                            )
+                                        },
+                                        term,
+                                    )
+                                }
+                                MeterUnion::Meter(m) => {
+                                    let mut m_callable = m.clone();
+                                    m_callable.call(
+                                        if self.get_parent().get_resized() {
+                                            None
+                                        } else {
+                                            Some(
+                                                mem.get()
+                                                    .unwrap()
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_swap_percent_index(name.clone())
+                                                    .unwrap_or(0)
+                                                    as i32,
+                                            )
+                                        },
+                                        term,
+                                    )
+                                }
                             },
                             gmv,
                             mem.get()
@@ -1046,38 +1189,54 @@ impl MemBox {
                                 .get_swap_index(name.clone())
                                 .unwrap_or(MeterUnion::Meter(Meter::default()))
                             {
-                                MeterUnion::Graph(g) => g.call(
-                                    if self.get_parent().get_resized() {
-                                        None
-                                    } else {
-                                        Some(
-                                            mem.get()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
-                                                .get_percent_index(name.clone())
-                                                .unwrap_or(0)
-                                                as i32,
-                                        )
-                                    },
-                                    term
-                                ),
-                                MeterUnion::Meter(m) => m.call(
-                                    if self.get_parent().get_resized() {
-                                        None
-                                    } else {
-                                        Some(
-                                            mem.get()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
-                                                .get_percent_index(name.clone())
-                                                .unwrap_or(0)
-                                                as i32,
-                                        )
-                                    },
-                                    term
-                                ),
+                                MeterUnion::Graph(g) => {
+                                    let mut g_callable = g.clone();
+                                    let save = g_callable.call(
+                                        if self.get_parent().get_resized() {
+                                            None
+                                        } else {
+                                            Some(
+                                                mem.get()
+                                                    .unwrap()
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_percent_index(name.clone())
+                                                    .unwrap_or(0)
+                                                    as i32,
+                                            )
+                                        },
+                                        term,
+                                    );
+                                    meters.get().unwrap().lock().unwrap().set_swap_index(
+                                        name.clone(),
+                                        MeterUnion::Graph(g_callable),
+                                    );
+                                    save
+                                }
+                                MeterUnion::Meter(m) => {
+                                    let mut m_callable = m.clone();
+                                    let save = m_callable.call(
+                                        if self.get_parent().get_resized() {
+                                            None
+                                        } else {
+                                            Some(
+                                                mem.get()
+                                                    .unwrap()
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_percent_index(name.clone())
+                                                    .unwrap_or(0)
+                                                    as i32,
+                                            )
+                                        },
+                                        term,
+                                    );
+                                    meters.get().unwrap().lock().unwrap().set_swap_index(
+                                        name.clone(),
+                                        MeterUnion::Meter(m_callable),
+                                    );
+                                    save
+                                }
                             },
                             match mem
                                 .get()
@@ -1127,10 +1286,10 @@ impl MemBox {
             let gli: String = format!(
                 "{}{}{}{}{}{}{}",
                 mv::left(2),
-                THEME.colors.div_line,
+                THEME.get().unwrap().lock().unwrap().colors.div_line,
                 symbol::title_right,
                 symbol::h_line.repeat(self.get_disks_width() as usize),
-                THEME.colors.mem_box,
+                THEME.get().unwrap().lock().unwrap().colors.mem_box,
                 symbol::title_left,
                 mv::left(u32::try_from(self.get_disks_width() as i32 - 1).unwrap_or(0)),
             );
@@ -1168,7 +1327,7 @@ impl MemBox {
                         "{}{}{}{}{:width$.12}{}{:>9}",
                         mv::to(y + cy, x + cx),
                         gli,
-                        THEME.colors.title,
+                        THEME.get().unwrap().lock().unwrap().colors.title,
                         fx::b,
                         item_s,
                         mv::to(
@@ -1197,23 +1356,23 @@ impl MemBox {
                             .unwrap_or(0)
                         ),
                         fx::ub,
-                        THEME.colors.main_fg,
+                        THEME.get().unwrap().lock().unwrap().colors.main_fg,
                         item[&"io".to_owned()],
                         fx::ub,
-                        THEME.colors.main_fg,
+                        THEME.get().unwrap().lock().unwrap().colors.main_fg,
                         mv::to(y + cy + 1, x + cx),
                     )
                     .as_str(),
                 );
-                out.push_str(if big_disk {
-                    format!(
-                        "Used:{:>4}",
-                        item[&"used_percent".to_owned()].to_string() + "%"
-                    )
-                    .as_str()
-                } else {
-                    "U "
-                });
+                let inserter_used = item.get(&"used_percent".to_owned()).unwrap().to_string() + "%";
+                out.push_str(
+                    if big_disk {
+                        format!("Used:{:>4}", inserter_used)
+                    } else {
+                        "U ".to_owned()
+                    }
+                    .as_str(),
+                );
 
                 let used: String = item[&"used".to_owned()].to_string();
                 let used_len: usize = used.len();
@@ -1242,15 +1401,15 @@ impl MemBox {
                         break;
                     }
                     out.push_str(mv::to(y + cy, x + cx).as_str());
-                    out.push_str(if big_disk {
-                        format!(
-                            "Free:{:>4} ",
-                            item[&"free_percent".to_owned()].to_string() + "%"
-                        )
-                        .as_str()
-                    } else {
-                        "F "
-                    });
+                    let inserter_free = item[&"free_percent".to_owned()].to_string() + "%";
+                    out.push_str(
+                        if big_disk {
+                            format!("Free:{:>4} ", inserter_free)
+                        } else {
+                            "F ".to_owned()
+                        }
+                        .as_str(),
+                    );
                     let free_s: String = item[&"free".to_owned()].to_string();
                     let free_len: usize = free_s.len();
                     let insert: String =

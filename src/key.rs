@@ -1,7 +1,12 @@
 use {
     crate::{
-        draw::Draw, error::throw_error, event::Event, menu::Menu, nonblocking::Nonblocking,
-        raw::Raw, term::Term,
+        draw::Draw,
+        error::throw_error,
+        event::{Event, EventEnum},
+        menu::Menu,
+        nonblocking::Nonblocking,
+        raw::Raw,
+        term::Term,
     },
     crossbeam,
     nix::sys::{
@@ -39,7 +44,7 @@ pub struct Key {
 }
 impl Key {
     pub fn new() -> Self {
-        let escape_mut: HashMap<KeyUnion, String> = HashMap::<KeyUnion, String>::new();
+        let mut escape_mut: HashMap<KeyUnion, String> = HashMap::<KeyUnion, String>::new();
         escape_mut.insert(KeyUnion::String("\n".to_owned()), "enter".to_owned());
         escape_mut.insert(
             KeyUnion::Tuple(("\x7f".to_owned(), "\x08".to_owned())),
@@ -87,9 +92,15 @@ impl Key {
             mouse: HashMap::<String, Vec<Vec<i32>>>::new(),
             mouse_pos: (0, 0),
             escape: escape_mut.clone(),
-            new: Event::Flag(false),
-            idle: Event::Flag(false),
-            mouse_move: Event::Flag(false),
+            new: Event {
+                t: EventEnum::Flag(false),
+            },
+            idle: Event {
+                t: EventEnum::Flag(false),
+            },
+            mouse_move: Event {
+                t: EventEnum::Flag(false),
+            },
             mouse_report: false,
             stopping: false,
             started: false,
@@ -132,14 +143,14 @@ impl Key {
 
     pub fn get_mouse(&mut self) -> (i32, i32) {
         if self.new.is_set() {
-            self.new = Event::Flag(false);
+            self.new.replace_self(EventEnum::Flag(false));
         }
         self.mouse_pos
     }
 
     pub fn mouse_moved(&mut self) -> bool {
         if self.mouse_move.is_set() {
-            self.mouse_move = Event::Flag(false);
+            self.mouse_move.replace_self(EventEnum::Flag(false));
             true
         } else {
             false
@@ -171,9 +182,9 @@ impl Key {
                 &mut self.idle,
             );
         }
-        self.new = Event::Wait;
+        self.new.replace_self(EventEnum::Flag(false));
         self.new.wait(if sec > 0.0 { sec } else { 0.0 });
-        self.new = Event::Flag(false);
+        self.new.replace_self(EventEnum::Flag(false));
         if mouse {
             draw.get().unwrap().lock().unwrap().now(
                 vec![
@@ -185,7 +196,7 @@ impl Key {
         }
 
         if self.new.is_set() {
-            self.new = Event::Flag(false);
+            self.new.replace_self(EventEnum::Flag(false));
 
             true
         } else {
@@ -195,9 +206,9 @@ impl Key {
 
     pub fn break_wait(&mut self) {
         self.list.push("_null".to_owned());
-        self.new = Event::Flag(true);
+        self.new.replace_self(EventEnum::Flag(false));
         thread::sleep(Duration::from_secs_f64(0.01));
-        self.new = Event::Flag(false);
+        self.new.replace_self(EventEnum::Flag(false));
     }
 
     /// Get a key or escape sequence from stdin, convert to readable format and save to keys list. Meant to be run in it's own thread
@@ -206,8 +217,7 @@ impl Key {
         let mut clean_key: String = String::default();
 
         while !self.stopping {
-            let mut current_stdin: Stdin = stdin();
-            let mut raw = Raw::new(&mut current_stdin);
+            let mut raw = Raw::new();
             raw.enter();
 
             match select(
@@ -220,26 +230,26 @@ impl Key {
                 Ok(s) => {
                     if s > 0 {
                         let mut buffer = [0; 1];
-                        match current_stdin.read_to_string(&mut input_key) {
+                        match raw.stream.read_to_string(&mut input_key) {
                             Ok(_) => {
                                 if input_key == String::from("\033") {
-                                    self.idle = Event::Flag(false);
-                                    draw.get().unwrap().lock().unwrap().idle = Event::Wait;
+                                    self.idle.replace_self(EventEnum::Flag(false));
+                                    draw.get().unwrap().lock().unwrap().idle.replace_self(EventEnum::Wait);
                                     draw.get().unwrap().lock().unwrap().idle.wait(-1.0);
 
-                                    let mut nonblocking = Nonblocking::new(&mut current_stdin);
+                                    let mut nonblocking = Nonblocking::new();
                                     nonblocking.enter();
 
-                                    match current_stdin.read_to_string(&mut input_key) {
+                                    match raw.stream.read_to_string(&mut input_key) {
                                         Ok(_) => {
                                             if input_key.starts_with("\033[<") {
-                                                current_stdin.read_to_end(&mut Vec::new());
+                                                raw.stream.read_to_end(&mut Vec::new());
                                             }
                                         }
                                         Err(_) => (),
                                     }
                                     nonblocking.exit();
-                                    self.idle = Event::Flag(true);
+                                    self.idle.replace_self(EventEnum::Flag(true));
                                 }
 
                                 if input_key == String::from("\033") {
@@ -262,8 +272,8 @@ impl Key {
                                     );
 
                                     if input_key.starts_with("\033[<35;") {
-                                        self.mouse_move = Event::Flag(true);
-                                        self.new = Event::Flag(true);
+                                        self.mouse_move.replace_self(EventEnum::Flag(true));
+                                        self.new.replace_self(EventEnum::Flag(true));
                                     } else if input_key.starts_with("\033[<64;") {
                                         clean_key = "mouse_scroll_up".to_owned();
                                     } else if input_key.starts_with("\033[<65;") {
@@ -275,7 +285,7 @@ impl Key {
                                             clean_key = "mouse_click".to_owned();
                                         } else {
                                             let mut broke: bool = false;
-                                            for (key_name, positions) in self.mouse {
+                                            for (key_name, positions) in self.mouse.clone() {
                                                 let check_inside: Vec<i32> =
                                                     vec![self.mouse_pos.0, self.mouse_pos.1];
                                                 if positions.contains(&check_inside) {
@@ -296,13 +306,16 @@ impl Key {
                                     for code in self.escape.keys() {
                                         if input_key.strip_prefix("\033").unwrap().starts_with(
                                             match code {
-                                                KeyUnion::String(s) => s,
+                                                KeyUnion::String(s) => s.to_owned(),
                                                 KeyUnion::Tuple((s1, s2)) => {
-                                                    &(s1.clone() + s2.as_str())
+                                                    let first = s1.clone();
+                                                    let second = s2.clone();
+                                                    let together = first + second.as_str();
+                                                    together.to_owned()
                                                 }
-                                            },
+                                            }.as_str()
                                         ) {
-                                            clean_key = self.escape[code];
+                                            clean_key = self.escape.get(&code.clone()).unwrap().clone();
                                             broke = true;
                                             break;
                                         }
@@ -320,7 +333,7 @@ impl Key {
                                         self.list.remove(0);
                                     }
                                     clean_key = String::default();
-                                    self.new = Event::Flag(true);
+                                    self.new.replace_self(EventEnum::Flag(true));
                                 }
                                 input_key = String::default();
                             }

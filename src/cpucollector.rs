@@ -18,7 +18,7 @@ use {
     once_cell::sync::OnceCell,
     psutil::sensors::*,
     std::time::SystemTime,
-    std::{collections::HashMap, iter::Enumerate, path::*, sync::Mutex,},
+    std::{collections::HashMap, iter::Enumerate, path::*, sync::Mutex},
     subprocess::Exec,
     sys_info::*,
     which::which,
@@ -75,7 +75,7 @@ impl CpuCollector {
         term: &OnceCell<Mutex<Term>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        passable_self : &OnceCell<Mutex<CpuCollector>>,
+        passable_self: &OnceCell<Mutex<CpuCollector>>,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -85,28 +85,26 @@ impl CpuCollector {
             Err(_) => (),
         }
 
-        if self.cpu_usage[0].len() > (term.get().unwrap().lock().unwrap().get_width() * 4) as usize {
+        if self.cpu_usage[0].len() > (term.get().unwrap().lock().unwrap().get_width() * 4) as usize
+        {
             self.cpu_usage[0].remove(0);
         }
 
-        let cpu_percentages = match psutil::cpu::CpuPercentCollector::new() {
-            Ok(p) => match p.cpu_percent_percpu() {
-                Ok(p) => p,
-                Err(e) => {
-                    error::errlog(format!("Unable to collect CPU percentages! (error {})", e));
-                    self.got_sensors = false;
-                    return;
-                }
-            },
+        let mut cpu_percent_collector = psutil::cpu::CpuPercentCollector::new().unwrap();
+        let cpu_percentages = match cpu_percent_collector.cpu_percent_percpu() {
+            Ok(p) => p,
             Err(e) => {
                 error::errlog(format!("Unable to collect CPU percentages! (error {})", e));
-                vec![-1.0]
+                self.got_sensors = false;
+                return;
             }
         };
 
         for (n, thread) in cpu_percentages.iter().enumerate() {
             self.cpu_usage[n].push(format!("{:.2}", *thread as u32).parse::<u32>().unwrap());
-            if self.cpu_usage[n].len() > (term.get().unwrap().lock().unwrap().get_width() * 2) as usize {
+            if self.cpu_usage[n].len()
+                > (term.get().unwrap().lock().unwrap().get_width() * 2) as usize
+            {
                 self.cpu_usage[n].remove(0);
             }
         }
@@ -163,17 +161,27 @@ impl CpuCollector {
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         key: &OnceCell<Mutex<Key>>,
-        THEME: &Theme,
+        THEME: &OnceCell<Mutex<Theme>>,
         term: &OnceCell<Mutex<Term>>,
         draw: &OnceCell<Mutex<Draw>>,
         ARG_MODE: ViewMode,
         graphs: &OnceCell<Mutex<Graphs>>,
         meters: &OnceCell<Mutex<Meters>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self : &OnceCell<Mutex<CpuCollector>>,
+        passable_self: &OnceCell<Mutex<CpuCollector>>,
     ) {
         cpu_box.get().unwrap().lock().unwrap().draw_fg(
-            passable_self, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu, THEME,
+            passable_self,
+            CONFIG,
+            key,
+            THEME,
+            term,
+            draw,
+            ARG_MODE,
+            graphs,
+            meters,
+            menu,
+            THEME,
         );
     }
 
@@ -207,7 +215,15 @@ impl CpuCollector {
                 }
                 Err(_) => (),
             }
-        } else if CONFIG.get().unwrap().lock().unwrap().cpu_sensor != "Auto" && CONFIG.get().unwrap().lock().unwrap().cpu_sensors.contains(&CONFIG.get().unwrap().lock().unwrap().cpu_sensor) {
+        } else if CONFIG.get().unwrap().lock().unwrap().cpu_sensor != "Auto"
+            && CONFIG
+                .get()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .cpu_sensors
+                .contains(&CONFIG.get().unwrap().lock().unwrap().cpu_sensor)
+        {
             self.sensor_method = String::from("psutil");
         } else {
             for res in temperatures() {
@@ -267,7 +283,7 @@ impl CpuCollector {
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         term: &OnceCell<Mutex<Term>>,
-        passable_self : &OnceCell<Mutex<CpuCollector>>,
+        passable_self: &OnceCell<Mutex<CpuCollector>>,
     ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
@@ -280,7 +296,8 @@ impl CpuCollector {
 
         if self.sensor_method == "psutil" {
             if CONFIG.get().unwrap().lock().unwrap().cpu_sensor != "Auto" {
-                let mut splitter = CONFIG.get().unwrap().lock().unwrap().cpu_sensor.splitn(2, ":");
+                let cpu_sensor_string = CONFIG.get().unwrap().lock().unwrap().cpu_sensor.clone();
+                let mut splitter = cpu_sensor_string.splitn(2, ":");
                 s_name = String::from(splitter.next().unwrap());
                 s_label = String::from(splitter.next().unwrap());
             }
@@ -377,10 +394,12 @@ impl CpuCollector {
                                     .parse::<i32>()
                                     .unwrap();
 
-                                if core_dict.contains_key(&entry_int) && cpu_type != "ryzen" {
+                                if core_dict.contains_key(&entry_int.clone())
+                                    && cpu_type != "ryzen".to_owned()
+                                {
                                     if c_max == 0 {
                                         let mut largest = 0;
-                                        for (key, val) in core_dict {
+                                        for (key, _) in core_dict.clone() {
                                             if key > largest {
                                                 largest = key.clone();
                                             }
@@ -467,7 +486,7 @@ impl CpuCollector {
                     self.cpu_temp_high = 80;
                     self.cpu_temp_crit = 95;
                 }
-                self.cpu_temp.get(0).unwrap().push(temp as u32);
+                self.cpu_temp.get_mut(0).unwrap().push(temp as u32);
                 if cpu_type == String::from("ryzen") {
                     let ccds: i32 = core_dict.len() as i32;
                     let cores_per_ccd: i32 = (CORES.to_owned() / ccds as u64) as i32;
@@ -494,12 +513,12 @@ impl CpuCollector {
             } else if cores.len() == (THREADS.to_owned() / 2) as usize {
                 self.cpu_temp[0].push(temp as u32);
                 let mut n = 1;
-                for t in cores {
-                    match self.cpu_temp.get(n) {
+                for t in cores.clone() {
+                    match self.cpu_temp.get_mut(n) {
                         Some(u) => u.push(t.parse::<u32>().unwrap()),
                         None => break,
                     }
-                    match self.cpu_temp.get((THREADS.to_owned() / 2) as usize + n) {
+                    match self.cpu_temp.get_mut((THREADS.to_owned() / 2) as usize + n) {
                         Some(u) => u.push(t.parse::<u32>().unwrap()),
                         None => break,
                     }
@@ -510,8 +529,8 @@ impl CpuCollector {
                 self.cpu_temp[0].push(temp as u32);
                 if cores.len() > 1 {
                     let mut n = 1;
-                    for t in cores {
-                        match self.cpu_temp.get(n) {
+                    for t in cores.clone() {
+                        match self.cpu_temp.get_mut(n) {
                             Some(u) => u.push(t.parse::<u32>().unwrap()),
                             None => break,
                         }
@@ -530,7 +549,13 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), passable_self);
+                            brshtop_box.get().unwrap().lock().unwrap().set_b_cpu_h(
+                                cpu_box.get().unwrap().lock().unwrap().calc_size(
+                                    term,
+                                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                                    passable_self,
+                                ),
+                            );
                             return;
                         }
                     };
@@ -551,7 +576,13 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), passable_self);
+                            brshtop_box.get().unwrap().lock().unwrap().set_b_cpu_h(
+                                cpu_box.get().unwrap().lock().unwrap().calc_size(
+                                    term,
+                                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                                    passable_self,
+                                ),
+                            );
                             return;
                         }
                     };
@@ -562,12 +593,12 @@ impl CpuCollector {
                         self.cpu_temp[0].push(temp as u32);
 
                         let mut n = 1;
-                        for t in cores {
-                            match self.cpu_temp.get(n) {
+                        for t in cores.clone() {
+                            match self.cpu_temp.get_mut(n) {
                                 Some(u) => u.push(t.parse::<u32>().unwrap()),
                                 None => break,
                             }
-                            match self.cpu_temp.get((THREADS.to_owned() / 2) as usize + n) {
+                            match self.cpu_temp.get_mut((THREADS.to_owned() / 2) as usize + n) {
                                 Some(u) => u.push(t.parse::<u32>().unwrap()),
                                 None => break,
                             }
@@ -578,7 +609,7 @@ impl CpuCollector {
                         cores.insert(0, temp.to_string());
 
                         for (n, t) in cores.iter().enumerate() {
-                            match self.cpu_temp.get(n) {
+                            match self.cpu_temp.get_mut(n) {
                                 Some(u) => u.push(t.parse::<u32>().unwrap()),
                                 None => break,
                             }
@@ -604,7 +635,13 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), passable_self);
+                            brshtop_box.get().unwrap().lock().unwrap().set_b_cpu_h(
+                                cpu_box.get().unwrap().lock().unwrap().calc_size(
+                                    term,
+                                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                                    passable_self,
+                                ),
+                            );
                             return;
                         }
                     };
@@ -630,7 +667,13 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            cpu_box.get().unwrap().lock().unwrap().calc_size(term, brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h_mut(), passable_self);
+                            brshtop_box.get().unwrap().lock().unwrap().set_b_cpu_h(
+                                cpu_box.get().unwrap().lock().unwrap().calc_size(
+                                    term,
+                                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                                    passable_self,
+                                ),
+                            );
                             return;
                         }
                     };
@@ -642,6 +685,10 @@ impl CpuCollector {
                         self.cpu_temp_crit = 80;
                     }
                 }
+                _ => error::errlog(format!(
+                    "Invalid sensor_method {} found in CpuCollector",
+                    self.sensor_method.clone()
+                )),
             }
 
             if cores.len() == 0 {
@@ -663,9 +710,9 @@ impl CpuCollector {
 
     pub fn get_parent(&self) -> Collector {
         self.parent.clone()
-    } 
+    }
 
-    pub fn set_parent(&mut self, parent : Collector) {
+    pub fn set_parent(&mut self, parent: Collector) {
         self.parent = parent.clone()
     }
 
@@ -673,6 +720,234 @@ impl CpuCollector {
         self.cpu_usage.clone()
     }
 
+    pub fn set_cpu_usage(&mut self, cpu_usage: Vec<Vec<u32>>) {
+        self.cpu_usage = cpu_usage.clone()
+    }
 
+    pub fn get_cpu_usage_index(&self, index: usize) -> Option<Vec<u32>> {
+        match self.get_cpu_usage().get(index) {
+            Some(v) => Some(v.clone()),
+            None => None,
+        }
+    }
 
+    /// Sets element at index to the argument provided, and if this index is larger than the size of the Vec, pushes it on the Vec
+    pub fn set_cpu_usage_index(&mut self, index: usize, element: Vec<u32>) {
+        if index < self.cpu_usage.len() {
+            let mut setter: Vec<Vec<u32>> = vec![];
+            for i in 0..self.cpu_usage.len() {
+                if i == index {
+                    setter.push(element.clone());
+                } else {
+                    setter.push(self.get_cpu_usage_index(index.clone()).unwrap())
+                }
+            }
+            self.cpu_usage = setter.clone();
+        } else {
+            self.cpu_usage.push(element.clone());
+        }
+    }
+
+    pub fn get_cpu_usage_inner_index(&self, index1: usize, index2: usize) -> Option<u32> {
+        match self.get_cpu_usage_index(index1.clone()) {
+            Some(v) => match v.get(index2) {
+                Some(u) => Some(u.clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn set_cpu_usage_inner_index(&mut self, index1: usize, index2: usize, element: u32) {
+        self.set_cpu_usage_index(
+            index1.clone(),
+            match self.get_cpu_usage_index(index1.clone()) {
+                Some(v) => {
+                    let mut returnable: Vec<u32> = v.clone();
+                    if index2 > v.len() {
+                        returnable = v.clone();
+                    } else {
+                        returnable = v.clone();
+                        returnable.push(element);
+                    }
+                    returnable.clone()
+                }
+                None => vec![element.clone()],
+            },
+        );
+    }
+
+    pub fn get_cpu_temp(&self) -> Vec<Vec<u32>> {
+        self.cpu_temp.clone()
+    }
+
+    pub fn set_cpu_temp(&mut self, cpu_temp: Vec<Vec<u32>>) {
+        self.cpu_temp = cpu_temp.clone()
+    }
+
+    pub fn get_cpu_temp_index(&self, index: usize) -> Option<Vec<u32>> {
+        match self.get_cpu_temp().get(index) {
+            Some(v) => Some(v.clone()),
+            None => None,
+        }
+    }
+
+    /// Sets element at index to the argument provided, and if this index is larger than the size of the Vec, pushes it on the Vec
+    pub fn set_cpu_temp_index(&mut self, index: usize, element: Vec<u32>) {
+        if index < self.cpu_temp.len() {
+            let mut setter: Vec<Vec<u32>> = vec![];
+            for i in 0..self.cpu_temp.len() {
+                if i == index {
+                    setter.push(element.clone());
+                } else {
+                    setter.push(self.get_cpu_temp_index(index.clone()).unwrap())
+                }
+            }
+            self.cpu_temp = setter.clone();
+        } else {
+            self.cpu_temp.push(element.clone());
+        }
+    }
+
+    pub fn get_cpu_temp_inner_index(&self, index1: usize, index2: usize) -> Option<u32> {
+        match self.get_cpu_temp_index(index1.clone()) {
+            Some(v) => match v.get(index2) {
+                Some(u) => Some(u.clone()),
+                None => None,
+            },
+            None => None,
+        }
+    }
+
+    pub fn set_cpu_temp_inner_index(&mut self, index1: usize, index2: usize, element: u32) {
+        self.set_cpu_temp_index(
+            index1.clone(),
+            match self.get_cpu_temp_index(index1.clone()) {
+                Some(v) => {
+                    let mut returnable: Vec<u32> = v.clone();
+                    if index2 > v.len() {
+                        returnable = v.clone();
+                    } else {
+                        returnable = v.clone();
+                        returnable.push(element);
+                    }
+                    returnable.clone()
+                }
+                None => vec![element.clone()],
+            },
+        );
+    }
+
+    pub fn get_cpu_temp_high(&self) -> i32 {
+        self.cpu_temp_high.clone()
+    }
+
+    pub fn set_cpu_temp_high(&mut self, cpu_temp_high: i32) {
+        self.cpu_temp_high = cpu_temp_high.clone();
+    }
+
+    pub fn get_cpu_temp_crit(&self) -> i32 {
+        self.cpu_temp_crit.clone()
+    }
+
+    pub fn set_cpu_temp_crit(&mut self, cpu_temp_crit: i32) {
+        self.cpu_temp_crit = cpu_temp_crit.clone()
+    }
+
+    pub fn get_freq_error(&self) -> bool {
+        self.freq_error.clone()
+    }
+
+    pub fn set_freq_error(&mut self, freq_error: bool) {
+        self.freq_error = freq_error.clone()
+    }
+
+    pub fn get_cpu_freq(&self) -> f64 {
+        self.cpu_freq.clone()
+    }
+
+    pub fn set_cpu_freq(&mut self, cpu_freq: f64) {
+        self.cpu_freq = cpu_freq.clone()
+    }
+
+    pub fn get_load_avg(&self) -> Vec<f64> {
+        self.load_avg.clone()
+    }
+
+    pub fn set_load_avg(&mut self, load_avg: Vec<f64>) {
+        self.load_avg = load_avg.clone()
+    }
+
+    pub fn get_load_avg_index(&self, index: usize) -> Option<f64> {
+        match self.load_avg.get(index) {
+            Some(f) => Some(f.clone()),
+            None => None,
+        }
+    }
+
+    pub fn set_load_avg_index(&mut self, index: usize, element: f64) {
+        let mut setter: Vec<f64> = vec![];
+
+        if index > self.get_load_avg().len() {
+            self.load_avg.push(element);
+        } else {
+            for i in 0..self.get_load_avg().len() {
+                if i == index {
+                    setter.push(element)
+                } else {
+                    setter.push(self.get_load_avg_index(i).unwrap())
+                }
+            }
+
+            self.load_avg = setter;
+        }
+    }
+
+    pub fn get_uptime(&self) -> String {
+        self.uptime.clone()
+    }
+
+    pub fn set_uptime(&mut self, uptime: String) {
+        self.uptime = uptime.clone()
+    }
+
+    pub fn get_buffer(&self) -> String {
+        self.buffer.clone()
+    }
+
+    pub fn set_buffer(&mut self, buffer: String) {
+        self.buffer = buffer.clone()
+    }
+
+    pub fn get_sensor_method(&self) -> String {
+        self.sensor_method.clone()
+    }
+
+    pub fn set_sensor_method(&mut self, sensor_method: String) {
+        self.sensor_method = sensor_method.clone()
+    }
+
+    pub fn get_got_sensors(&self) -> bool {
+        self.got_sensors.clone()
+    }
+
+    pub fn set_got_sensors(&mut self, got_sensors: bool) {
+        self.got_sensors = got_sensors.clone()
+    }
+
+    pub fn get_sensor_swap(&self) -> bool {
+        self.sensor_swap.clone()
+    }
+
+    pub fn set_sensor_swap(&mut self, sensor_swap: bool) {
+        self.sensor_swap = sensor_swap.clone()
+    }
+
+    pub fn get_cpu_temp_only(&self) -> bool {
+        self.cpu_temp_only.clone()
+    }
+
+    pub fn set_cpu_temp_only(&mut self, cpu_temp_only: bool) {
+        self.cpu_temp_only = cpu_temp_only.clone()
+    }
 }
