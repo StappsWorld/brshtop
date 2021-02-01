@@ -137,7 +137,7 @@ impl Term {
             self.height = self._h;
             draw.get().unwrap().lock().unwrap().now(
                 vec![self.clear.clone()],
-                &mut key.get().unwrap().lock().unwrap().idle,
+                key,
             );
             let mut mutex_self: Mutex<Term> = Mutex::new(self.clone());
             let mut passable_self: OnceCell<Mutex<Term>> = OnceCell::new();
@@ -176,13 +176,13 @@ impl Term {
                         self.get_fg()
                     ),
                 ],
-                &mut key.get().unwrap().lock().unwrap().idle,
+                key,
             );
 
             while self._w < 80 || self._h < 24 {
                 draw.get().unwrap().lock().unwrap().now(
                     vec![self.clear.clone()],
-                    &mut key.get().unwrap().lock().unwrap().idle,
+                    key,
                 );
                 draw.get().unwrap().lock().unwrap().now(
                     vec![
@@ -240,7 +240,7 @@ impl Term {
                             self.get_fg()
                         ),
                     ],
-                    &mut key.get().unwrap().lock().unwrap().idle,
+                    key,
                 );
                 self.winch.replace_self(EventEnum::Wait);
                 self.winch.wait(0.3);

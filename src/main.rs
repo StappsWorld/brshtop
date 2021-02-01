@@ -447,6 +447,8 @@ pub fn main() {
     let mut mutex_THEME: Mutex<Theme> = Mutex::new(THEME);
     let mut passable_THEME: OnceCell<Mutex<Theme>> = OnceCell::new();
     passable_THEME.set(mutex_THEME);
+    
+    println!("Made it through global variables");
 
     // Pre main ---------------------------------------------------------------------------------------------
     let mut term: Term = Term::new();
@@ -558,6 +560,8 @@ pub fn main() {
     let mut passable_meters: OnceCell<Mutex<Meters>> = OnceCell::new();
     passable_meters.set(mutex_meters);
 
+    println!("Made it through pre-main");
+
     // Main -----------------------------------------------------------------------------------------------
 
     let term_size = terminal_size();
@@ -569,7 +573,9 @@ pub fn main() {
         None => error::throw_error("Unable to get size of terminal!"),
     };
 
+
     // Init ----------------------------------------------------------------------------------
+    println!("Starting init");
     if DEBUG {
         passable_timeit
             .get()
@@ -581,7 +587,10 @@ pub fn main() {
 
     // Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
 
-    passable_draw.get().unwrap().lock().unwrap().now(
+    println!("Attempting to lock");
+    let mut usable_draw = passable_draw.get().unwrap().lock().unwrap();
+    println!("Attempting to draw out");
+    usable_draw.now(
         vec![
             passable_term
                 .get()
@@ -599,9 +608,11 @@ pub fn main() {
             passable_term.get().unwrap().lock().unwrap().get_mouse_on(),
             Term::title("BRShtop".to_owned()),
         ],
-        &mut passable_key.get().unwrap().lock().unwrap().idle,
+        &passable_key,
     );
+    println!("Drew first now");
     Term::echo(false);
+    println!("Echo off");
     passable_term.get().unwrap().lock().unwrap().refresh(
         vec![],
         boxes.clone(),
@@ -621,11 +632,16 @@ pub fn main() {
         &passable_net_box,
         &passable_proc_box,
     );
+    println!("Refreshed");
+
+    println!("Initializing terminal");
 
     // Start a thread checking for updates while running init
     if passable_CONFIG.get().unwrap().lock().unwrap().update_check {
         passable_updatechecker.get().unwrap().lock().unwrap().run();
     }
+
+    println!("Start a thread checking for updates while running init");
 
     // Draw banner and init status
     if passable_CONFIG.get().unwrap().lock().unwrap().show_init
@@ -637,6 +653,8 @@ pub fn main() {
             &passable_term,
         );
     }
+
+    println!("Draw banner and init status");
 
     // Load theme
     if passable_CONFIG.get().unwrap().lock().unwrap().show_init {
@@ -1178,6 +1196,7 @@ pub fn run(
                 false,
                 draw,
                 term,
+                key
             ) {
                 process_keys(
                     ARG_MODE,
@@ -1477,7 +1496,7 @@ pub fn clean_quit(
             term.get().unwrap().lock().unwrap().get_mouse_direct_off(),
             Term::title(String::default()),
         ],
-        &mut key.get().unwrap().lock().unwrap().idle,
+        key,
     );
     Term::echo(true);
     let now = SystemTime::now();
@@ -2407,7 +2426,7 @@ pub fn now_sleeping(
             term.get().unwrap().lock().unwrap().get_mouse_off(),
             Term::title("".to_owned()),
         ],
-        &mut key.get().unwrap().lock().unwrap().idle,
+        key,
     );
     Term::echo(true);
     match psutil::process::Process::new(process::id())
@@ -2456,7 +2475,7 @@ pub fn now_awake(
             term.get().unwrap().lock().unwrap().get_mouse_on(),
             Term::title("BRShtop".to_owned()),
         ],
-        &mut key.get().unwrap().lock().unwrap().idle,
+        key,
     );
     Term::echo(false);
     key.get().unwrap().lock().unwrap().start(draw, menu);

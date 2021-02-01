@@ -313,7 +313,7 @@ impl Init {
         if self.resized {
             draw.get().unwrap().lock().unwrap().now(
                 vec![term.get().unwrap().lock().unwrap().get_clear()],
-                &mut key.get().unwrap().lock().unwrap().idle,
+                key,
             );
         } else {
             self.draw_bg(10, draw, term, key);

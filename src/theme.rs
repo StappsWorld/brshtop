@@ -60,6 +60,7 @@ impl Color {
 
     pub fn new<S: ToString>(s: S) -> Result<Self, String> {
         let s = s.to_string();
+
         let (r, g, b);
         if let Some(captures) = SIX_DIGIT_HEX.captures(&s) {
             let hex = captures.get(1).unwrap().as_str(); // Unwrap is safe, only one possible capture if we got any
@@ -84,7 +85,8 @@ impl Color {
             g = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap(); // These unwraps are unreachable because of the regex
             b = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap(); // These unwraps are unreachable because of the regex
         } else {
-            return Err(format!("Unable to parse color from {:?}", s));
+            errlog(format!("Unable to parse color from {:?}", s));
+            return Ok(Color::Null());
         }
 
         Ok(Self {
@@ -176,6 +178,7 @@ impl From<Vec<String>> for Color {
 #[derive(FromMapDefault, FromMap, Debug, Gradient, Clone)]
 #[value_type = "Color"]
 pub struct Colors {
+    #[default("")]
     pub main_bg: Color,
     #[default("#cc")]
     pub main_fg: Color,
@@ -262,7 +265,7 @@ pub struct Colors {
 }
 impl Colors {
     fn from_str<S: ToString>(s: S) -> Result<Self, String> {
-        let s = s.to_string();
+        /*let s = s.to_string();
         let map: HashMap<String, Color> = HashMap::from_iter(
             s.split('\n')
                 .filter(|line| !line.starts_with("#") && THEME_SELECTOR.is_match(line))
@@ -271,10 +274,18 @@ impl Colors {
                         Some(caps) => caps,
                         None => unreachable!(),
                     };
-                    Ok((
-                        captures.get(1).unwrap().as_str().into(),
-                        Color::new(captures.get(2).unwrap().as_str())?,
-                    ))
+
+                    let first = captures.get(1).unwrap().as_str();
+                    let second = captures.get(2).unwrap().as_str();
+                    println!("Adding {} with a color of {}", first, second);
+                    if second.is_empty() {
+                        Err(format!(
+                            "Attempted to add attribute {} with an empty string...",
+                            first
+                        ))
+                    } else {
+                        Ok((first.into(), Color::new(second)?))
+                    }
                 })
                 .filter(|result| {
                     if let Err(msg) = result {
@@ -286,7 +297,51 @@ impl Colors {
                 })
                 .map(|res| res.unwrap()),
         );
-        Ok(Self::from_map_default(map))
+        Ok(Self::from_map_default(map))*/
+        Ok(Colors {
+            main_bg: Color::from("".to_owned()),
+            main_fg: Color::from("#cc".to_owned()),
+            title: Color::from("#ee".to_owned()),
+            hi_fg: Color::from("#969696".to_owned()),
+            selected_bg: Color::from("#7e2626".to_owned()),
+            selected_fg: Color::from("#ee".to_owned()),
+            inactive_fg: Color::from("#40".to_owned()),
+            proc_misc: Color::from("#60".to_owned()),
+            cpu_box: Color::from("#40".to_owned()),
+            mem_box: Color::from("#0de756".to_owned()),
+            net_box: Color::from("#3d7b46".to_owned()),
+            proc_box: Color::from("#8a882e".to_owned()),
+            div_line: Color::from("#423ba5".to_owned()),
+            temp_start: Color::from("#923535".to_owned()),
+            temp_mid: Color::from("#30".to_owned()),
+            temp_end: Color::from("#4897d4".to_owned()),
+            cpu_start: Color::from("#5474e8".to_owned()),
+            cpu_mid: Color::from("#ff40b6".to_owned()),
+            cpu_end: Color::from("#50f095".to_owned()),
+            free_start: Color::from("#f2e266".to_owned()),
+            free_mid: Color::from("#fa1e1e".to_owned()),
+            free_end: Color::from("#223014".to_owned()),
+            cached_start: Color::from("#b5e685".to_owned()),
+            cached_mid: Color::from("#dcff85".to_owned()),
+            cached_end: Color::from("#0b1a29".to_owned()),
+            available_start: Color::from("#74e6fc".to_owned()),
+            available_mid: Color::from("#26c5ff".to_owned()),
+            available_end: Color::from("#292107".to_owned()),
+            used_start: Color::from("#ffd77a".to_owned()),
+            used_mid: Color::from("#ffb814".to_owned()),
+            used_end: Color::from("#3b1f1c".to_owned()),
+            download_start: Color::from("#d9626d".to_owned()),
+            download_mid: Color::from("#ff4769".to_owned()),
+            download_end: Color::from("#231a63".to_owned()),
+            upload_start: Color::from("#4f43a3".to_owned()),
+            upload_mid: Color::from("#b0a9de".to_owned()),
+            upload_end: Color::from("#510554".to_owned()),
+            graph_text: Color::from("#7d4180".to_owned()),
+            meter_bg: Color::from("#dcafde".to_owned()),
+            process_start: Color::from("#80d0a3".to_owned()),
+            process_mid: Color::from("#dcd179".to_owned()),
+            process_end: Color::from("#d45454".to_owned()),
+        })
     }
 
     pub fn new<R>(mut reader: R) -> Result<Self, String>

@@ -172,6 +172,7 @@ impl Key {
         mouse: bool,
         draw: &OnceCell<Mutex<Draw>>,
         term: &OnceCell<Mutex<Term>>,
+        passable_self : &OnceCell<Mutex<Key>>,
     ) -> bool {
         if self.list.len() > 0 {
             return true;
@@ -179,7 +180,7 @@ impl Key {
         if mouse {
             draw.get().unwrap().lock().unwrap().now(
                 vec![term.get().unwrap().lock().unwrap().get_mouse_direct_on()],
-                &mut self.idle,
+                passable_self,
             );
         }
         self.new.replace_self(EventEnum::Flag(false));
@@ -191,7 +192,7 @@ impl Key {
                     term.get().unwrap().lock().unwrap().get_mouse_direct_off(),
                     term.get().unwrap().lock().unwrap().get_mouse_on(),
                 ],
-                &mut self.idle,
+                passable_self,
             );
         }
 

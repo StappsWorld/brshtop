@@ -9,24 +9,27 @@ pub enum EventEnum {
 
 #[derive(Clone, Copy)]
 pub struct Event {
-    pub t : EventEnum,
+    pub t: EventEnum,
 }
 impl Event {
     /// Give a time in milliseconds to pause the current connection between threads, or give -1 for  time to wait until a different thread has set this enum
-    pub fn wait(&self, time : f64) {
+    pub fn wait(&self, time: f64) {
+        println!("Waiting");
         let now = SystemTime::now();
         let wait_period = time::Duration::from_millis(50);
-        match time {
-            -1.0 => {
-                let mut breaker = true;
-                while breaker {
-                    match self.t {
-                        EventEnum::Flag(true) => breaker = false,
-                        _ => thread::sleep(wait_period),
-                    }
+        if time == -1.0 {
+            let mut breaker = true;
+            while breaker {
+                match self.t {
+                    EventEnum::Flag(true) => breaker = false,
+                    _ => thread::sleep(wait_period),
                 }
-            },
-            _ => while now.elapsed().unwrap() < Duration::from_secs_f64(time as f64) {},
+            }
+        } else {
+            while now.elapsed().unwrap() > Duration::from_secs_f64(time as f64) {
+                thread::sleep(wait_period);
+                println!("Currently at {:?}", now.elapsed().unwrap());
+            }
         }
     }
 
@@ -37,7 +40,7 @@ impl Event {
         };
     }
 
-    pub fn replace_self(&mut self, replace : EventEnum) {
+    pub fn replace_self(&mut self, replace: EventEnum) {
         self.t = replace.clone()
     }
 }

@@ -34,17 +34,25 @@ impl Draw {
     }
 
     /// Wait for input reader and self to be idle then print to screen
-    pub fn now(&mut self, args: Vec<String>, idle: &mut Event) {
-        idle.replace_self(EventEnum::Wait);
-        idle.wait(-1.0);
-        idle.replace_self(EventEnum::Flag(false));
+    pub fn now(&mut self, args: Vec<String>, key: &OnceCell<Mutex<Key>>) {
 
+        key.get().unwrap().lock().unwrap().idle.replace_self(EventEnum::Wait);
+        //key.get().unwrap().lock().unwrap().idle.wait(-1.0);
+
+        println!("Replacing idle with wait");
+        self.idle.replace_self(EventEnum::Wait);
+        println!("Waiting");
+        //self.idle.wait(10.0);
+        println!("Finished waiting and replacing idle with false");
+        self.idle.replace_self(EventEnum::Flag(false));
+
+        println!("Drawing out:");
         io::stdout().flush().unwrap();
         for s in args {
             print!("{}", s);
         }
 
-        idle.replace_self(EventEnum::Flag(true));
+        self.idle.replace_self(EventEnum::Flag(true));
     }
 
     /// Defaults append: bool = False, now: bool = False, z: int = 100, only_save: bool = False, no_save: bool = False, once: bool = False
@@ -131,7 +139,7 @@ impl Draw {
             if clear {
                 self.clear(vec![], false);
             }
-            self.now(vec![out], &mut key.get().unwrap().lock().unwrap().idle);
+            self.now(vec![out], key);
         }
     }
 

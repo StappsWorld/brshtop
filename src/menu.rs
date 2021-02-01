@@ -78,9 +78,9 @@ impl Menu {
                         .push_str(
                             fx::Fx::trans(format!(
                                 "{}{}",
-                                Color::fg(MENU_COLORS.get(&sel.clone()).unwrap().get(i).unwrap())
+                                Color::fg(MENU_COLORS.get(&sel.clone()).unwrap().get(i).unwrap_or(&String::default()))
                                     .unwrap(),
-                                iterable[i]
+                                iterable.get(i).unwrap_or(&String::default()).to_owned(),
                             ))
                             .as_str(),
                         );
@@ -250,12 +250,12 @@ impl Menu {
             if skip && redraw {
                 draw.get().unwrap().lock().unwrap().now(
                     vec![out.clone()],
-                    &mut key_class.get().unwrap().lock().unwrap().idle,
+                    key_class,
                 );
             } else if !skip {
                 draw.get().unwrap().lock().unwrap().now(
                     vec![format!("{}{}{}", self.background, banner_mut, out)],
-                    &mut key_class.get().unwrap().lock().unwrap().idle,
+                    key_class,
                 );
             }
             skip = false;
@@ -272,6 +272,7 @@ impl Menu {
                 true,
                 draw,
                 term,
+                key_class,
             ) {
                 if key_class.get().unwrap().lock().unwrap().mouse_moved() {
                     let (mx_set, my_set) = key_class.get().unwrap().lock().unwrap().get_mouse();
@@ -433,7 +434,7 @@ impl Menu {
                 "{}",
                 draw.get().unwrap().lock().unwrap().saved_buffer()
             )],
-            &mut key_class.get().unwrap().lock().unwrap().idle,
+            key_class,
         );
         self.background = String::default();
         self.active = false;
@@ -706,12 +707,12 @@ impl Menu {
                 if skip && redraw {
                     draw.get().unwrap().lock().unwrap().now(
                         vec![out.clone()],
-                        &mut key_class.get().unwrap().lock().unwrap().idle,
+                        key_class,
                     );
                 } else if !skip {
                     draw.get().unwrap().lock().unwrap().now(
                         vec![format!("{}{}{}", self.background, out_misc, out)],
-                        &mut key_class.get().unwrap().lock().unwrap().idle,
+                        key_class,
                     );
                 }
                 skip = false;
@@ -728,6 +729,7 @@ impl Menu {
                     false,
                     draw,
                     term,
+                    key_class,
                 ) {
                     key = match key_class.get().unwrap().lock().unwrap().get() {
                         Some(k) => k,
@@ -835,7 +837,7 @@ impl Menu {
             }
             draw.get().unwrap().lock().unwrap().now(
                 vec![draw.get().unwrap().lock().unwrap().saved_buffer()],
-                &mut key_class.get().unwrap().lock().unwrap().idle,
+                key_class,
             );
             self.active = false;
             self.close = false;
@@ -1681,7 +1683,7 @@ impl Menu {
             if !skip || redraw {
                 draw.get().unwrap().lock().unwrap().now(
                     vec![format!("{}{}{}", self.background, out_misc, out)],
-                    &mut key_class.get().unwrap().lock().unwrap().idle,
+                    key_class,
                 );
             }
             skip = false;
@@ -1698,6 +1700,7 @@ impl Menu {
                 false,
                 draw,
                 term,
+                key_class,
             ) {
                 key = match key_class.get().unwrap().lock().unwrap().get() {
                     Some(k) => k,
@@ -2053,7 +2056,7 @@ impl Menu {
                         );
                         draw.get().unwrap().lock().unwrap().now(
                             vec![term.get().unwrap().lock().unwrap().get_bg().to_string()],
-                            &mut key_class.get().unwrap().lock().unwrap().idle,
+                            key_class,
                         );
                     } else if selected == "show_battery".to_owned() {
                         draw.get()
@@ -2408,7 +2411,7 @@ impl Menu {
         }
         draw.get().unwrap().lock().unwrap().now(
             vec![draw.get().unwrap().lock().unwrap().saved_buffer()],
-            &mut key_class.get().unwrap().lock().unwrap().idle,
+            key_class,
         );
         self.background = String::default();
         self.active = false;
