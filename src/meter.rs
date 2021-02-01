@@ -140,8 +140,8 @@ impl Meter {
     ) -> Self {
         let mut meter = Meter {
             out: gradient_name.clone(),
-            color_gradient: THEME.get().unwrap().lock().unwrap().gradient[&gradient_name.clone()].clone(),
-            color_inactive: THEME.get().unwrap().lock().unwrap().colors.meter_bg,
+            color_gradient: THEME.get().unwrap().try_lock().unwrap().gradient[&gradient_name.clone()].clone(),
+            color_inactive: THEME.get().unwrap().try_lock().unwrap().colors.meter_bg,
             gradient_name: String::default(),
             width: width,
             invert: invert,
@@ -211,7 +211,7 @@ impl Meter {
             out.push_str(
                 term.get()
                     .unwrap()
-                    .lock()
+                    .try_lock()
                     .unwrap()
                     .get_fg()
                     .to_string()

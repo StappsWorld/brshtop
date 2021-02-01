@@ -14,7 +14,7 @@ pub struct Event {
 impl Event {
     /// Give a time in milliseconds to pause the current connection between threads, or give -1 for  time to wait until a different thread has set this enum
     pub fn wait(&self, time: f64) {
-        println!("Waiting");
+        //println!("Waiting");
         let now = SystemTime::now();
         let wait_period = time::Duration::from_millis(50);
         if time == -1.0 {
@@ -28,7 +28,7 @@ impl Event {
         } else {
             while now.elapsed().unwrap() > Duration::from_secs_f64(time as f64) {
                 thread::sleep(wait_period);
-                println!("Currently at {:?}", now.elapsed().unwrap());
+                //println!("Currently at {:?}", now.elapsed().unwrap());
             }
         }
     }

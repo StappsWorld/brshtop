@@ -34,7 +34,7 @@ lazy_static! {
     };
     static ref __graph_up_small: HashMap<u32, &'static str> = {
         let mut map = __graph_up.clone();
-        map.insert(0, "\033[1C");
+        map.insert(0, "\x1b[1C");
         map
     };
     static ref __graph_down: HashMap<u32, &'static str> = {
@@ -68,7 +68,7 @@ lazy_static! {
     };
     static ref __graph_down_small: HashMap<u32, &'static str> = {
         let mut map = __graph_down.clone();
-        map.insert(0, "\033[1C");
+        map.insert(0, "\x1b[1C");
         map
     };
     static ref __ok: String = format!(

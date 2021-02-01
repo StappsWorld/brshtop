@@ -39,7 +39,7 @@ pub struct Color {
 impl Color {
     pub fn escape(&self) -> String {
         format!(
-            "\033[{};2;{};{};{}m",
+            "\x1b[{};2;{};{};{}m",
             if self.depth == LayerDepth::Fg { 38 } else { 48 },
             self.r,
             self.g,
@@ -81,9 +81,9 @@ impl Color {
                 .iter()
                 .take(3)
                 .map(|capture| capture.unwrap().as_str()); // Unwrap is safe, regex will only match if 3 decimal values exist
-            r = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap(); // These unwraps are unreachable because of the regex
-            g = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap(); // These unwraps are unreachable because of the regex
-            b = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap(); // These unwraps are unreachable because of the regex
+            r = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap_or(0); // These unwraps are unreachable because of the regex
+            g = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap_or(0); // These unwraps are unreachable because of the regex
+            b = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap_or(0); // These unwraps are unreachable because of the regex
         } else {
             errlog(format!("Unable to parse color from {:?}", s));
             return Ok(Color::Null());
@@ -137,8 +137,8 @@ impl Color {
             self.escape(),
             adder,
             match self.depth {
-                LayerDepth::Fg => term.get().unwrap().lock().unwrap().get_fg(),
-                LayerDepth::Bg => term.get().unwrap().lock().unwrap().get_bg(),
+                LayerDepth::Fg => term.get().unwrap().try_lock().unwrap().get_fg(),
+                LayerDepth::Bg => term.get().unwrap().try_lock().unwrap().get_bg(),
             }
         ))
     }
@@ -636,7 +636,7 @@ class Theme:
                 self.gradient[name] += [c] * 101
         #* Set terminal colors
         Term.fg = f'{self.main_fg}'
-        Term.bg = f'{self.main_bg}' if CONFIG.theme_background else "\033[49m"
+        Term.bg = f'{self.main_bg}' if CONFIG.theme_background else "\x1b[49m"
         Draw.now(self.main_fg, self.main_bg)
 
     @classmethod

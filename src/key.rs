@@ -178,8 +178,8 @@ impl Key {
             return true;
         }
         if mouse {
-            draw.get().unwrap().lock().unwrap().now(
-                vec![term.get().unwrap().lock().unwrap().get_mouse_direct_on()],
+            draw.get().unwrap().try_lock().unwrap().now(
+                vec![term.get().unwrap().try_lock().unwrap().get_mouse_direct_on()],
                 passable_self,
             );
         }
@@ -187,10 +187,10 @@ impl Key {
         self.new.wait(if sec > 0.0 { sec } else { 0.0 });
         self.new.replace_self(EventEnum::Flag(false));
         if mouse {
-            draw.get().unwrap().lock().unwrap().now(
+            draw.get().unwrap().try_lock().unwrap().now(
                 vec![
-                    term.get().unwrap().lock().unwrap().get_mouse_direct_off(),
-                    term.get().unwrap().lock().unwrap().get_mouse_on(),
+                    term.get().unwrap().try_lock().unwrap().get_mouse_direct_off(),
+                    term.get().unwrap().try_lock().unwrap().get_mouse_on(),
                 ],
                 passable_self,
             );
@@ -233,17 +233,17 @@ impl Key {
                         let mut buffer = [0; 1];
                         match raw.stream.read_to_string(&mut input_key) {
                             Ok(_) => {
-                                if input_key == String::from("\033") {
+                                if input_key == String::from("\x1b") {
                                     self.idle.replace_self(EventEnum::Flag(false));
-                                    draw.get().unwrap().lock().unwrap().idle.replace_self(EventEnum::Wait);
-                                    draw.get().unwrap().lock().unwrap().idle.wait(-1.0);
+                                    draw.get().unwrap().try_lock().unwrap().idle.replace_self(EventEnum::Wait);
+                                    draw.get().unwrap().try_lock().unwrap().idle.wait(-1.0);
 
                                     let mut nonblocking = Nonblocking::new();
                                     nonblocking.enter();
 
                                     match raw.stream.read_to_string(&mut input_key) {
                                         Ok(_) => {
-                                            if input_key.starts_with("\033[<") {
+                                            if input_key.starts_with("\x1b[<") {
                                                 raw.stream.read_to_end(&mut Vec::new());
                                             }
                                         }
@@ -253,12 +253,12 @@ impl Key {
                                     self.idle.replace_self(EventEnum::Flag(true));
                                 }
 
-                                if input_key == String::from("\033") {
+                                if input_key == String::from("\x1b") {
                                     clean_key = String::from("escape");
-                                } else if input_key.starts_with("\033[<0;")
-                                    || input_key.starts_with("\033[<35;")
-                                    || input_key.starts_with("\033[<64;")
-                                    || input_key.starts_with("\033[<65;")
+                                } else if input_key.starts_with("\x1b[<0;")
+                                    || input_key.starts_with("\x1b[<35;")
+                                    || input_key.starts_with("\x1b[<64;")
+                                    || input_key.starts_with("\x1b[<65;")
                                 {
                                     let mut input_vec =
                                         input_key.as_str().split(';').collect::<Vec<&str>>();
@@ -272,17 +272,17 @@ impl Key {
                                             .unwrap(),
                                     );
 
-                                    if input_key.starts_with("\033[<35;") {
+                                    if input_key.starts_with("\x1b[<35;") {
                                         self.mouse_move.replace_self(EventEnum::Flag(true));
                                         self.new.replace_self(EventEnum::Flag(true));
-                                    } else if input_key.starts_with("\033[<64;") {
+                                    } else if input_key.starts_with("\x1b[<64;") {
                                         clean_key = "mouse_scroll_up".to_owned();
-                                    } else if input_key.starts_with("\033[<65;") {
+                                    } else if input_key.starts_with("\x1b[<65;") {
                                         clean_key = "mouse_scroll_down".to_owned();
-                                    } else if input_key.starts_with("\033[<0;")
+                                    } else if input_key.starts_with("\x1b[<0;")
                                         && input_key.ends_with("m")
                                     {
-                                        if menu.get().unwrap().lock().unwrap().active {
+                                        if menu.get().unwrap().try_lock().unwrap().active {
                                             clean_key = "mouse_click".to_owned();
                                         } else {
                                             let mut broke: bool = false;
@@ -305,7 +305,7 @@ impl Key {
                                 } else {
                                     let mut broke: bool = false;
                                     for code in self.escape.keys() {
-                                        if input_key.strip_prefix("\033").unwrap().starts_with(
+                                        if input_key.strip_prefix("\x1b").unwrap().starts_with(
                                             match code {
                                                 KeyUnion::String(s) => s.to_owned(),
                                                 KeyUnion::Tuple((s1, s2)) => {

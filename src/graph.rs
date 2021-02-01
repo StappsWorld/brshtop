@@ -452,7 +452,7 @@ impl Graph {
         }
 
         if !self.colors.is_empty() {
-            self.out.push_str(&term.get().unwrap().lock().unwrap().get_fg().to_string())
+            self.out.push_str(&term.get().unwrap().try_lock().unwrap().get_fg().to_string())
         }
     }
 

@@ -34,22 +34,25 @@ impl Draw {
     }
 
     /// Wait for input reader and self to be idle then print to screen
-    pub fn now(&mut self, args: Vec<String>, key: &OnceCell<Mutex<Key>>) {
+    pub fn now(&mut self, args: Vec<String>, key_p: &OnceCell<Mutex<Key>>) {
+        
+        let mut key = key_p.get().unwrap().try_lock().unwrap();
 
-        key.get().unwrap().lock().unwrap().idle.replace_self(EventEnum::Wait);
-        //key.get().unwrap().lock().unwrap().idle.wait(-1.0);
+        key.idle.replace_self(EventEnum::Wait);
+        //key.get().unwrap().try_lock().unwrap().idle.wait(-1.0);
 
         println!("Replacing idle with wait");
         self.idle.replace_self(EventEnum::Wait);
-        println!("Waiting");
-        //self.idle.wait(10.0);
+        //println!("Waiting");
+        //self.idle.wait(-1.0);
         println!("Finished waiting and replacing idle with false");
         self.idle.replace_self(EventEnum::Flag(false));
 
         println!("Drawing out:");
-        io::stdout().flush().unwrap();
-        for s in args {
+        print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+        for s in args.clone() {
             print!("{}", s);
+            io::stdout().flush().unwrap();
         }
 
         self.idle.replace_self(EventEnum::Flag(true));

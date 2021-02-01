@@ -21,7 +21,13 @@ use {
         timer::Timer,
     },
     once_cell::sync::OnceCell,
-    std::{collections::HashMap, io, os::unix::io::AsRawFd, sync::Mutex},
+    std::{
+        collections::HashMap,
+        io,
+        ops::{Deref, DerefMut},
+        os::unix::io::AsRawFd,
+        sync::Mutex,
+    },
     terminal_size::{terminal_size, Height, Width},
     termios::*,
 };
@@ -56,17 +62,17 @@ impl Term {
             _h: 0,
             fg: Color::Default(),                    // Default foreground color,
             bg: Color::Default(),                    // Default background color,
-            hide_cursor: String::from("\033[?25l"),  // Hide terminal cursor,
-            show_cursor: String::from("\033[?25h"),  // Show terminal cursor,
-            alt_screen: String::from("\033[?1049h"), // Switch to alternate screen,
-            normal_screen: String::from("\033[?1049l"), // Switch to normal screen,
-            clear: String::from("\033[2J\033[0;0f"), // Clear screen and set cursor to position 0,0,
+            hide_cursor: String::from("\x1b[?25l"),  // Hide terminal cursor,
+            show_cursor: String::from("\x1b[?25h"),  // Show terminal cursor,
+            alt_screen: String::from("\x1b[?1049h"), // Switch to alternate screen,
+            normal_screen: String::from("\x1b[?1049l"), // Switch to normal screen,
+            clear: String::from("\x1b[2J\x1b[0;0f"), // Clear screen and set cursor to position 0,0,
             // Enable reporting of mouse position on click and release,
-            mouse_on: String::from("\033[?1002h\033[?1015h\033[?1006h"),
-            mouse_off: String::from("\033[?1002l"), // Disable mouse reporting,
+            mouse_on: String::from("\x1b[?1002h\x1b[?1015h\x1b[?1006h"),
+            mouse_off: String::from("\x1b[?1002l"), // Disable mouse reporting,
             // Enable reporting of mouse position at any movement,
-            mouse_direct_on: String::from("\033[?1003h"),
-            mouse_direct_off: String::from("\033[?1003l"), // Disable direct mouse reporting,
+            mouse_direct_on: String::from("\x1b[?1003h"),
+            mouse_direct_off: String::from("\x1b[?1003l"), // Disable direct mouse reporting,
             winch: Event {
                 t: EventEnum::Flag(false),
             },
@@ -78,22 +84,31 @@ impl Term {
         &mut self,
         args: Vec<String>,
         boxes: Vec<Boxes>,
-        collector: &OnceCell<Mutex<Collector>>,
-        init: &OnceCell<Mutex<Init>>,
-        cpu_box: &OnceCell<Mutex<CpuBox>>,
-        draw: &OnceCell<Mutex<Draw>>,
+        collector_p: &OnceCell<Mutex<Collector>>,
+        init_p: &OnceCell<Mutex<Init>>,
+        cpu_box_p: &OnceCell<Mutex<CpuBox>>,
+        draw_p: &OnceCell<Mutex<Draw>>,
         force: bool,
-        key: &OnceCell<Mutex<Key>>,
-        menu: &OnceCell<Mutex<Menu>>,
-        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        timer: &OnceCell<Mutex<Timer>>,
-        config: &OnceCell<Mutex<Config>>,
-        theme: &OnceCell<Mutex<Theme>>,
-        cpu: &OnceCell<Mutex<CpuCollector>>,
-        mem_box: &OnceCell<Mutex<MemBox>>,
-        net_box: &OnceCell<Mutex<NetBox>>,
-        proc_box: &OnceCell<Mutex<ProcBox>>,
+        key_p: &OnceCell<Mutex<Key>>,
+        menu_p: &OnceCell<Mutex<Menu>>,
+        brshtop_box_p: &OnceCell<Mutex<BrshtopBox>>,
+        timer_p: &OnceCell<Mutex<Timer>>,
+        config_p: &OnceCell<Mutex<Config>>,
+        theme_p: &OnceCell<Mutex<Theme>>,
+        cpu_p: &OnceCell<Mutex<CpuCollector>>,
+        mem_box_p: &OnceCell<Mutex<MemBox>>,
+        net_box_p: &OnceCell<Mutex<NetBox>>,
+        proc_box_p: &OnceCell<Mutex<ProcBox>>,
     ) {
+        let mut collector = collector_p.get().unwrap().try_lock().unwrap().deref_mut();
+        let mut init = init_p.get().unwrap().try_lock().unwrap().deref_mut();
+        let mut cpu_box = cpu_box_p.get().unwrap().try_lock().unwrap().deref_mut();
+        let mut draw = draw_p.get().unwrap().try_lock().unwrap().deref_mut();
+        let mut key = key_p.get().unwrap().try_lock().unwrap().deref_mut();
+        let mut menu = menu_p.get().unwrap().try_lock().unwrap().deref_mut();
+        let mut brshtop_box = brshtop_box_p.get().unwrap().try_lock().unwrap().deref_mut();
+        let mut timer = timer_p.get().unwrap().try_lock().unwrap().deref_mut();
+
         if self.resized {
             self.winch.replace_self(EventEnum::Flag(true));
             return;
@@ -112,37 +127,24 @@ impl Term {
             return;
         }
         if force {
-            collector
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .set_collect_interrupt(true);
+            collector.set_collect_interrupt(true);
         }
 
         while (self._w != self.width && self._h != self.height) || (self._w < 80 || self._h < 24) {
-            if init.get().unwrap().lock().unwrap().running {
-                init.get().unwrap().lock().unwrap().resized = true;
+            if init.running {
+                init.resized = true;
             }
 
-            cpu_box.get().unwrap().lock().unwrap().set_clock_block(true);
+            cpu_box.set_clock_block(true);
             self.resized = true;
-            collector
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .set_collect_interrupt(true);
+            collector.set_collect_interrupt(true);
             self.width = self._w;
             self.height = self._h;
-            draw.get().unwrap().lock().unwrap().now(
-                vec![self.clear.clone()],
-                key,
-            );
+            draw.now(vec![self.clear.clone()], key_p);
             let mut mutex_self: Mutex<Term> = Mutex::new(self.clone());
             let mut passable_self: OnceCell<Mutex<Term>> = OnceCell::new();
             passable_self.set(mutex_self);
-            draw.get().unwrap().lock().unwrap().now(
+            draw.now(
                 vec![
                     create_box(
                         (self._w as u32 / 2) - 25,
@@ -156,7 +158,7 @@ impl Term {
                         true,
                         None,
                         &passable_self,
-                        theme,
+                        theme_p,
                         None,
                         None,
                         None,
@@ -176,15 +178,12 @@ impl Term {
                         self.get_fg()
                     ),
                 ],
-                key,
+                key_p,
             );
 
             while self._w < 80 || self._h < 24 {
-                draw.get().unwrap().lock().unwrap().now(
-                    vec![self.clear.clone()],
-                    key,
-                );
-                draw.get().unwrap().lock().unwrap().now(
+                draw.now(vec![self.clear.clone()], key_p);
+                draw.now(
                     vec![
                         create_box(
                             (self._w as u32 / 2) - 25,
@@ -198,7 +197,7 @@ impl Term {
                             true,
                             None,
                             &passable_self,
-                            theme,
+                            theme_p,
                             None,
                             None,
                             None,
@@ -240,7 +239,7 @@ impl Term {
                             self.get_fg()
                         ),
                     ],
-                    key,
+                    key_p,
                 );
                 self.winch.replace_self(EventEnum::Wait);
                 self.winch.wait(0.3);
@@ -269,47 +268,45 @@ impl Term {
             };
         }
 
-        key.get().unwrap().lock().unwrap().mouse = HashMap::<String, Vec<Vec<i32>>>::new();
+        key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
         let mut mutex_self: Mutex<Term> = Mutex::new(self.clone());
         let mut passable_self: OnceCell<Mutex<Term>> = OnceCell::new();
         passable_self.set(mutex_self);
-        brshtop_box.get().unwrap().lock().unwrap().calc_sizes(
+        brshtop_box.calc_sizes(
             boxes.clone(),
             &passable_self,
-            config,
-            cpu,
-            cpu_box,
-            mem_box,
-            net_box,
-            proc_box,
+            config_p,
+            cpu_p,
+            cpu_box_p,
+            mem_box_p,
+            net_box_p,
+            proc_box_p,
         );
-        if init.get().unwrap().lock().unwrap().running {
+        if init.running {
             self.resized = false;
             return;
         }
 
-        if menu.get().unwrap().lock().unwrap().active {
-            menu.get().unwrap().lock().unwrap().resized = true;
+        if menu.active {
+            menu.resized = true;
         }
 
-        brshtop_box.get().unwrap().lock().unwrap().draw_bg(
+        brshtop_box.draw_bg(
             false,
-            draw,
+            draw_p,
             boxes.clone(),
-            menu,
-            config,
-            cpu_box,
-            mem_box,
-            net_box,
-            proc_box,
-            key,
-            theme,
+            menu_p,
+            config_p,
+            cpu_box_p,
+            mem_box_p,
+            net_box_p,
+            proc_box_p,
+            key_p,
+            theme_p,
             &passable_self,
         );
         self.resized = false;
-        timer.get().unwrap().lock().unwrap().finish(key, config);
-
-        return;
+        timer.finish(key_p, config_p);
     }
 
     /// Toggle input echo
@@ -337,6 +334,7 @@ impl Term {
     }
 
     pub fn title(text: String) -> String {
+        //println!("Making title");
         let mut out: String = match std::env::var("TERMINAL_TITLE") {
             Ok(o) => o,
             Err(e) => {
@@ -350,7 +348,7 @@ impl Term {
         } else {
             out.push_str(text.as_str());
         }
-        format!("\033]0;{}{}", out, ascii_utils::table::BEL)
+        format!("\x1b]0;{}{}", out, ascii_utils::table::BEL)
     }
 
     pub fn get_width(&self) -> u16 {

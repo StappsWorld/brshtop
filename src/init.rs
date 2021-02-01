@@ -47,7 +47,7 @@ impl Init {
         key: &OnceCell<Mutex<Key>>,
         term: &OnceCell<Mutex<Term>>,
     ) {
-        draw.get().unwrap().lock().unwrap().buffer(
+        draw.get().unwrap().try_lock().unwrap().buffer(
             "init".to_owned(),
             vec![],
             false,
@@ -58,7 +58,7 @@ impl Init {
             false,
             key,
         );
-        draw.get().unwrap().lock().unwrap().buffer(
+        draw.get().unwrap().try_lock().unwrap().buffer(
             "initbg".to_owned(),
             vec![],
             false,
@@ -75,12 +75,12 @@ impl Init {
                     .push(Color::fg(format!("{} {} {}", i, i, i)).unwrap_or(Color::default()));
             }
         }
-        draw.get().unwrap().lock().unwrap().buffer(
+        draw.get().unwrap().try_lock().unwrap().buffer(
             "+banner".to_owned(),
             vec![format!(
                 "{}{}{}{}{}{}{}Version: {}{}{}{}{}{}",
                 draw_banner(
-                    ((term.get().unwrap().lock().unwrap().get_height() / 2) - 10) as u32,
+                    ((term.get().unwrap().try_lock().unwrap().get_height() / 2) - 10) as u32,
                     0,
                     true,
                     false,
@@ -97,8 +97,8 @@ impl Init {
                 VERSION.to_owned(),
                 fx::ui,
                 fx::ub,
-                term.get().unwrap().lock().unwrap().get_bg(),
-                term.get().unwrap().lock().unwrap().get_fg(),
+                term.get().unwrap().try_lock().unwrap().get_bg(),
+                term.get().unwrap().try_lock().unwrap().get_fg(),
                 Color::fg("#50").unwrap_or(Color::default())
             )],
             false,
@@ -111,13 +111,13 @@ impl Init {
         );
         for i in 0..7 {
             let perc = format!("{:>5}", ((i + 1) * 14 + 2).to_string() + "%");
-            draw.get().unwrap().lock().unwrap().buffer(
+            draw.get().unwrap().try_lock().unwrap().buffer(
                 "+banner".to_owned(),
                 vec![format!(
                     "{}{}{}",
                     mv::to(
-                        (term.get().unwrap().lock().unwrap().get_height() / 2) as u32 - 2 + i,
-                        (term.get().unwrap().lock().unwrap().get_width() as u32 / 2) - 28
+                        (term.get().unwrap().try_lock().unwrap().get_height() / 2) as u32 - 2 + i,
+                        (term.get().unwrap().try_lock().unwrap().get_width() as u32 / 2) - 28
                     ),
                     Fx::trans(perc),
                     symbol::v_line,
@@ -133,18 +133,18 @@ impl Init {
         }
         draw.get()
             .unwrap()
-            .lock()
+            .try_lock()
             .unwrap()
             .out(vec!["banner".to_owned()], false, key);
-        draw.get().unwrap().lock().unwrap().buffer(
+        draw.get().unwrap().try_lock().unwrap().buffer(
             "+init!".to_owned(),
             vec![format!(
                 "{}{}{}{}",
                 Color::fg("#cc").unwrap_or(Color::default()),
                 fx::b,
                 mv::to(
-                    (term.get().unwrap().lock().unwrap().get_height() as u32 / 2) - 2,
-                    (term.get().unwrap().lock().unwrap().get_width() as u32 / 2) - 21
+                    (term.get().unwrap().try_lock().unwrap().get_height() as u32 / 2) - 2,
+                    (term.get().unwrap().try_lock().unwrap().get_width() as u32 / 2) - 21
                 ),
                 mv::save
             )],
@@ -159,13 +159,13 @@ impl Init {
 
         let mut rand: Vec<i32> = Vec::<i32>::new();
         let mut rng = rand::thread_rng();
-        for _ in 0..term.get().unwrap().lock().unwrap().get_width() * 2 {
+        for _ in 0..term.get().unwrap().try_lock().unwrap().get_width() * 2 {
             rand.push(rng.gen_range(0..100));
         }
         self.initbg_data = rand.clone();
         self.initbg_up = Graph::new(
-            term.get().unwrap().lock().unwrap().get_width() as i32,
-            term.get().unwrap().lock().unwrap().get_height() as i32 / 2,
+            term.get().unwrap().try_lock().unwrap().get_width() as i32,
+            term.get().unwrap().try_lock().unwrap().get_height() as i32 / 2,
             Some(ColorSwitch::VecColor(self.initbg_colors.clone())),
             self.initbg_data.clone(),
             term,
@@ -175,8 +175,8 @@ impl Init {
             None,
         );
         self.initbg_down = Graph::new(
-            term.get().unwrap().lock().unwrap().get_width() as i32,
-            term.get().unwrap().lock().unwrap().get_height() as i32 / 2,
+            term.get().unwrap().try_lock().unwrap().get_width() as i32,
+            term.get().unwrap().try_lock().unwrap().get_height() as i32 / 2,
             Some(ColorSwitch::VecColor(self.initbg_colors.clone())),
             self.initbg_data.clone(),
             term,
@@ -194,17 +194,17 @@ impl Init {
         term: &OnceCell<Mutex<Term>>,
         key: &OnceCell<Mutex<Key>>,
     ) {
-        if !CONFIG.get().unwrap().lock().unwrap().show_init || self.resized {
+        if !CONFIG.get().unwrap().try_lock().unwrap().show_init || self.resized {
             return;
         }
         self.draw_bg(5, draw, term, key);
-        draw.get().unwrap().lock().unwrap().buffer(
+        draw.get().unwrap().try_lock().unwrap().buffer(
             "+init!".to_owned(),
             vec![format!(
                 "{}{}\n{}{}",
                 mv::restore,
                 symbol::ok(),
-                mv::right((term.get().unwrap().lock().unwrap().get_width() as u32 / 2) - 22),
+                mv::right((term.get().unwrap().try_lock().unwrap().get_width() as u32 / 2) - 22),
                 mv::save
             )],
             false,
@@ -225,8 +225,8 @@ impl Init {
         key: &OnceCell<Mutex<Key>>,
         term: &OnceCell<Mutex<Term>>,
     ) {
-        if CONFIG.get().unwrap().lock().unwrap().show_init {
-            draw.get().unwrap().lock().unwrap().buffer(
+        if CONFIG.get().unwrap().try_lock().unwrap().show_init {
+            draw.get().unwrap().try_lock().unwrap().buffer(
                 "+init!".to_owned(),
                 vec![format!("{}{}", mv::restore, symbol::fail())],
                 false,
@@ -267,7 +267,7 @@ impl Init {
             thread::sleep(time::Duration::from_secs_f32(0.05));
             let mut rng = rand::thread_rng();
             let x: u32 = rng.gen_range(0..100);
-            draw.get().unwrap().lock().unwrap().buffer(
+            draw.get().unwrap().try_lock().unwrap().buffer(
                 "initbg".to_owned(),
                 vec![format!(
                     "{}{}{}{}{}",
@@ -275,7 +275,7 @@ impl Init {
                     mv::to(0, 0),
                     self.initbg_up.call(Some(x as i32), term),
                     mv::to(
-                        term.get().unwrap().lock().unwrap().get_height() as u32 / 2,
+                        term.get().unwrap().try_lock().unwrap().get_height() as u32 / 2,
                         0
                     ),
                     self.initbg_down.call(Some(x as i32), term)
@@ -288,7 +288,7 @@ impl Init {
                 false,
                 key,
             );
-            draw.get().unwrap().lock().unwrap().out(
+            draw.get().unwrap().try_lock().unwrap().out(
                 vec!["initbg", "banner", "init"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
@@ -307,18 +307,18 @@ impl Init {
         key: &OnceCell<Mutex<Key>>,
     ) {
         self.running = false;
-        if !CONFIG.get().unwrap().lock().unwrap().show_init {
+        if !CONFIG.get().unwrap().try_lock().unwrap().show_init {
             return;
         }
         if self.resized {
-            draw.get().unwrap().lock().unwrap().now(
-                vec![term.get().unwrap().lock().unwrap().get_clear()],
+            draw.get().unwrap().try_lock().unwrap().now(
+                vec![term.get().unwrap().try_lock().unwrap().get_clear()],
                 key,
             );
         } else {
             self.draw_bg(10, draw, term, key);
         }
-        draw.get().unwrap().lock().unwrap().clear(
+        draw.get().unwrap().try_lock().unwrap().clear(
             vec!["initbg", "banner", "init"]
                 .iter()
                 .map(|s| s.to_owned().to_owned())
