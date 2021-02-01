@@ -418,7 +418,16 @@ impl Config {
                     ConfigItem::Error => {
                         initializing_config.recreate = true;
 
-                        let sender = match initializing_config.attr.get(&key).unwrap() {
+                        let sender = match initializing_config
+                            .attr
+                            .get(&key.clone())
+                            .unwrap_or_else(|| {
+                                errlog(format!(
+                                    "Attempted to find attribute {} in CONFIG initialization",
+                                    key.clone()
+                                ));
+                                &ConfigItem::Error
+                            }) {
                             ConfigItem::Str(s) => ConfigItem::Str(String::from(s)),
                             ConfigItem::Int(i) => ConfigItem::Int(*i),
                             ConfigItem::Bool(b) => ConfigItem::Bool(*b),
@@ -431,7 +440,13 @@ impl Config {
                         initializing_config.conf_dict.insert(key, sender);
                     }
                     _ => {
-                        let sender = match conf.get(&key).unwrap() {
+                        let sender = match conf.get(&key).unwrap_or_else(|| {
+                            errlog(format!(
+                                "Attempted to find attribute {} in CONFIG initialization",
+                                key.clone()
+                            ));
+                            &ConfigItem::Error
+                        }) {
                             ConfigItem::Str(s) => ConfigItem::Str(String::from(s)),
                             ConfigItem::Int(i) => ConfigItem::Int(*i),
                             ConfigItem::Bool(b) => ConfigItem::Bool(*b),
@@ -675,7 +690,10 @@ impl Config {
             "update_check" => ConfigAttr::Bool(self.update_check),
             "log_level" => ConfigAttr::LogLevel(self.log_level),
             _ => {
-                errlog(format!("Malformed attr {} found in getattr, defaulting...", attr.clone()));
+                errlog(format!(
+                    "Malformed attr {} found in getattr, defaulting...",
+                    attr.clone()
+                ));
                 ConfigAttr::String(String::default())
             }
         }
@@ -972,10 +990,12 @@ impl Config {
                         LogLevel::Debug
                     }
                 }
-            },
+            }
             _ => {
-                throw_error(format!("Illegal attribute {} to be set on CONFIG", attr.clone()).as_str());
-                return
+                throw_error(
+                    format!("Illegal attribute {} to be set on CONFIG", attr.clone()).as_str(),
+                );
+                return;
             }
         }
     }
