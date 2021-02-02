@@ -76,7 +76,7 @@ impl<'a> NetCollector<'a> {
     pub fn new(netbox: &OnceCell<Mutex<NetBox>>, CONFIG: &OnceCell<Mutex<Config>>) -> Self {
         NetCollector {
             parent: Collector::new(),
-            buffer: netbox.get().unwrap().try_lock().unwrap().get_buffer().clone(),
+            buffer: netbox.get().unwrap().lock().unwrap().get_buffer().clone(),
             up_stat: HashMap::<String, Nic>::new(),
             nics: Vec::<&'a Nic>::new(),
             nic_i: 0,
@@ -100,7 +100,7 @@ impl<'a> NetCollector<'a> {
                 .iter()
                 .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
                 .collect::<HashMap<String, i32>>(),
-            auto_min: CONFIG.get().unwrap().try_lock().unwrap().net_auto,
+            auto_min: CONFIG.get().unwrap().lock().unwrap().net_auto,
             sync_top: 0,
             sync_string: String::default(),
         }
@@ -183,7 +183,7 @@ impl<'a> NetCollector<'a> {
         self.new_nic = Some(self.nics[self.nic_i as usize]);
         self.switched = true;
 
-        collector.get().unwrap().try_lock().unwrap().collect(
+        collector.get().unwrap().lock().unwrap().collect(
             vec![Collectors::NetCollector],
             CONFIG,
             true,
@@ -389,8 +389,8 @@ impl<'a> NetCollector<'a> {
                         self.net_min.insert(
                             direction.clone(),
                             units_to_bytes(match direction.as_str() {
-                                "download" => CONFIG.get().unwrap().try_lock().unwrap().net_download.clone(),
-                                "upload" => CONFIG.get().unwrap().try_lock().unwrap().net_upload.clone(),
+                                "download" => CONFIG.get().unwrap().lock().unwrap().net_download.clone(),
+                                "upload" => CONFIG.get().unwrap().lock().unwrap().net_upload.clone(),
                                 _ => "".to_owned()
                             }) as i32,
                         );
@@ -448,7 +448,7 @@ impl<'a> NetCollector<'a> {
                         }
                         if direction == "upload".to_owned() {
                             self.reset = false;
-                            netbox.get().unwrap().try_lock().unwrap().set_redraw(true);
+                            netbox.get().unwrap().lock().unwrap().set_redraw(true);
                         }
                     }
 
@@ -456,7 +456,7 @@ impl<'a> NetCollector<'a> {
                         > netbox
                             .get()
                             .unwrap()
-                            .try_lock()
+                            .lock()
                             .unwrap()
                             .get_parent()
                             .get_width()
@@ -617,7 +617,7 @@ impl<'a> NetCollector<'a> {
 
                 self.timestamp = SystemTime::now();
 
-                if CONFIG.get().unwrap().try_lock().unwrap().net_sync {
+                if CONFIG.get().unwrap().lock().unwrap().net_sync {
                     let download_top = self
                         .stats
                         .get(&self.nic.unwrap().name().to_owned())
@@ -654,7 +654,7 @@ impl<'a> NetCollector<'a> {
                         self.sync_top = c_max;
                         self.sync_string =
                             floating_humanizer(self.sync_top as f64, false, false, 0, false);
-                        netbox.get().unwrap().try_lock().unwrap().set_redraw(true);
+                        netbox.get().unwrap().lock().unwrap().set_redraw(true);
                     }
                 }
             }
@@ -678,7 +678,7 @@ impl<'a> NetCollector<'a> {
         menu: &OnceCell<Mutex<Menu>>,
         passable_self: &OnceCell<Mutex<NetCollector>>,
     ) {
-        netbox.get().unwrap().try_lock().unwrap().draw_fg(
+        netbox.get().unwrap().lock().unwrap().draw_fg(
             theme,
             key,
             term,

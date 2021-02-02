@@ -24,6 +24,7 @@ use {
     std::{
         collections::HashMap,
         io,
+        mem::drop,
         ops::{Deref, DerefMut},
         os::unix::io::AsRawFd,
         sync::Mutex,
@@ -55,11 +56,11 @@ pub struct Term {
 impl Term {
     pub fn new() -> Self {
         Term {
-            width: 0,
-            height: 0,
+            width: 1,
+            height: 1,
             resized: false,
-            _w: 0,
-            _h: 0,
+            _w: 1,
+            _h: 1,
             fg: Color::Default(),                    // Default foreground color,
             bg: Color::Default(),                    // Default background color,
             hide_cursor: String::from("\x1b[?25l"),  // Hide terminal cursor,
@@ -100,14 +101,15 @@ impl Term {
         net_box_p: &OnceCell<Mutex<NetBox>>,
         proc_box_p: &OnceCell<Mutex<ProcBox>>,
     ) {
-        let mut collector = collector_p.get().unwrap().try_lock().unwrap().deref_mut();
-        let mut init = init_p.get().unwrap().try_lock().unwrap().deref_mut();
-        let mut cpu_box = cpu_box_p.get().unwrap().try_lock().unwrap().deref_mut();
-        let mut draw = draw_p.get().unwrap().try_lock().unwrap().deref_mut();
-        let mut key = key_p.get().unwrap().try_lock().unwrap().deref_mut();
-        let mut menu = menu_p.get().unwrap().try_lock().unwrap().deref_mut();
-        let mut brshtop_box = brshtop_box_p.get().unwrap().try_lock().unwrap().deref_mut();
-        let mut timer = timer_p.get().unwrap().try_lock().unwrap().deref_mut();
+        let mut collector = collector_p.get().unwrap().lock().unwrap();
+        let mut init = init_p.get().unwrap().lock().unwrap();
+        let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
+        let mut draw = draw_p.get().unwrap().lock().unwrap();
+        let mut key = key_p.get().unwrap().lock().unwrap();
+        drop(key);
+        let mut menu = menu_p.get().unwrap().lock().unwrap();
+        let mut brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
+        let mut timer = timer_p.get().unwrap().lock().unwrap();
 
         if self.resized {
             self.winch.replace_self(EventEnum::Flag(true));
@@ -268,7 +270,9 @@ impl Term {
             };
         }
 
+        key = key_p.get().unwrap().lock().unwrap();
         key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
+        drop(cpu_box);
         let mut mutex_self: Mutex<Term> = Mutex::new(self.clone());
         let mut passable_self: OnceCell<Mutex<Term>> = OnceCell::new();
         passable_self.set(mutex_self);

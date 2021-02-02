@@ -227,13 +227,13 @@ impl Collector {
         let mut debugged = false;
 
         while !self.get_stopping() {
-            if CONFIG.get().unwrap().try_lock().unwrap().draw_clock != String::default()
-                && CONFIG.get().unwrap().try_lock().unwrap().update_ms != 1000
+            if CONFIG.get().unwrap().lock().unwrap().draw_clock != String::default()
+                && CONFIG.get().unwrap().lock().unwrap().update_ms != 1000
             {
                 brshtop_box
                     .get()
                     .unwrap()
-                    .try_lock()
+                    .lock()
                     .unwrap()
                     .draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
             }
@@ -252,7 +252,7 @@ impl Collector {
                 timeit
                     .get()
                     .unwrap()
-                    .try_lock()
+                    .lock()
                     .unwrap()
                     .start("Collect and draw".to_owned());
             }
@@ -264,31 +264,31 @@ impl Collector {
                         Collectors::CpuCollector => cpu_collector
                             .get()
                             .unwrap()
-                            .try_lock()
+                            .lock()
                             .unwrap()
                             .collect(CONFIG, term, cpu_box, brshtop_box, cpu_collector),
                         Collectors::NetCollector => net_collector
                             .get()
                             .unwrap()
-                            .try_lock()
+                            .lock()
                             .unwrap()
                             .collect(CONFIG, netbox),
                         Collectors::ProcCollector => proc_collector
                             .get()
                             .unwrap()
-                            .try_lock()
+                            .lock()
                             .unwrap()
                             .collect(brshtop_box, CONFIG, procbox),
                         Collectors::MemCollector => mem_collector
                             .get()
                             .unwrap()
-                            .try_lock()
+                            .lock()
                             .unwrap()
                             .collect(CONFIG, membox),
                     }
                 }
                 match collector {
-                    Collectors::CpuCollector => cpu_collector.get().unwrap().try_lock().unwrap().draw(
+                    Collectors::CpuCollector => cpu_collector.get().unwrap().lock().unwrap().draw(
                         cpu_box,
                         CONFIG,
                         key,
@@ -301,7 +301,7 @@ impl Collector {
                         menu,
                         cpu_collector,
                     ),
-                    Collectors::NetCollector => net_collector.get().unwrap().try_lock().unwrap().draw(
+                    Collectors::NetCollector => net_collector.get().unwrap().lock().unwrap().draw(
                         netbox,
                         THEME,
                         key,
@@ -313,7 +313,7 @@ impl Collector {
                         net_collector,
                     ),
                     Collectors::ProcCollector => {
-                        proc_collector.get().unwrap().try_lock().unwrap().draw(
+                        proc_collector.get().unwrap().lock().unwrap().draw(
                             procbox,
                             CONFIG,
                             key,
@@ -325,7 +325,7 @@ impl Collector {
                             proc_collector,
                         )
                     }
-                    Collectors::MemCollector => mem_collector.get().unwrap().try_lock().unwrap().draw(
+                    Collectors::MemCollector => mem_collector.get().unwrap().lock().unwrap().draw(
                         membox,
                         term,
                         brshtop_box,
@@ -345,24 +345,24 @@ impl Collector {
                         Collectors::CpuCollector => cpu_collector
                             .get()
                             .unwrap()
-                            .try_lock()
+                            .lock()
                             .unwrap()
                             .get_buffer()
                             .clone(),
                         Collectors::NetCollector => net_collector
                             .get()
                             .unwrap()
-                            .try_lock()
+                            .lock()
                             .unwrap()
                             .get_buffer()
                             .clone(),
                         Collectors::ProcCollector => {
-                            proc_collector.get().unwrap().try_lock().unwrap().buffer.clone()
+                            proc_collector.get().unwrap().lock().unwrap().buffer.clone()
                         }
                         Collectors::MemCollector => mem_collector
                             .get()
                             .unwrap()
-                            .try_lock()
+                            .lock()
                             .unwrap()
                             .get_buffer()
                             .clone(),
@@ -378,38 +378,38 @@ impl Collector {
                 timeit
                     .get()
                     .unwrap()
-                    .try_lock()
+                    .lock()
                     .unwrap()
                     .stop("Collect and draw".to_owned());
                 debugged = true;
             }
 
             if self.get_draw_now()
-                && !menu.get().unwrap().try_lock().unwrap().active
+                && !menu.get().unwrap().lock().unwrap().active
                 && !self.get_collect_interrupt()
             {
                 if self.get_use_draw_list() {
                     draw.get()
                         .unwrap()
-                        .try_lock()
+                        .lock()
                         .unwrap()
                         .out(draw_buffers, false, key);
                 } else {
                     draw.get()
                         .unwrap()
-                        .try_lock()
+                        .lock()
                         .unwrap()
                         .out(Vec::<String>::new(), false, key);
                 }
             }
 
-            if CONFIG.get().unwrap().try_lock().unwrap().draw_clock != String::default()
-                && CONFIG.get().unwrap().try_lock().unwrap().update_ms == 1000
+            if CONFIG.get().unwrap().lock().unwrap().draw_clock != String::default()
+                && CONFIG.get().unwrap().lock().unwrap().update_ms == 1000
             {
                 brshtop_box
                     .get()
                     .unwrap()
-                    .try_lock()
+                    .lock()
                     .unwrap()
                     .draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
             }

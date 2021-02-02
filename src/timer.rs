@@ -31,7 +31,7 @@ impl Timer {
         match self
             .timestamp
             .checked_add(Duration::from_millis(
-                CONFIG.get().unwrap().try_lock().unwrap().update_ms as u64,
+                CONFIG.get().unwrap().lock().unwrap().update_ms as u64,
             ))
             .unwrap()
             .duration_since(SystemTime::now())
@@ -45,7 +45,7 @@ impl Timer {
         match SystemTime::now().duration_since(
             self.timestamp
                 .checked_add(Duration::from_millis(
-                    CONFIG.get().unwrap().try_lock().unwrap().update_ms as u64,
+                    CONFIG.get().unwrap().lock().unwrap().update_ms as u64,
                 ))
                 .unwrap(),
         ) {
@@ -53,7 +53,7 @@ impl Timer {
             Err(_) => self
                 .timestamp
                 .checked_add(Duration::from_millis(
-                    CONFIG.get().unwrap().try_lock().unwrap().update_ms as u64,
+                    CONFIG.get().unwrap().lock().unwrap().update_ms as u64,
                 ))
                 .unwrap()
                 .duration_since(SystemTime::now())
@@ -65,9 +65,9 @@ impl Timer {
         self.return_zero = true;
         self.timestamp = SystemTime::now()
             .checked_sub(Duration::from_millis(
-                CONFIG.get().unwrap().try_lock().unwrap().update_ms as u64,
+                CONFIG.get().unwrap().lock().unwrap().update_ms as u64,
             ))
             .unwrap();
-        key.get().unwrap().try_lock().unwrap().break_wait();
+        key.get().unwrap().lock().unwrap().break_wait();
     }
 }

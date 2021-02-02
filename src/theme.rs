@@ -137,8 +137,8 @@ impl Color {
             self.escape(),
             adder,
             match self.depth {
-                LayerDepth::Fg => term.get().unwrap().try_lock().unwrap().get_fg(),
-                LayerDepth::Bg => term.get().unwrap().try_lock().unwrap().get_bg(),
+                LayerDepth::Fg => term.get().unwrap().lock().unwrap().get_fg(),
+                LayerDepth::Bg => term.get().unwrap().lock().unwrap().get_bg(),
             }
         ))
     }

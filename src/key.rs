@@ -178,8 +178,8 @@ impl Key {
             return true;
         }
         if mouse {
-            draw.get().unwrap().try_lock().unwrap().now(
-                vec![term.get().unwrap().try_lock().unwrap().get_mouse_direct_on()],
+            draw.get().unwrap().lock().unwrap().now(
+                vec![term.get().unwrap().lock().unwrap().get_mouse_direct_on()],
                 passable_self,
             );
         }
@@ -187,10 +187,10 @@ impl Key {
         self.new.wait(if sec > 0.0 { sec } else { 0.0 });
         self.new.replace_self(EventEnum::Flag(false));
         if mouse {
-            draw.get().unwrap().try_lock().unwrap().now(
+            draw.get().unwrap().lock().unwrap().now(
                 vec![
-                    term.get().unwrap().try_lock().unwrap().get_mouse_direct_off(),
-                    term.get().unwrap().try_lock().unwrap().get_mouse_on(),
+                    term.get().unwrap().lock().unwrap().get_mouse_direct_off(),
+                    term.get().unwrap().lock().unwrap().get_mouse_on(),
                 ],
                 passable_self,
             );
@@ -235,8 +235,8 @@ impl Key {
                             Ok(_) => {
                                 if input_key == String::from("\x1b") {
                                     self.idle.replace_self(EventEnum::Flag(false));
-                                    draw.get().unwrap().try_lock().unwrap().idle.replace_self(EventEnum::Wait);
-                                    draw.get().unwrap().try_lock().unwrap().idle.wait(-1.0);
+                                    draw.get().unwrap().lock().unwrap().idle.replace_self(EventEnum::Wait);
+                                    draw.get().unwrap().lock().unwrap().idle.wait(-1.0);
 
                                     let mut nonblocking = Nonblocking::new();
                                     nonblocking.enter();
@@ -282,7 +282,7 @@ impl Key {
                                     } else if input_key.starts_with("\x1b[<0;")
                                         && input_key.ends_with("m")
                                     {
-                                        if menu.get().unwrap().try_lock().unwrap().active {
+                                        if menu.get().unwrap().lock().unwrap().active {
                                             clean_key = "mouse_click".to_owned();
                                         } else {
                                             let mut broke: bool = false;

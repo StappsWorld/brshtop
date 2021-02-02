@@ -71,17 +71,17 @@ pub fn draw_banner(
 ) -> String {
     let mut out = String::new();
     if center {
-        col = term.get().unwrap().try_lock().unwrap().get_width() as u32 / 2 - BANNER_META.length as u32 / 2;
+        col = term.get().unwrap().lock().unwrap().get_width() as u32 / 2 - BANNER_META.length as u32 / 2;
     }
 
     for (n, o) in BANNER_META.out.iter().enumerate() {
         out.push_str(&format!("{}{}", mv::to(line + n as u32, col), o))
     }
 
-    out.push_str(&term.get().unwrap().try_lock().unwrap().get_fg().to_string().as_str());
+    out.push_str(&term.get().unwrap().lock().unwrap().get_fg().to_string().as_str());
 
     if now {
-        draw.get().unwrap().try_lock().unwrap().out(vec![out.clone()], false, key);
+        draw.get().unwrap().lock().unwrap().out(vec![out.clone()], false, key);
     }
 
     out
