@@ -844,26 +844,26 @@ pub fn main() {
                     SIGWINCH => {
                         let mut SIG_term = passable_term.get().unwrap().lock().unwrap();
                         SIG_term.refresh(
-                        vec![],
-                        boxes.clone(),
-                        &passable_collector,
-                        &passable_init,
-                        &passable_cpu_box,
-                        &passable_draw,
-                        true,
-                        &passable_key,
-                        &passable_menu,
-                        &passable_brshtop_box,
-                        &passable_timer,
-                        &passable_CONFIG,
-                        &passable_THEME,
-                        &passable_cpu_collector,
-                        &passable_mem_box,
-                        &passable_net_box,
-                        &passable_proc_box,
-                    );
-                    drop(SIG_term);
-                },
+                            vec![],
+                            boxes.clone(),
+                            &passable_collector,
+                            &passable_init,
+                            &passable_cpu_box,
+                            &passable_draw,
+                            true,
+                            &passable_key,
+                            &passable_menu,
+                            &passable_brshtop_box,
+                            &passable_timer,
+                            &passable_CONFIG,
+                            &passable_THEME,
+                            &passable_cpu_collector,
+                            &passable_mem_box,
+                            &passable_net_box,
+                            &passable_proc_box,
+                        );
+                        drop(SIG_term);
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -900,12 +900,8 @@ pub fn main() {
             &passable_key,
         );
     }
-    let mut init_key = passable_key
-    .get()
-    .unwrap()
-    .lock()
-    .unwrap();
-    
+    let mut init_key = passable_key.get().unwrap().lock().unwrap();
+
     init_key.start(&passable_draw, &passable_menu);
 
     drop(init_CONFIG);
@@ -938,7 +934,9 @@ pub fn main() {
             &passable_key,
         );
     }
-    passable_collector.get().unwrap().lock().unwrap().start(
+
+    let mut init_collector = passable_collector.get().unwrap().lock().unwrap();
+    init_collector.start(
         &passable_CONFIG,
         DEBUG,
         collectors.clone(),
@@ -960,9 +958,9 @@ pub fn main() {
         &passable_mem_collector,
         &passable_net_collector,
         &passable_proc_collector,
-        &passable_collector,
     );
-    passable_init.get().unwrap().lock().unwrap().success(
+    init_init = passable_init.get().unwrap().lock().unwrap();
+    init_init.success(
         &passable_CONFIG,
         &passable_draw,
         &passable_term,
@@ -970,8 +968,9 @@ pub fn main() {
     );
 
     // Collect data and draw to buffer
-    if passable_CONFIG.get().unwrap().lock().unwrap().show_init {
-        passable_draw.get().unwrap().lock().unwrap().buffer(
+    if init_CONFIG.show_init {
+        init_draw = passable_draw.get().unwrap().lock().unwrap();
+        init_draw.buffer(
             "+init!".to_owned(),
             vec![format!(
                 "{}{}{}",
@@ -1244,10 +1243,10 @@ pub fn create_box(
     term: &OnceCell<Mutex<Term>>,
     THEME: &OnceCell<Mutex<Theme>>,
     brshtop_box: Option<&OnceCell<Mutex<BrshtopBox>>>,
-    cpu_box: Option<&OnceCell<Mutex<CpuBox>>>,
-    mem_box: Option<&OnceCell<Mutex<MemBox>>>,
-    net_box: Option<&OnceCell<Mutex<NetBox>>>,
-    proc_box: Option<&OnceCell<Mutex<ProcBox>>>,
+    cpu_box: Option<&CpuBox>,
+    mem_box: Option<&MemBox>,
+    net_box: Option<&NetBox>,
+    proc_box: Option<&ProcBox>,
 ) -> String {
     let mut out: String = format!(
         "{}{}",
@@ -1300,7 +1299,7 @@ pub fn create_box(
                     .get_name();
             }
             Boxes::CpuBox => {
-                let parent_box = cpu_box.unwrap().get().unwrap().lock().unwrap().get_parent();
+                let parent_box = cpu_box.unwrap().get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
@@ -1308,7 +1307,7 @@ pub fn create_box(
                 wt = parent_box.get_name();
             }
             Boxes::MemBox => {
-                let parent_box = mem_box.unwrap().get().unwrap().lock().unwrap().get_parent();
+                let parent_box = mem_box.unwrap().get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
@@ -1316,7 +1315,7 @@ pub fn create_box(
                 wt = parent_box.get_name();
             }
             Boxes::NetBox => {
-                let parent_box = net_box.unwrap().get().unwrap().lock().unwrap().get_parent();
+                let parent_box = net_box.unwrap().get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
@@ -1324,13 +1323,7 @@ pub fn create_box(
                 wt = parent_box.get_name();
             }
             Boxes::ProcBox => {
-                let parent_box = proc_box
-                    .unwrap()
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .get_parent();
+                let parent_box = proc_box.unwrap().get_parent();
                 wx = parent_box.get_x();
                 wy = parent_box.get_y();
                 ww = parent_box.get_width();
@@ -2534,6 +2527,5 @@ pub fn now_awake(
         mem_collector,
         net_collector,
         proc_collector,
-        collector,
     )
 }

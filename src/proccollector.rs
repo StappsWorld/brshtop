@@ -1364,7 +1364,6 @@ impl ProcCollector {
         term: &OnceCell<Mutex<Term>>,
         draw: &OnceCell<Mutex<Draw>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self: &OnceCell<Mutex<ProcCollector>>,
     ) {
         procbox.get().unwrap().lock().unwrap().draw_fg(
             CONFIG,
@@ -1373,7 +1372,7 @@ impl ProcCollector {
             graphs,
             term,
             draw,
-            passable_self,
+            self,
             menu,
         )
     }

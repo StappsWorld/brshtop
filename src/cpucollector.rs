@@ -75,7 +75,6 @@ impl CpuCollector {
         term: &OnceCell<Mutex<Term>>,
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        passable_self: &OnceCell<Mutex<CpuCollector>>,
     ) {
         match psutil::cpu::CpuPercentCollector::new()
             .unwrap()
@@ -152,7 +151,7 @@ impl CpuCollector {
         };
 
         if CONFIG.get().unwrap().lock().unwrap().check_temp && self.got_sensors {
-            self.collect_temps(CONFIG, cpu_box, brshtop_box, term, passable_self);
+            self.collect_temps(CONFIG, cpu_box, brshtop_box, term);
         }
     }
 
@@ -168,10 +167,9 @@ impl CpuCollector {
         graphs: &OnceCell<Mutex<Graphs>>,
         meters: &OnceCell<Mutex<Meters>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self: &OnceCell<Mutex<CpuCollector>>,
     ) {
         cpu_box.get().unwrap().lock().unwrap().draw_fg(
-            passable_self,
+            self,
             CONFIG,
             key,
             THEME,
@@ -278,7 +276,6 @@ impl CpuCollector {
         cpu_box: &OnceCell<Mutex<CpuBox>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         term: &OnceCell<Mutex<Term>>,
-        passable_self: &OnceCell<Mutex<CpuCollector>>,
     ) {
         let mut temp: i32 = 1000;
         let mut cores: Vec<String> = Vec::<String>::new();
@@ -548,7 +545,7 @@ impl CpuCollector {
                                 cpu_box.get().unwrap().lock().unwrap().calc_size(
                                     term,
                                     brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
-                                    passable_self,
+                                    self,
                                 ),
                             );
                             return;
@@ -575,7 +572,7 @@ impl CpuCollector {
                                 cpu_box.get().unwrap().lock().unwrap().calc_size(
                                     term,
                                     brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
-                                    passable_self,
+                                    self,
                                 ),
                             );
                             return;
@@ -634,7 +631,7 @@ impl CpuCollector {
                                 cpu_box.get().unwrap().lock().unwrap().calc_size(
                                     term,
                                     brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
-                                    passable_self,
+                                    self,
                                 ),
                             );
                             return;
@@ -666,7 +663,7 @@ impl CpuCollector {
                                 cpu_box.get().unwrap().lock().unwrap().calc_size(
                                     term,
                                     brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
-                                    passable_self,
+                                    self,
                                 ),
                             );
                             return;

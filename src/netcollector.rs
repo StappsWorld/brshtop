@@ -194,7 +194,14 @@ impl<'a> NetCollector<'a> {
         );
     }
 
-    pub fn collect(&mut self, CONFIG: &OnceCell<Mutex<Config>>, netbox: &OnceCell<Mutex<NetBox>>) {
+    pub fn collect(
+        &mut self,
+        CONFIG_p: &OnceCell<Mutex<Config>>,
+        netbox_p: &OnceCell<Mutex<NetBox>>,
+    ) {
+        let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+        let mut netbox = netbox_p.get().unwrap().lock().unwrap();
+
         let mut speed: i32 = 0;
         let mut stat: HashMap<String, NetCollectorStat> =
             HashMap::<String, NetCollectorStat>::new();
@@ -219,8 +226,11 @@ impl<'a> NetCollector<'a> {
         }
 
         if self.nic.is_none()
-            || !self.up_stat.contains_key(&self.nic.unwrap().name().to_owned())
-            || !self.up_stat
+            || !self
+                .up_stat
+                .contains_key(&self.nic.unwrap().name().to_owned())
+            || !self
+                .up_stat
                 .get(&self.nic.unwrap().name().to_owned())
                 .unwrap()
                 .is_up()
@@ -389,9 +399,9 @@ impl<'a> NetCollector<'a> {
                         self.net_min.insert(
                             direction.clone(),
                             units_to_bytes(match direction.as_str() {
-                                "download" => CONFIG.get().unwrap().lock().unwrap().net_download.clone(),
-                                "upload" => CONFIG.get().unwrap().lock().unwrap().net_upload.clone(),
-                                _ => "".to_owned()
+                                "download" => CONFIG.net_download.clone(),
+                                "upload" => CONFIG.net_upload.clone(),
+                                _ => "".to_owned(),
                             }) as i32,
                         );
                         stat.insert(
@@ -448,20 +458,11 @@ impl<'a> NetCollector<'a> {
                         }
                         if direction == "upload".to_owned() {
                             self.reset = false;
-                            netbox.get().unwrap().lock().unwrap().set_redraw(true);
+                            netbox.set_redraw(true);
                         }
                     }
 
-                    if speed_vec.len() as u32
-                        > netbox
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .get_parent()
-                            .get_width()
-                            * 2
-                    {
+                    if speed_vec.len() as u32 > netbox.get_parent().get_width() * 2 {
                         speed_vec.remove(0);
                     }
 
@@ -524,22 +525,24 @@ impl<'a> NetCollector<'a> {
                                 0
                             }
                         };
-                        let mut graph_raise: i32 = match stat.get(&"graph_raise".to_owned()).unwrap() {
-                            NetCollectorStat::I32(i) => i.to_owned(),
-                            NetCollectorStat::U64(u) => u.to_owned() as i32,
-                            _ => {
-                                errlog("Malformed type in stat['graph_raise']".to_owned());
-                                0
-                            }
-                        };
-                        let mut graph_lower: i32 = match stat.get(&"graph_lower".to_owned()).unwrap() {
-                            NetCollectorStat::I32(i) => i.to_owned(),
-                            NetCollectorStat::U64(u) => u.to_owned() as i32,
-                            _ => {
-                                errlog("Malformed type in stat['graph_lower']".to_owned());
-                                0
-                            }
-                        };
+                        let mut graph_raise: i32 =
+                            match stat.get(&"graph_raise".to_owned()).unwrap() {
+                                NetCollectorStat::I32(i) => i.to_owned(),
+                                NetCollectorStat::U64(u) => u.to_owned() as i32,
+                                _ => {
+                                    errlog("Malformed type in stat['graph_raise']".to_owned());
+                                    0
+                                }
+                            };
+                        let mut graph_lower: i32 =
+                            match stat.get(&"graph_lower".to_owned()).unwrap() {
+                                NetCollectorStat::I32(i) => i.to_owned(),
+                                NetCollectorStat::U64(u) => u.to_owned() as i32,
+                                _ => {
+                                    errlog("Malformed type in stat['graph_lower']".to_owned());
+                                    0
+                                }
+                            };
 
                         if speed > graph_top {
                             graph_raise += 1;
@@ -617,7 +620,7 @@ impl<'a> NetCollector<'a> {
 
                 self.timestamp = SystemTime::now();
 
-                if CONFIG.get().unwrap().lock().unwrap().net_sync {
+                if CONFIG.net_sync {
                     let download_top = self
                         .stats
                         .get(&self.nic.unwrap().name().to_owned())
@@ -654,7 +657,7 @@ impl<'a> NetCollector<'a> {
                         self.sync_top = c_max;
                         self.sync_string =
                             floating_humanizer(self.sync_top as f64, false, false, 0, false);
-                        netbox.get().unwrap().lock().unwrap().set_redraw(true);
+                        netbox.set_redraw(true);
                     }
                 }
             }
@@ -676,7 +679,6 @@ impl<'a> NetCollector<'a> {
         draw: &OnceCell<Mutex<Draw>>,
         graphs: &OnceCell<Mutex<Graphs>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self: &OnceCell<Mutex<NetCollector>>,
     ) {
         netbox.get().unwrap().lock().unwrap().draw_fg(
             theme,
@@ -686,8 +688,7 @@ impl<'a> NetCollector<'a> {
             draw,
             graphs,
             menu,
-            passable_self,
-            netbox,
+            self,
         )
     }
 

@@ -211,7 +211,6 @@ impl MemBox {
         THEME: &OnceCell<Mutex<Theme>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         term: &OnceCell<Mutex<Term>>,
-        passable_self: &OnceCell<Mutex<MemBox>>,
     ) -> String {
         if self.get_parent().get_proc_mode() {
             String::default()
@@ -233,7 +232,7 @@ impl MemBox {
                     THEME,
                     None,
                     None,
-                    Some(passable_self),
+                    Some(self),
                     None,
                     None,
                 )
@@ -318,23 +317,22 @@ impl MemBox {
 
     pub fn draw_fg(
         &mut self,
-        mem: &OnceCell<Mutex<MemCollector>>,
+        mem: &MemCollector,
         term: &OnceCell<Mutex<Term>>,
         brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
         CONFIG: &OnceCell<Mutex<Config>>,
         meters: &OnceCell<Mutex<Meters>>,
         THEME: &OnceCell<Mutex<Theme>>,
         key: &OnceCell<Mutex<Key>>,
-        collector: &OnceCell<Mutex<Collector>>,
+        collector: &Collector,
         draw: &OnceCell<Mutex<Draw>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self: &OnceCell<Mutex<MemBox>>,
     ) {
         if self.get_parent().get_proc_mode() {
             return;
         }
 
-        if mem.get().unwrap().lock().unwrap().get_parent().get_redraw() {
+        if mem.get_parent().get_redraw() {
             self.set_redraw(true);
         }
 
@@ -362,7 +360,7 @@ impl MemBox {
                     brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
                     CONFIG,
                 ));
-            out_misc.push_str(self.draw_bg(THEME, CONFIG, term, passable_self).as_str());
+            out_misc.push_str(self.draw_bg(THEME, CONFIG, term).as_str());
             meters
                 .get()
                 .unwrap()
@@ -406,11 +404,7 @@ impl MemBox {
                                         .unwrap()
                                         .clone(),
                                 )),
-                                mem.get()
-                                    .unwrap()
-                                    .lock()
-                                    .unwrap()
-                                    .get_vlist_index(name.clone())
+                                mem.get_vlist_index(name.clone())
                                     .unwrap()
                                     .iter()
                                     .map(|u| u.to_owned() as i32)
@@ -426,12 +420,7 @@ impl MemBox {
                         meters.get().unwrap().lock().unwrap().set_mem_index(
                             name.clone(),
                             MeterUnion::Meter(Meter::new(
-                                mem.get()
-                                    .unwrap()
-                                    .lock()
-                                    .unwrap()
-                                    .get_percent_index(name.clone())
-                                    .unwrap_or(0) as i32,
+                                mem.get_percent_index(name.clone()).unwrap_or(0) as i32,
                                 self.get_mem_meter() as u32,
                                 name.clone(),
                                 false,
@@ -462,11 +451,7 @@ impl MemBox {
                                             .unwrap()
                                             .clone(),
                                     )),
-                                    mem.get()
-                                        .unwrap()
-                                        .lock()
-                                        .unwrap()
-                                        .get_vlist_index(name.clone())
+                                    mem.get_vlist_index(name.clone())
                                         .unwrap_or(vec![])
                                         .iter()
                                         .map(|u| u.to_owned() as i32)
@@ -484,12 +469,8 @@ impl MemBox {
                             meters.get().unwrap().lock().unwrap().set_disks_used_index(
                                 "__swap".to_owned(),
                                 Meter::new(
-                                    mem.get()
-                                        .unwrap()
-                                        .lock()
-                                        .unwrap()
-                                        .get_swap_percent_index("used".to_owned())
-                                        .unwrap_or(0) as i32,
+                                    mem.get_swap_percent_index("used".to_owned()).unwrap_or(0)
+                                        as i32,
                                     self.get_disk_meter() as u32,
                                     "used".to_owned(),
                                     false,
@@ -497,18 +478,11 @@ impl MemBox {
                                     term,
                                 ),
                             );
-                            if mem.get().unwrap().lock().unwrap().get_disks().len() * 3
-                                <= h as usize + 1
-                            {
+                            if mem.get_disks().len() * 3 <= h as usize + 1 {
                                 meters.get().unwrap().lock().unwrap().set_disks_free_index(
                                     "__swap".to_owned(),
                                     Meter::new(
-                                        mem.get()
-                                            .unwrap()
-                                            .lock()
-                                            .unwrap()
-                                            .get_swap_percent_index("free".to_owned())
-                                            .unwrap_or(0)
+                                        mem.get_swap_percent_index("free".to_owned()).unwrap_or(0)
                                             as i32,
                                         self.get_mem_meter() as u32,
                                         "free".to_owned(),
@@ -523,12 +497,7 @@ impl MemBox {
                             meters.get().unwrap().lock().unwrap().set_swap_index(
                                 name.clone(),
                                 MeterUnion::Meter(Meter::new(
-                                    mem.get()
-                                        .unwrap()
-                                        .lock()
-                                        .unwrap()
-                                        .get_swap_percent_index(name.clone())
-                                        .unwrap_or(0) as i32,
+                                    mem.get_swap_percent_index(name.clone()).unwrap_or(0) as i32,
                                     self.get_mem_meter() as u32,
                                     name,
                                     false,
@@ -541,15 +510,7 @@ impl MemBox {
                 }
             }
             if self.get_disk_meter() > 0 {
-                for (n, name) in mem
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .get_disks()
-                    .keys()
-                    .enumerate()
-                {
+                for (n, name) in mem.get_disks().keys().enumerate() {
                     if n * 2 > h as usize {
                         break;
                     }
@@ -557,10 +518,6 @@ impl MemBox {
                         name.clone(),
                         Meter::new(
                             match mem
-                                .get()
-                                .unwrap()
-                                .lock()
-                                .unwrap()
                                 .get_disks_inner_index(name.clone(), "used_percent".to_owned())
                                 .unwrap_or(DiskInfo::U64(0))
                             {
@@ -576,15 +533,11 @@ impl MemBox {
                             term,
                         ),
                     );
-                    if mem.get().unwrap().lock().unwrap().get_disks().len() * 3 <= h as usize + 1 {
+                    if mem.get_disks().len() * 3 <= h as usize + 1 {
                         meters.get().unwrap().lock().unwrap().set_disks_free_index(
                             name.clone(),
                             Meter::new(
                                 match mem
-                                    .get()
-                                    .unwrap()
-                                    .lock()
-                                    .unwrap()
                                     .get_disks_inner_index(name.clone(), "free_percent".to_owned())
                                     .unwrap_or(DiskInfo::U64(0))
                                 {
@@ -739,13 +692,7 @@ impl MemBox {
                     .as_str(),
                 );
             }
-            if collector
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .get_collect_interrupt()
-            {
+            if collector.get_collect_interrupt() {
                 return;
             }
             draw.get().unwrap().lock().unwrap().buffer(
@@ -769,10 +716,7 @@ impl MemBox {
                 mv::to(y as u32, x as u32 + 1),
                 THEME.get().unwrap().lock().unwrap().colors.title,
                 fx::b,
-                mem.get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
+                mem
                     .get_string_index("total".to_owned())
                     .unwrap_or(String::default()),
                 fx::ub,
@@ -823,13 +767,7 @@ impl MemBox {
 
         let big_mem: bool = false;
         for name in self.get_mem_names() {
-            if collector
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .get_collect_interrupt()
-            {
+            if collector.get_collect_interrupt() {
                 return;
             }
             if self.get_mem_size() > 2 {
@@ -846,10 +784,6 @@ impl MemBox {
                                 x as i32 + cx as i32 + self.get_mem_width() as i32
                                     - 3
                                     - mem
-                                        .get()
-                                        .unwrap()
-                                        .lock()
-                                        .unwrap()
                                         .get_string_index(name.clone())
                                         .unwrap_or(String::default())
                                         .len() as i32
@@ -857,10 +791,7 @@ impl MemBox {
                             .unwrap_or(0)
                         ),
                         Fx::trans(
-                            mem.get()
-                                .unwrap()
-                                .lock()
-                                .unwrap()
+                            mem
                                 .get_string_index(name.clone())
                                 .unwrap_or(String::default())
                         ),
@@ -881,10 +812,7 @@ impl MemBox {
                                         None
                                     } else {
                                         Some(
-                                            mem.get()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
+                                            mem
                                                 .get_percent_index(name.clone())
                                                 .unwrap_or(0)
                                                 as i32,
@@ -907,10 +835,7 @@ impl MemBox {
                                         None
                                     } else {
                                         Some(
-                                            mem.get()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
+                                            mem
                                                 .get_percent_index(name.clone())
                                                 .unwrap_or(0)
                                                 as i32,
@@ -928,10 +853,7 @@ impl MemBox {
                             }
                         },
                         gmv,
-                        mem.get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
+                        mem
                             .get_percent_index(name.clone())
                             .unwrap_or(0)
                             .to_string()
@@ -969,10 +891,7 @@ impl MemBox {
                                         None
                                     } else {
                                         Some(
-                                            mem.get()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
+                                            mem
                                                 .get_percent_index(name.clone())
                                                 .unwrap_or(0)
                                                 as i32,
@@ -988,10 +907,7 @@ impl MemBox {
                                         None
                                     } else {
                                         Some(
-                                            mem.get()
-                                                .unwrap()
-                                                .lock()
-                                                .unwrap()
+                                            mem
                                                 .get_percent_index(name.clone())
                                                 .unwrap_or(0)
                                                 as i32,
@@ -1002,10 +918,6 @@ impl MemBox {
                             }
                         },
                         match mem
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
                             .get_string_index(name.clone())
                         {
                             Some(s) => (s.clone()[if mem_check {
@@ -1038,7 +950,7 @@ impl MemBox {
         if self.get_swap_on()
             && CONFIG.get().unwrap().lock().unwrap().show_swap
             && !CONFIG.get().unwrap().lock().unwrap().swap_disk
-            && mem.get().unwrap().lock().unwrap().get_swap_string().len() > 0
+            && mem.get_swap_string().len() > 0
         {
             if h - cy > 5 {
                 out.push_str(format!("{}{}", mv::to(y + cy, x + cx), gli).as_str());
@@ -1050,10 +962,7 @@ impl MemBox {
                     mv::to(y + cy, x + cx),
                     THEME.get().unwrap().lock().unwrap().colors.title,
                     fx::b,
-                    mem.get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
+                    mem
                         .get_swap_string_index("total".to_owned())
                         .unwrap_or(String::default()),
                     fx::ub,
@@ -1064,13 +973,7 @@ impl MemBox {
             );
             cy += 1;
             for name in self.get_swap_names() {
-                if collector
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .get_collect_interrupt()
-                {
+                if collector.get_collect_interrupt() {
                     return;
                 }
                 if self.get_mem_size() > 2 {
@@ -1087,10 +990,6 @@ impl MemBox {
                                     x as i32 + cx as i32 + self.get_mem_width() as i32
                                         - 3
                                         - mem
-                                            .get()
-                                            .unwrap()
-                                            .lock()
-                                            .unwrap()
                                             .get_swap_string_index(name.clone())
                                             .unwrap_or(String::default())
                                             .len() as i32
@@ -1098,10 +997,7 @@ impl MemBox {
                                 .unwrap_or(0)
                             ),
                             Fx::trans(
-                                mem.get()
-                                    .unwrap()
-                                    .lock()
-                                    .unwrap()
+                                mem
                                     .get_swap_string_index(name.clone())
                                     .unwrap_or(String::default())
                             ),
@@ -1122,10 +1018,7 @@ impl MemBox {
                                             None
                                         } else {
                                             Some(
-                                                mem.get()
-                                                    .unwrap()
-                                                    .lock()
-                                                    .unwrap()
+                                                mem
                                                     .get_swap_percent_index(name.clone())
                                                     .unwrap_or(0)
                                                     as i32,
@@ -1141,10 +1034,7 @@ impl MemBox {
                                             None
                                         } else {
                                             Some(
-                                                mem.get()
-                                                    .unwrap()
-                                                    .lock()
-                                                    .unwrap()
+                                                mem
                                                     .get_swap_percent_index(name.clone())
                                                     .unwrap_or(0)
                                                     as i32,
@@ -1155,10 +1045,7 @@ impl MemBox {
                                 }
                             },
                             gmv,
-                            mem.get()
-                                .unwrap()
-                                .lock()
-                                .unwrap()
+                            mem
                                 .get_swap_percent_index(name.clone())
                                 .unwrap_or(0)
                                 .to_string()
@@ -1196,10 +1083,7 @@ impl MemBox {
                                             None
                                         } else {
                                             Some(
-                                                mem.get()
-                                                    .unwrap()
-                                                    .lock()
-                                                    .unwrap()
+                                                mem
                                                     .get_percent_index(name.clone())
                                                     .unwrap_or(0)
                                                     as i32,
@@ -1220,10 +1104,7 @@ impl MemBox {
                                             None
                                         } else {
                                             Some(
-                                                mem.get()
-                                                    .unwrap()
-                                                    .lock()
-                                                    .unwrap()
+                                                mem
                                                     .get_percent_index(name.clone())
                                                     .unwrap_or(0)
                                                     as i32,
@@ -1239,10 +1120,6 @@ impl MemBox {
                                 }
                             },
                             match mem
-                                .get()
-                                .unwrap()
-                                .lock()
-                                .unwrap()
                                 .get_swap_string_index(name.clone())
                             {
                                 Some(s) => s.clone()[if mem_check {
@@ -1277,9 +1154,7 @@ impl MemBox {
         }
 
         // * Disks
-        if CONFIG.get().unwrap().lock().unwrap().show_disks
-            && mem.get().unwrap().lock().unwrap().get_disks().len() > 0
-        {
+        if CONFIG.get().unwrap().lock().unwrap().show_disks && mem.get_disks().len() > 0 {
             cx = u32::try_from(x as i32 + self.mem_width as i32 - 1).unwrap_or(0);
             cy = 0;
             let mut big_disk: bool = self.get_disks_width() >= 25;
@@ -1294,14 +1169,8 @@ impl MemBox {
                 mv::left(u32::try_from(self.get_disks_width() as i32 - 1).unwrap_or(0)),
             );
 
-            for (name, item) in mem.get().unwrap().lock().unwrap().get_disks() {
-                if collector
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .get_collect_interrupt()
-                {
+            for (name, item) in mem.get_disks() {
+                if collector.get_collect_interrupt() {
                     return;
                 }
                 if !meters
@@ -1396,7 +1265,7 @@ impl MemBox {
                 );
                 cy += 2;
 
-                if mem.get().unwrap().lock().unwrap().get_disks().len() as u32 * 3 <= h + 1 {
+                if mem.get_disks().len() as u32 * 3 <= h + 1 {
                     if cy > h - 1 {
                         break;
                     }
@@ -1430,7 +1299,7 @@ impl MemBox {
                         .as_str(),
                     );
                     cy += 1;
-                    if mem.get().unwrap().lock().unwrap().get_disks().len() as u32 * 4 <= h + 1 {
+                    if mem.get_disks().len() as u32 * 4 <= h + 1 {
                         cy += 1;
                     }
                 }

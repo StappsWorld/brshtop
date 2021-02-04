@@ -124,12 +124,7 @@ impl NetBox {
         self.set_redraw(true);
     }
 
-    pub fn draw_bg(
-        &self,
-        theme: &OnceCell<Mutex<Theme>>,
-        term: &OnceCell<Mutex<Term>>,
-        passable_self: &OnceCell<Mutex<NetBox>>,
-    ) -> String {
+    pub fn draw_bg(&self, theme: &OnceCell<Mutex<Theme>>, term: &OnceCell<Mutex<Term>>) -> String {
         if self.parent.get_proc_mode() {
             return String::default();
         }
@@ -151,7 +146,7 @@ impl NetBox {
                 None,
                 None,
                 None,
-                Some(passable_self),
+                Some(self),
                 None,
             ),
             create_box(
@@ -170,7 +165,7 @@ impl NetBox {
                 None,
                 None,
                 None,
-                Some(passable_self),
+                Some(self),
                 None,
             )
         )
@@ -185,17 +180,16 @@ impl NetBox {
         draw: &OnceCell<Mutex<Draw>>,
         graphs: &OnceCell<Mutex<Graphs>>,
         menu: &OnceCell<Mutex<Menu>>,
-        net: &OnceCell<Mutex<NetCollector>>,
-        passable_self: &OnceCell<Mutex<NetBox>>,
+        net: &mut NetCollector,
     ) {
         if self.get_parent().get_proc_mode() {
             return;
         }
 
-        if net.get().unwrap().lock().unwrap().get_parent().get_redraw() {
+        if net.get_parent().get_redraw() {
             self.redraw = true;
         }
-        if net.get().unwrap().lock().unwrap().nic.is_none() {
+        if net.nic.is_none() {
             return;
         }
 
@@ -209,32 +203,19 @@ impl NetBox {
         let by: u32 = self.get_sub().get_box_y() + 1;
         let bw: u32 = u32::try_from(self.get_sub().get_box_width() as i32 - 2).unwrap_or(0);
         let bh: u32 = u32::try_from(self.get_sub().get_box_height() as i32 - 2).unwrap_or(0);
-        let nic_name: String = net
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .nic
-            .unwrap()
-            .name()
-            .to_owned();
-        let reset: bool = match net
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .get_stats_inner_inner_index(
-                nic_name.clone(),
-                "download".to_owned(),
-                "offset".to_owned(),
-            ) {
+        let nic_name: String = net.nic.unwrap().name().to_owned();
+        let reset: bool = match net.get_stats_inner_inner_index(
+            nic_name.clone(),
+            "download".to_owned(),
+            "offset".to_owned(),
+        ) {
             NetCollectorStat::Bool(b) => b,
             NetCollectorStat::I32(i) => i > 0,
             NetCollectorStat::U64(u) => u > 0,
             NetCollectorStat::Vec(v) => v.len() > 0,
             NetCollectorStat::String(s) => {
                 errlog(format!(
-                    "Malformed type in net.get().unwrap().lock().unwrap().stats[{}]['download']['offset']",
+                    "Malformed type in net.stats[{}]['download']['offset']",
                     nic_name
                 ));
                 s.parse::<i64>().unwrap_or(0) > 0
@@ -242,7 +223,7 @@ impl NetBox {
         };
 
         if self.get_parent().get_resized() || self.get_redraw() {
-            out_misc.push_str(self.draw_bg(theme, term, passable_self).as_str());
+            out_misc.push_str(self.draw_bg(theme, term).as_str());
             if key
                 .get()
                 .unwrap()
@@ -414,11 +395,7 @@ impl NetBox {
                             .colors
                             .net_box
                             .call(symbol::title_left.to_owned(), term),
-                        if net.get().unwrap().lock().unwrap().get_auto_min() {
-                            fx::b
-                        } else {
-                            ""
-                        },
+                        if net.get_auto_min() { fx::b } else { "" },
                         theme
                             .get()
                             .unwrap()
@@ -489,11 +466,7 @@ impl NetBox {
                             .colors
                             .net_box
                             .call(symbol::title_left.to_owned(), term),
-                        if net.get().unwrap().lock().unwrap().get_auto_min() {
-                            fx::b
-                        } else {
-                            ""
-                        },
+                        if net.get_auto_min() { fx::b } else { "" },
                         theme
                             .get()
                             .unwrap()
@@ -630,17 +603,9 @@ impl NetBox {
             .collect::<Vec<String>>()
         {
             let mut strings = net
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
                 .get_strings_inner_index(nic_name.clone(), direction.clone())
                 .unwrap();
             let mut stats = net
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
                 .get_stats_inner_index(nic_name.clone(), direction.clone())
                 .unwrap();
 
@@ -684,7 +649,7 @@ impl NetBox {
                         term,
                         direction != "download".to_owned(),
                         if CONFIG.get().unwrap().lock().unwrap().net_sync {
-                            net.get().unwrap().lock().unwrap().get_sync_top()
+                            net.get_sync_top()
                         } else {
                             match stats.get(&"graph_top".to_owned()).unwrap() {
                                 NetCollectorStat::Bool(b) => {
@@ -705,14 +670,7 @@ impl NetBox {
                         },
                         0,
                         if CONFIG.get().unwrap().lock().unwrap().net_color_fixed {
-                            Some(
-                                net.get()
-                                    .unwrap()
-                                    .lock()
-                                    .unwrap()
-                                    .get_net_min_index(direction.clone())
-                                    .unwrap(),
-                            )
+                            Some(net.get_net_min_index(direction.clone()).unwrap())
                         } else {
                             None
                         },
@@ -822,16 +780,8 @@ impl NetBox {
                 }
             }
             stats.insert("redraw".to_owned(), NetCollectorStat::Bool(false));
-            net.get().unwrap().lock().unwrap().set_strings_inner_index(
-                nic_name.clone(),
-                direction.clone(),
-                strings.clone(),
-            );
-            net.get().unwrap().lock().unwrap().set_stats_inner_index(
-                nic_name.clone(),
-                direction.clone(),
-                stats.clone(),
-            );
+            net.set_strings_inner_index(nic_name.clone(), direction.clone(), strings.clone());
+            net.set_stats_inner_index(nic_name.clone(), direction.clone(), stats.clone());
         }
 
         out.push_str(
@@ -840,34 +790,26 @@ impl NetBox {
                 mv::to(y, x),
                 theme.get().unwrap().lock().unwrap().colors.graph_text.call(
                     if CONFIG.get().unwrap().lock().unwrap().net_sync {
-                        net.get().unwrap().lock().unwrap().get_sync_string()
+                        net.get_sync_string()
                     } else {
-                        net.get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .get_strings_inner_inner_index(
-                                nic_name.clone(),
-                                "download".to_owned(),
-                                "graph_top".to_owned(),
-                            )
+                        net.get_strings_inner_inner_index(
+                            nic_name.clone(),
+                            "download".to_owned(),
+                            "graph_top".to_owned(),
+                        )
                     },
                     term
                 ),
                 mv::to(u32::try_from(y as i32 + h as i32 - 1).unwrap_or(0), x),
                 theme.get().unwrap().lock().unwrap().colors.graph_text.call(
                     if CONFIG.get().unwrap().lock().unwrap().net_sync {
-                        net.get().unwrap().lock().unwrap().get_sync_string()
+                        net.get_sync_string()
                     } else {
-                        net.get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .get_strings_inner_inner_index(
-                                nic_name.clone(),
-                                "upload".to_owned(),
-                                "graph_top".to_owned(),
-                            )
+                        net.get_strings_inner_inner_index(
+                            nic_name.clone(),
+                            "upload".to_owned(),
+                            "graph_top".to_owned(),
+                        )
                     },
                     term
                 ),

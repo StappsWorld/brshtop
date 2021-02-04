@@ -117,7 +117,7 @@ impl<'a> ProcBox {
         self.parent.set_resized(true);
     }
 
-    pub fn draw_bg(&self, theme: &OnceCell<Mutex<Theme>>, term : &OnceCell<Mutex<Term>>, passable_self : &OnceCell<Mutex<ProcBox>>) -> String {
+    pub fn draw_bg(&self, theme: &OnceCell<Mutex<Theme>>, term : &OnceCell<Mutex<Term>>) -> String {
         if self.parent.get_stat_mode() {
             return String::default();
         }
@@ -138,7 +138,7 @@ impl<'a> ProcBox {
             None,
             None,
             None,
-            Some(passable_self),
+            Some(self),
         );
     }
 
@@ -281,18 +281,18 @@ impl<'a> ProcBox {
         graphs: &OnceCell<Mutex<Graphs>>,
         term: &OnceCell<Mutex<Term>>,
         draw : &OnceCell<Mutex<Draw>>,
-        proc : &OnceCell<Mutex<ProcCollector>>,
+        proc : &ProcCollector,
         menu : &OnceCell<Mutex<Menu>>,
     ) {
         if self.parent.get_stat_mode() {
             return;
         }
 
-        if proc.get().unwrap().lock().unwrap().parent.get_proc_interrupt() {
+        if proc.parent.get_proc_interrupt() {
             return;
         }
 
-        if proc.get().unwrap().lock().unwrap().parent.get_redraw() {
+        if proc.parent.get_redraw() {
             self.redraw = true;
         }
 
@@ -329,17 +329,17 @@ impl<'a> ProcBox {
         let mut g_color: String = String::default();
         let mut s_len: usize = 0;
 
-        if proc.get().unwrap().lock().unwrap().search_filter.len() > 0 {
-            s_len = proc.get().unwrap().lock().unwrap().search_filter[..10].len();
+        if proc.search_filter.len() > 0 {
+            s_len = proc.search_filter[..10].len();
         }
         let mut loc_string: String = format!(
             "{}/{}",
             self.start + self.selected as i32 - 1,
-            proc.get().unwrap().lock().unwrap().num_procs
+            proc.num_procs
         );
         let mut end: String = String::default();
 
-        if proc.get().unwrap().lock().unwrap().detailed {
+        if proc.detailed {
             dgx = x;
             dgw = w / 3;
             dw = w - dgw - 1;
@@ -355,7 +355,7 @@ impl<'a> ProcBox {
         if w > 67 {
             arg_len = (w
                 - 53
-                - if proc.get().unwrap().lock().unwrap().num_procs > self.select_max as u32 {
+                - if proc.num_procs > self.select_max as u32 {
                     1
                 } else {
                     0
@@ -365,7 +365,7 @@ impl<'a> ProcBox {
             arg_len = 0;
             prog_len = (w
                 - 38
-                - if proc.get().unwrap().lock().unwrap().num_procs > self.select_max as u32 {
+                - if proc.num_procs > self.select_max as u32 {
                     1
                 } else {
                     0
@@ -389,7 +389,7 @@ impl<'a> ProcBox {
         // * Buttons and titles only redrawn if needed
         if self.parent.get_resized() || self.redraw {
             s_len += CONFIG.get().unwrap().lock().unwrap().proc_sorting.to_string().len();
-            if self.parent.get_resized() || s_len != self.s_len || proc.get().unwrap().lock().unwrap().detailed {
+            if self.parent.get_resized() || s_len != self.s_len || proc.detailed {
                 self.s_len = s_len;
                 for k in [
                     "e", "r", "c", "t", "k", "i", "enter", "left", " ", "f", "delete",
@@ -403,8 +403,8 @@ impl<'a> ProcBox {
                     }
                 }
             }
-            if proc.get().unwrap().lock().unwrap().detailed {
-                let mut killed: bool = match proc.get().unwrap().lock().unwrap().details[&"killed".to_owned()] {
+            if proc.detailed {
+                let mut killed: bool = match proc.details[&"killed".to_owned()] {
                     ProcCollectorDetails::Bool(b) => b,
                     _ => {
                         errlog("ProcCollectorDetails contained non-numeric value for 'killed'".to_owned());
@@ -488,7 +488,7 @@ impl<'a> ProcBox {
                         THEME.get().unwrap().lock().unwrap()
                             .colors
                             .title
-                            .call(proc.get().unwrap().lock().unwrap().details[&"pid".to_owned()].to_string(), term),
+                            .call(proc.details[&"pid".to_owned()].to_string(), term),
                         fx::ub,
                         THEME.get().unwrap().lock().unwrap()
                             .colors
@@ -500,7 +500,7 @@ impl<'a> ProcBox {
                             .call(symbol::title_left.to_owned(), term),
                         fx::b,
                         THEME.get().unwrap().lock().unwrap().colors.title.call(
-                            proc.get().unwrap().lock().unwrap().details[&"name".to_owned()].to_string()[..dgw as usize - 11].to_owned(),
+                            proc.details[&"name".to_owned()].to_string()[..dgw as usize - 11].to_owned(),
                             term
                         ),
                         fx::ub,
@@ -650,7 +650,7 @@ impl<'a> ProcBox {
                         (dgw + 1) as i32,
                         7,
                         Some(ColorSwitch::VecString(THEME.get().unwrap().lock().unwrap().gradient.get(&"cpu".to_owned()).unwrap().clone())),
-                        proc.get().unwrap().lock().unwrap().details_cpu.iter().map(|i| i.to_owned() as i32).collect(),
+                        proc.details_cpu.iter().map(|i| i.to_owned() as i32).collect(),
                         term,
                         false,
                         0,
@@ -661,7 +661,7 @@ impl<'a> ProcBox {
                         (dw / 3) as i32,
                         1,
                         None,
-                        proc.get().unwrap().lock().unwrap().details_mem.iter().map(|i| i.to_owned() as i32).collect(),
+                        proc.details_mem.iter().map(|i| i.to_owned() as i32).collect(),
                         term,
                         false,
                         0,
@@ -729,7 +729,7 @@ impl<'a> ProcBox {
             out_misc.push_str(format!("{}{}{}{}{}{}{} {} {}{}{}",
                     mv::to(y - 1, x + 8),
                     THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::h_line.repeat(w as usize - 9).to_owned(), term),
-                    if !proc.get().unwrap().lock().unwrap().detailed {
+                    if !proc.detailed {
                         "".to_owned()
                     } else {
                         format!("{}{}", 
@@ -813,7 +813,7 @@ impl<'a> ProcBox {
                 if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"c".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
-                    for i in 0.. if proc.get().unwrap().lock().unwrap().search_filter.len() == 0 {6} else {2 + proc.get().unwrap().lock().unwrap().search_filter[(proc.get().unwrap().lock().unwrap().search_filter.len() - 11)..].len()} {
+                    for i in 0.. if proc.search_filter.len() == 0 {6} else {2 + proc.search_filter[(proc.search_filter.len() - 11)..].len()} {
                         let mut pusher: Vec<i32> = Vec::<i32>::new();
                         pusher.push((sort_pos - 24) as i32 + i as i32);
                         pusher.push(y as i32 - 1);
@@ -843,7 +843,7 @@ impl<'a> ProcBox {
             if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"f".to_owned()) || self.parent.get_resized() {
                 let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
-                    for i in 0.. if proc.get().unwrap().lock().unwrap().search_filter.len() == 0 {6} else {2 + proc.get().unwrap().lock().unwrap().search_filter[(proc.get().unwrap().lock().unwrap().search_filter.len() - 11)..].len()} {
+                    for i in 0.. if proc.search_filter.len() == 0 {6} else {2 + proc.search_filter[(proc.search_filter.len() - 11)..].len()} {
                         let mut pusher: Vec<i32> = Vec::<i32>::new();
                         pusher.push((x + 5) as i32 + i as i32);
                         pusher.push(y as i32 - 1);
@@ -852,13 +852,13 @@ impl<'a> ProcBox {
 
                     key.get().unwrap().lock().unwrap().mouse.insert("f".to_owned(), top.clone());
             }
-            if proc.get().unwrap().lock().unwrap().search_filter.len() > 0 {
+            if proc.search_filter.len() > 0 {
                 if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"delete".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..3 {
                         let mut pusher: Vec<i32> = Vec::<i32>::new();
-                        pusher.push((x + 11 + proc.get().unwrap().lock().unwrap().search_filter[(proc.get().unwrap().lock().unwrap().search_filter.len() - 11)..].len() as u32) as i32 + i);
+                        pusher.push((x + 11 + proc.search_filter[(proc.search_filter.len() - 11)..].len() as u32) as i32 + i);
                         pusher.push(y as i32 - 1);
                         top.push(pusher);
                     }
@@ -872,18 +872,18 @@ impl<'a> ProcBox {
             out_misc.push_str(format!("{}{}{}{}{}{}{}",
                     mv::to(y - 1, x + 7),
                     THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
-                    if self.filtering || proc.get().unwrap().lock().unwrap().search_filter.len() > 0 {
+                    if self.filtering || proc.search_filter.len() > 0 {
                         fx::b
                     } else {
                         ""
                     },
                     THEME.get().unwrap().lock().unwrap().colors.hi_fg.call("f".to_owned(), term),
                     THEME.get().unwrap().lock().unwrap().colors.title,
-                    if proc.get().unwrap().lock().unwrap().search_filter.len() == 0 && !self.filtering {
+                    if proc.search_filter.len() == 0 && !self.filtering {
                         "ilter".to_owned()
                     } else {
                         let adder = if w < 83 {10} else {w as usize - 74};
-                        let proc_insert : String = proc.get().unwrap().lock().unwrap().search_filter[proc.get().unwrap().lock().unwrap().search_filter.len() - 1 + adder..].to_owned();
+                        let proc_insert : String = proc.search_filter[proc.search_filter.len() - 1 + adder..].to_owned();
                         format!(" {}{}",
                             proc_insert,
                             if self.filtering {
@@ -1126,7 +1126,7 @@ impl<'a> ProcBox {
                     "Cpu%",
                     fx::ub,
                     THEME.get().unwrap().lock().unwrap().colors.main_fg,
-                    if proc.get().unwrap().lock().unwrap().num_procs > self.select_max as u32 {
+                    if proc.num_procs > self.select_max as u32 {
                         " "
                     } else {
                         ""
@@ -1148,8 +1148,8 @@ impl<'a> ProcBox {
         }
 
         // * Detailed box draw
-        if proc.get().unwrap().lock().unwrap().detailed {
-            let mut stat_color : String = match proc.get().unwrap().lock().unwrap().details[&"status".to_owned()] {
+        if proc.detailed {
+            let mut stat_color : String = match proc.details[&"status".to_owned()] {
                 ProcCollectorDetails::Status(s) => match s {
                     Status::Running => fx::b.to_owned(),
                     Status::Dead => THEME.get().unwrap().lock().unwrap().colors.inactive_fg.to_string(),
@@ -1162,42 +1162,42 @@ impl<'a> ProcBox {
                     String::default()
                 },
             };
-            let expand : u32 = proc.get().unwrap().lock().unwrap().expand;
+            let expand : u32 = proc.expand;
             let iw : u32 = (dw - 3) / (4 + expand);
             let iw2 : u32 = iw - 1;
 
             out.push_str(format!("{}{}{}{}{}%{}{}{}",
                     mv::to(dy, dgx),
                     graphs.get().unwrap().lock().unwrap().detailed_cpu.call(
-                        if self.moved || match proc.get().unwrap().lock().unwrap().details[&"killed".to_owned()] {
+                        if self.moved || match proc.details[&"killed".to_owned()] {
                             ProcCollectorDetails::Bool(b) => b,
                             _ => {
-                                errlog("Wrong ProcCollectorDetails type from proc.get().unwrap().lock().unwrap().details['killed']".to_owned());
+                                errlog("Wrong ProcCollectorDetails type from proc.details['killed']".to_owned());
                                 false
                             },
                         } {
                             None
                         } else {
-                            Some(proc.get().unwrap().lock().unwrap().details_cpu[proc.get().unwrap().lock().unwrap().details_cpu.len() - 2] as i32)
+                            Some(proc.details_cpu[proc.details_cpu.len() - 2] as i32)
                         }, 
                         term
                     ),
                     mv::to(dy , dgx),
                     THEME.get().unwrap().lock().unwrap().colors.title,
                     fx::b,
-                    if match proc.get().unwrap().lock().unwrap().details[&"killed".to_owned()] {
+                    if match proc.details[&"killed".to_owned()] {
                         ProcCollectorDetails::Bool(b) => b,
                         _ => {
-                            errlog("Wrong ProcCollectorDetails type from proc.get().unwrap().lock().unwrap().details['killed']".to_owned());
+                            errlog("Wrong ProcCollectorDetails type from proc.details['killed']".to_owned());
                             false
                         },
                     } {
                         0
                     } else {
-                        match proc.get().unwrap().lock().unwrap().details[&"cpu_percent".to_owned()] {
+                        match proc.details[&"cpu_percent".to_owned()] {
                             ProcCollectorDetails::U32(u) => u,
                             _ => {
-                                errlog("Wrong ProcCollectorDetails type from proc.get().unwrap().lock().unwrap().details['cpu_percent']".to_owned());
+                                errlog("Wrong ProcCollectorDetails type from proc.details['cpu_percent']".to_owned());
                                 0
                             },
                         }
@@ -1211,7 +1211,7 @@ impl<'a> ProcBox {
                         } else {
                             "Core"
                         }
-                    }).to_owned() + proc.get().unwrap().lock().unwrap().details[&"cpu_name".to_owned()].to_string().as_str(),
+                    }).to_owned() + proc.details[&"cpu_name".to_owned()].to_string().as_str(),
                 )
                 .as_str()
             );
@@ -1224,7 +1224,7 @@ impl<'a> ProcBox {
             }
 
 
-            let inserter : String = proc.get().unwrap().lock().unwrap().details[&"terminal".to_owned()].to_string()[(proc.get().unwrap().lock().unwrap().details[&"terminal".to_owned()].to_string().len() - 1 - iw2 as usize)..].to_owned();
+            let inserter : String = proc.details[&"terminal".to_owned()].to_string()[(proc.details[&"terminal".to_owned()].to_string().len() - 1 - iw2 as usize)..].to_owned();
             let expand_4 = format!("{:^first$.second$}", inserter, first = iw as usize, second = iw2 as usize);
             
             
@@ -1272,37 +1272,37 @@ impl<'a> ProcBox {
                     fx::ub,
                     THEME.get().unwrap().lock().unwrap().colors.main_fg,
                     stat_color,
-                    proc.get().unwrap().lock().unwrap().details[&"status".to_owned()],
+                    proc.details[&"status".to_owned()],
                     fx::ub,
                     THEME.get().unwrap().lock().unwrap().colors.main_fg,
-                    proc.get().unwrap().lock().unwrap().details[&"uptime".to_owned()],
+                    proc.details[&"uptime".to_owned()],
                     if dw > 28 {
-                        format!("{:^first$.second$}", proc.get().unwrap().lock().unwrap().details[&"parent_name".to_owned()], first = iw as usize, second = iw2 as usize)
+                        format!("{:^first$.second$}", proc.details[&"parent_name".to_owned()], first = iw as usize, second = iw2 as usize)
                     } else {
                         String::default()
                     },
                     if dw > 38 {
-                        format!("{:^first$.second$}", proc.get().unwrap().lock().unwrap().details[&"username".to_owned()], first = iw as usize, second = iw2 as usize)
+                        format!("{:^first$.second$}", proc.details[&"username".to_owned()], first = iw as usize, second = iw2 as usize)
                     } else {
                         String::default()
                     },
                     if expand > 0 {
-                        format!("{:^first$.second$}", proc.get().unwrap().lock().unwrap().details[&"threads".to_owned()], first = iw as usize, second = iw2 as usize)
+                        format!("{:^first$.second$}", proc.details[&"threads".to_owned()], first = iw as usize, second = iw2 as usize)
                     } else {
                         String::default()
                     },
                     if expand > 1 {
-                        format!("{:^first$.second$}", proc.get().unwrap().lock().unwrap().details[&"nice".to_owned()], first = iw as usize, second = iw2 as usize)
+                        format!("{:^first$.second$}", proc.details[&"nice".to_owned()], first = iw as usize, second = iw2 as usize)
                     } else {
                         String::default()
                     },
                     if expand > 2 {
-                        format!("{:^first$.second$}", proc.get().unwrap().lock().unwrap().details[&"io_read".to_owned()], first = iw as usize, second = iw2 as usize)
+                        format!("{:^first$.second$}", proc.details[&"io_read".to_owned()], first = iw as usize, second = iw2 as usize)
                     } else {
                         String::default()
                     },
                     if expand > 3 {
-                        format!("{:^first$.second$}", proc.get().unwrap().lock().unwrap().details[&"io_write".to_owned()], first = iw as usize, second = iw2 as usize)
+                        format!("{:^first$.second$}", proc.details[&"io_write".to_owned()], first = iw as usize, second = iw2 as usize)
                     } else {
                         String::default()
                     },
@@ -1319,7 +1319,7 @@ impl<'a> ProcBox {
                             "Memory: "
                         } else {
                             "M:"
-                        }).to_owned() + proc.get().unwrap().lock().unwrap().details["memory_percent"].to_string().as_str() + "%",
+                        }).to_owned() + proc.details["memory_percent"].to_string().as_str() + "%",
                         width = (dw as usize / 3) - 1,
                     ),
                     fx::ub,
@@ -1333,7 +1333,7 @@ impl<'a> ProcBox {
                             None
                         } else {
                             Some(
-                                match proc.get().unwrap().lock().unwrap().details[&"memory_percent".to_owned()] {
+                                match proc.details[&"memory_percent".to_owned()] {
                                     ProcCollectorDetails::Bool(b) => if b {1} else {0},
                                     ProcCollectorDetails::U32(u) => u as i32,
                                     ProcCollectorDetails::F32(f) => f as i32,
@@ -1350,18 +1350,18 @@ impl<'a> ProcBox {
                     ),
                     THEME.get().unwrap().lock().unwrap().colors.title,
                     fx::b,
-                    format!("{:.width$}", proc.get().unwrap().lock().unwrap().details[&"memory_bytes".to_owned()], width = (dw as usize / 3) - 2),
+                    format!("{:.width$}", proc.details[&"memory_bytes".to_owned()], width = (dw as usize / 3) - 2),
                     THEME.get().unwrap().lock().unwrap().colors.main_fg,
                     fx::ub,
                 )
                 .as_str()
             );
 
-            let cmdline : String = match proc.get().unwrap().lock().unwrap().details.get(&"cmdline".to_owned()).unwrap() {
+            let cmdline : String = match proc.details.get(&"cmdline".to_owned()).unwrap() {
                 ProcCollectorDetails::String(s) => s.clone(),
                 ProcCollectorDetails::VecString(v) => v.clone().join(", ").clone(),
                 _ => {
-                    errlog("Wrong type in proc.get().unwrap().lock().unwrap().details['cmdline']".to_owned());
+                    errlog("Wrong type in proc.details['cmdline']".to_owned());
                     String::default()
                 },
             };
@@ -1454,16 +1454,16 @@ impl<'a> ProcBox {
         }
 
         // * Checking for selection out of bounds
-        if self.start > (proc.get().unwrap().lock().unwrap().num_procs - self.select_max as u32 + 1) as i32 && proc.get().unwrap().lock().unwrap().num_procs > self.select_max as u32 {
-            self.start = (proc.get().unwrap().lock().unwrap().num_procs - self.select_max as u32 + 1) as i32;
-        } else if self.start > proc.get().unwrap().lock().unwrap().num_procs as i32 {
-            self.start = proc.get().unwrap().lock().unwrap().num_procs as i32;
+        if self.start > (proc.num_procs - self.select_max as u32 + 1) as i32 && proc.num_procs > self.select_max as u32 {
+            self.start = (proc.num_procs - self.select_max as u32 + 1) as i32;
+        } else if self.start > proc.num_procs as i32 {
+            self.start = proc.num_procs as i32;
         }
         if self.start < 1 {
             self.start = 1;
         }
-        if self.selected as u32 > proc.get().unwrap().lock().unwrap().num_procs && proc.get().unwrap().lock().unwrap().num_procs < self.select_max as u32 {
-            self.selected = proc.get().unwrap().lock().unwrap().num_procs as usize;
+        if self.selected as u32 > proc.num_procs && proc.num_procs < self.select_max as u32 {
+            self.selected = proc.num_procs as usize;
         } else if self.selected > self.select_max {
             self.selected = self.select_max;
         }
@@ -1471,7 +1471,7 @@ impl<'a> ProcBox {
         // * Start iteration over all processes and info
         let mut cy: u32 = 1;
 
-        for (n, (pid, items)) in proc.get().unwrap().lock().unwrap().processes.iter().enumerate() {
+        for (n, (pid, items)) in proc.processes.iter().enumerate() {
             if (n as i32) < self.start {
                 continue;
             }
@@ -1703,7 +1703,7 @@ impl<'a> ProcBox {
                     } else {
                         format!("{cpu:>width$.*} ", 0, cpu = cpu, width = 5)
                     }.as_str() + end.as_str(),
-                    if proc.get().unwrap().lock().unwrap().num_procs > self.select_max as u32 {
+                    if proc.num_procs > self.select_max as u32 {
                         " "
                     } else {
                         ""
@@ -1722,7 +1722,7 @@ impl<'a> ProcBox {
             // * Draw small cpu graph for process if cpu usage was above 1% in the last 10 updates
             if graphs.get().unwrap().lock().unwrap().pid_cpu.contains_key(&pid) {
                 out.push_str(format!("{}{}{}{}",
-                        mv::to(y + cy, x + w - if proc.get().unwrap().lock().unwrap().num_procs > self.select_max as u32 {
+                        mv::to(y + cy, x + w - if proc.num_procs > self.select_max as u32 {
                             12
                         } else {
                             11
@@ -1749,7 +1749,7 @@ impl<'a> ProcBox {
                         term.get().unwrap().lock().unwrap().get_fg(),
                         term.get().unwrap().lock().unwrap().get_bg(),
                         mv::to(y + cy, x + w - 1),
-                        if proc.get().unwrap().lock().unwrap().num_procs > self.select_max as u32 {
+                        if proc.num_procs > self.select_max as u32 {
                             " "
                         } else {
                             ""
@@ -1771,7 +1771,7 @@ impl<'a> ProcBox {
         }
 
         // * Draw scrollbar if needed
-        if proc.get().unwrap().lock().unwrap().num_procs > self.select_max as u32 {
+        if proc.num_procs > self.select_max as u32 {
             if self.parent.get_resized() {
                 match key.get().unwrap().lock().unwrap().mouse.get(&"mouse_scroll_up".to_owned()) {
                     Some(_) => {
@@ -1806,8 +1806,8 @@ impl<'a> ProcBox {
                     }
                 };
             }
-            scroll_pos = (self.start * (self.select_max as i32 - 2) / (proc.get().unwrap().lock().unwrap().num_procs - (self.select_max as u32 - 2)) as i32) as u32;
-            if scroll_pos > h - 3 || self.start >= (proc.get().unwrap().lock().unwrap().num_procs - self.select_max as u32) as i32 {
+            scroll_pos = (self.start * (self.select_max as i32 - 2) / (proc.num_procs - (self.select_max as u32 - 2)) as i32) as u32;
+            if scroll_pos > h - 3 || self.start >= (proc.num_procs - self.select_max as u32) as i32 {
                 scroll_pos = h - 3;
             }
             out.push_str(format!("{}{}{}↑{}↓{}{}█",

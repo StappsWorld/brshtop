@@ -121,72 +121,56 @@ impl BrshtopBox {
     pub fn calc_sizes(
         &mut self,
         boxes: Vec<Boxes>,
-        term: &OnceCell<Mutex<Term>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        cpu: &OnceCell<Mutex<CpuCollector>>,
-        cpu_box: &OnceCell<Mutex<CpuBox>>,
-        mem_box: &OnceCell<Mutex<MemBox>>,
-        net_box: &OnceCell<Mutex<NetBox>>,
-        proc_box: &OnceCell<Mutex<ProcBox>>,
+        term_p: &OnceCell<Mutex<Term>>,
+        CONFIG_p: &OnceCell<Mutex<Config>>,
+        cpu_p: &OnceCell<Mutex<CpuCollector>>,
+        cpu_box_p: &OnceCell<Mutex<CpuBox>>,
+        mem_box_p: &OnceCell<Mutex<MemBox>>,
+        net_box_p: &OnceCell<Mutex<NetBox>>,
+        proc_box_p: &OnceCell<Mutex<ProcBox>>,
     ) {
+        let mut term = term_p.get().unwrap().lock().unwrap();
+        let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+        let mut cpu = cpu_p.get().unwrap().lock().unwrap();
+        let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
+        let mut mem_box = mem_box_p.get().unwrap().lock().unwrap();
+        let mut net_box = net_box_p.get().unwrap().lock().unwrap();
+        let mut proc_box = proc_box_p.get().unwrap().lock().unwrap();
+
         for sub in boxes {
             match sub {
                 Boxes::BrshtopBox => (),
                 Boxes::CpuBox => {
-                    self._b_cpu_h = cpu_box.get().unwrap().lock().unwrap().calc_size(
-                        term,
-                        self._b_cpu_h.clone(),
-                        cpu,
-                    );
-                    cpu_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .set_parent_resized(true);
+                    drop(term);
+                    self._b_cpu_h =
+                        cpu_box.calc_size(term_p, self._b_cpu_h.clone(), &cpu.to_owned());
+                    term = term_p.get().unwrap().lock().unwrap();
+                    cpu = cpu_p.get().unwrap().lock().unwrap();
+                    cpu_box.set_parent_resized(true);
                 }
                 Boxes::MemBox => {
                     let mut _b_mem_h_mutable: i32 = self._b_mem_h.clone();
-                    _b_mem_h_mutable = mem_box.get().unwrap().lock().unwrap().calc_size(
-                        term,
-                        _b_mem_h_mutable,
-                        self.get_b_cpu_h(),
-                        CONFIG,
-                    );
+                    drop(term);
+                    drop(CONFIG);
+                    _b_mem_h_mutable =
+                        mem_box.calc_size(term_p, _b_mem_h_mutable, self.get_b_cpu_h(), CONFIG_p);
+                    term = term_p.get().unwrap().lock().unwrap();
+                    CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+
                     self._b_mem_h = _b_mem_h_mutable.clone();
-                    mem_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .set_parent_resized(true);
+                    mem_box.set_parent_resized(true);
                 }
                 Boxes::NetBox => {
-                    net_box.get().unwrap().lock().unwrap().calc_size(
-                        term,
-                        self.get_b_cpu_h(),
-                        self.get_b_mem_h(),
-                    );
-                    net_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .set_parent_resized(true);
+                    drop(term);
+                    net_box.calc_size(term_p, self.get_b_cpu_h(), self.get_b_mem_h());
+                    term = term_p.get().unwrap().lock().unwrap();
+                    net_box.set_parent_resized(true);
                 }
                 Boxes::ProcBox => {
-                    proc_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .calc_size(term, self.get_b_cpu_h());
-                    proc_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .set_parent_resized(true);
+                    drop(term);
+                    proc_box.calc_size(term_p, self.get_b_cpu_h());
+                    term = term_p.get().unwrap().lock().unwrap();
+                    proc_box.set_parent_resized(true);
                 }
             }
         }
@@ -360,14 +344,22 @@ impl BrshtopBox {
     pub fn draw_clock(
         &mut self,
         force: bool,
-        term: &OnceCell<Mutex<Term>>,
-        config: &OnceCell<Mutex<Config>>,
-        theme: &OnceCell<Mutex<Theme>>,
-        menu: &OnceCell<Mutex<Menu>>,
-        cpu_box: &OnceCell<Mutex<CpuBox>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        key: &OnceCell<Mutex<Key>>,
+        term_p: &OnceCell<Mutex<Term>>,
+        config_p: &OnceCell<Mutex<Config>>,
+        theme_p: &OnceCell<Mutex<Theme>>,
+        menu_p: &OnceCell<Mutex<Menu>>,
+        cpu_box_p: &OnceCell<Mutex<CpuBox>>,
+        draw_p: &OnceCell<Mutex<Draw>>,
+        key_p: &OnceCell<Mutex<Key>>,
     ) {
+        let mut term = term_p.get().unwrap().lock().unwrap();
+        let mut config = config_p.get().unwrap().lock().unwrap();
+        let mut theme = theme_p.get().unwrap().lock().unwrap();
+        let mut menu = menu_p.get().unwrap().lock().unwrap();
+        let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
+        let mut draw = draw_p.get().unwrap().lock().unwrap();
+        let mut key = key_p.get().unwrap().lock().unwrap();
+
         let mut out: String = String::default();
 
         let system_time = SystemTime::now();
@@ -375,9 +367,9 @@ impl BrshtopBox {
 
         if !force
             && (!self.get_clock_on()
-                || term.get().unwrap().lock().unwrap().get_resized()
+                || term.get_resized()
                 || datetime
-                    .format(config.get().unwrap().lock().unwrap().draw_clock.as_str())
+                    .format(config.draw_clock.clone().as_str())
                     .to_string()
                     == self.get_clock())
         {
@@ -385,11 +377,11 @@ impl BrshtopBox {
         }
 
         let mut clock_string: String = datetime
-            .format(config.get().unwrap().lock().unwrap().draw_clock.as_str())
+            .format(config.draw_clock.clone().as_str())
             .to_string()
             .clone();
         self.clock = datetime
-            .format(config.get().unwrap().lock().unwrap().draw_clock.as_str())
+            .format(config.draw_clock.clone().as_str())
             .to_string()
             .clone();
         for (custom, value) in self.clock_custom_format.clone() {
@@ -398,110 +390,66 @@ impl BrshtopBox {
             }
         }
 
-        let clock_len = clock_string[..cpu_box
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .get_parent()
-            .get_width() as usize
-            - 56]
-            .len();
+        let clock_len = clock_string[..cpu_box.get_parent().get_width() as usize - 56].len();
 
-        if self.clock_len != clock_len as u32
-            && !cpu_box
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .get_parent()
-                .get_resized()
-        {
+        if self.clock_len != clock_len as u32 && !cpu_box.get_parent().get_resized() {
             out = format!(
                 "{}{}{}{}",
                 mv::to(
-                    cpu_box.get().unwrap().lock().unwrap().get_parent().get_y(),
-                    ((cpu_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .get_parent()
-                        .get_width())
-                        / 2) as u32
-                        - (clock_len / 2) as u32
+                    cpu_box.get_parent().get_y(),
+                    ((cpu_box.get_parent().get_width()) / 2) as u32 - (clock_len / 2) as u32
                 ),
                 fx::ub,
-                theme.get().unwrap().lock().unwrap().colors.cpu_box,
+                theme.colors.cpu_box,
                 symbol::h_line.repeat(self.clock_len as usize)
             );
         }
         self.clock_len = clock_len.clone() as u32;
-        let now: bool = if menu.get().unwrap().lock().unwrap().active {
-            false
-        } else {
-            !force
-        };
+        let now: bool = if menu.active { false } else { !force };
 
+        let inserter = term.get_fg();
+        drop(term);
         out.push_str(
             format!(
                 "{}{}{}{}{}{}{}{}{}{}",
                 mv::to(
-                    cpu_box.get().unwrap().lock().unwrap().get_parent().get_y(),
-                    (cpu_box
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .get_parent()
-                        .get_width()
-                        / 2) as u32
-                        - (clock_len / 2) as u32
+                    cpu_box.get_parent().get_y(),
+                    (cpu_box.get_parent().get_width() / 2) as u32 - (clock_len / 2) as u32
                 ),
                 fx::ub,
-                theme.get().unwrap().lock().unwrap().colors.cpu_box,
+                theme.colors.cpu_box,
                 symbol::title_left,
                 fx::b,
                 theme
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
                     .colors
                     .title
-                    .call(clock_string[..clock_len as usize].to_string(), term),
+                    .call(clock_string[..clock_len as usize].to_string(), term_p),
                 fx::ub,
-                theme.get().unwrap().lock().unwrap().colors.cpu_box,
+                theme.colors.cpu_box,
                 symbol::title_right,
-                term.get().unwrap().lock().unwrap().get_fg()
+                inserter
             )
             .as_str(),
         );
-
-        draw.get().unwrap().lock().unwrap().buffer(
+        term = term_p.get().unwrap().lock().unwrap();
+        drop(key);
+        draw.buffer(
             "clock".to_owned(),
-            vec![out],
+            vec![out.clone()],
             false,
             now,
             100,
-            menu.get().unwrap().lock().unwrap().active,
+            menu.active,
             false,
             !force,
-            key,
+            key_p,
         );
 
-        if now
-            && !menu.get().unwrap().lock().unwrap().active
-            && config.get().unwrap().lock().unwrap().show_battery
-        {
+        if now && !menu.active && config.show_battery {
             match Manager::new() {
                 Ok(m) => match m.batteries() {
                     Ok(b) => match b.into_iter().size_hint() {
-                        (0, Some(_)) => draw.get().unwrap().lock().unwrap().out(
-                            vec!["battery".to_owned()],
-                            false,
-                            key,
-                        ),
+                        (0, Some(_)) => draw.out(vec!["battery".to_owned()], false, key_p),
                         _ => (),
                     },
                     _ => (),
@@ -537,25 +485,25 @@ impl BrshtopBox {
                         .unwrap()
                         .lock()
                         .unwrap()
-                        .draw_bg(key, theme, term, config, cpu_box),
+                        .draw_bg(key, theme, term, config),
                     Boxes::MemBox => mem_box
                         .get()
                         .unwrap()
                         .lock()
                         .unwrap()
-                        .draw_bg(theme, config, term, mem_box),
+                        .draw_bg(theme, config, term),
                     Boxes::NetBox => net_box
                         .get()
                         .unwrap()
                         .lock()
                         .unwrap()
-                        .draw_bg(theme, term, net_box),
+                        .draw_bg(theme, term),
                     Boxes::ProcBox => proc_box
                         .get()
                         .unwrap()
                         .lock()
                         .unwrap()
-                        .draw_bg(theme, term, proc_box),
+                        .draw_bg(theme, term),
                     _ => String::default(),
                 })
                 .collect(),

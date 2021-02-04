@@ -602,13 +602,12 @@ impl MemCollector {
         meters: &OnceCell<Mutex<Meters>>,
         THEME: &OnceCell<Mutex<Theme>>,
         key: &OnceCell<Mutex<Key>>,
-        collector: &OnceCell<Mutex<Collector>>,
+        collector: &Collector,
         draw: &OnceCell<Mutex<Draw>>,
         menu: &OnceCell<Mutex<Menu>>,
-        passable_self: &OnceCell<Mutex<MemCollector>>,
     ) {
         membox.get().unwrap().lock().unwrap().draw_fg(
-            passable_self,
+            self,
             term,
             brshtop_box,
             CONFIG,
@@ -618,7 +617,6 @@ impl MemCollector {
             collector,
             draw,
             menu,
-            membox,
         );
     }
 
