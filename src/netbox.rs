@@ -124,10 +124,14 @@ impl NetBox {
         self.set_redraw(true);
     }
 
-    pub fn draw_bg(&self, theme: &OnceCell<Mutex<Theme>>, term: &OnceCell<Mutex<Term>>) -> String {
+    pub fn draw_bg(&self, theme_p: &OnceCell<Mutex<Theme>>, term_p: &OnceCell<Mutex<Term>>) -> String {
         if self.parent.get_proc_mode() {
             return String::default();
         }
+
+        let mut theme = theme_p.get().unwrap().lock().unwrap();
+        let mut term = term_p.get().unwrap().lock().unwrap();
+
         format!(
             "{}{}",
             create_box(
@@ -137,12 +141,12 @@ impl NetBox {
                 0,
                 None,
                 None,
-                Some(theme.get().unwrap().lock().unwrap().colors.net_box),
+                Some(theme.colors.net_box),
                 None,
                 true,
                 Some(Boxes::NetBox),
-                term,
-                theme,
+                &term.to_owned(),
+                &theme.to_owned(),
                 None,
                 None,
                 None,
@@ -156,12 +160,12 @@ impl NetBox {
                 self.sub.get_box_height(),
                 Some("Download".to_owned()),
                 Some("Upload".to_owned()),
-                Some(theme.get().unwrap().lock().unwrap().colors.div_line),
+                Some(theme.colors.div_line),
                 None,
                 false,
                 None,
-                term,
-                theme,
+                &term.to_owned(),
+                &theme.to_owned(),
                 None,
                 None,
                 None,

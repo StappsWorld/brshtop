@@ -18,7 +18,7 @@ use {
         collections::HashMap,
         io::{self, stdin, Read, Stdin},
         path::Path,
-        sync::Mutex,
+        sync::{Mutex, MutexGuard},
         thread,
         time::Duration,
     },
@@ -170,29 +170,31 @@ impl Key {
         &mut self,
         sec: f64,
         mouse: bool,
-        draw: &OnceCell<Mutex<Draw>>,
-        term: &OnceCell<Mutex<Term>>,
-        passable_self : &OnceCell<Mutex<Key>>,
+        draw_p: &OnceCell<Mutex<Draw>>,
+        term_p: &OnceCell<Mutex<Term>>,
     ) -> bool {
+        let mut draw = draw_p.get().unwrap().lock().unwrap();
+        let mut term = term_p.get().unwrap().lock().unwrap();
+
         if self.list.len() > 0 {
             return true;
         }
         if mouse {
-            draw.get().unwrap().lock().unwrap().now(
-                vec![term.get().unwrap().lock().unwrap().get_mouse_direct_on()],
-                passable_self,
+            draw.now_unreferenced_key(
+                vec![term.get_mouse_direct_on()],
+                self,
             );
         }
         self.new.replace_self(EventEnum::Flag(false));
         self.new.wait(if sec > 0.0 { sec } else { 0.0 });
         self.new.replace_self(EventEnum::Flag(false));
         if mouse {
-            draw.get().unwrap().lock().unwrap().now(
+            draw.now_unreferenced_key(
                 vec![
-                    term.get().unwrap().lock().unwrap().get_mouse_direct_off(),
-                    term.get().unwrap().lock().unwrap().get_mouse_on(),
+                    term.get_mouse_direct_off(),
+                    term.get_mouse_on(),
                 ],
-                passable_self,
+                self,
             );
         }
 
@@ -235,7 +237,12 @@ impl Key {
                             Ok(_) => {
                                 if input_key == String::from("\x1b") {
                                     self.idle.replace_self(EventEnum::Flag(false));
-                                    draw.get().unwrap().lock().unwrap().idle.replace_self(EventEnum::Wait);
+                                    draw.get()
+                                        .unwrap()
+                                        .lock()
+                                        .unwrap()
+                                        .idle
+                                        .replace_self(EventEnum::Wait);
                                     draw.get().unwrap().lock().unwrap().idle.wait(-1.0);
 
                                     let mut nonblocking = Nonblocking::new();
@@ -314,9 +321,11 @@ impl Key {
                                                     let together = first + second.as_str();
                                                     together.to_owned()
                                                 }
-                                            }.as_str()
+                                            }
+                                            .as_str(),
                                         ) {
-                                            clean_key = self.escape.get(&code.clone()).unwrap().clone();
+                                            clean_key =
+                                                self.escape.get(&code.clone()).unwrap().clone();
                                             broke = true;
                                             break;
                                         }

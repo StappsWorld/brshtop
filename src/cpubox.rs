@@ -120,68 +120,32 @@ impl CpuBox {
             0,
         ) as u32);
 
-        if self.get_sub().get_box_columns()
-            * (20
-                + if cpu.get_got_sensors() {
-                    13
-                } else {
-                    21
-                })
+        if self.get_sub().get_box_columns() * (20 + if cpu.get_got_sensors() { 13 } else { 21 })
             < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
             self.set_sub_column_size(2);
-            self.set_sub_box_width(
-                20 + if cpu.get_got_sensors() {
-                    13
-                } else {
-                    21
-                },
-            );
+            self.set_sub_box_width(20 + if cpu.get_got_sensors() { 13 } else { 21 });
         } else if self.get_sub().get_box_columns()
-            * (15
-                + if cpu.get_got_sensors() {
-                    6
-                } else {
-                    15
-                })
+            * (15 + if cpu.get_got_sensors() { 6 } else { 15 })
             < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
             self.set_sub_column_size(1);
-            self.set_sub_box_width(
-                15 + if cpu.get_got_sensors() {
-                    6
-                } else {
-                    15
-                },
-            );
-        } else if self.get_sub().get_box_columns()
-            * (8 + if cpu.get_got_sensors() {
-                6
-            } else {
-                8
-            })
+            self.set_sub_box_width(15 + if cpu.get_got_sensors() { 6 } else { 15 });
+        } else if self.get_sub().get_box_columns() * (8 + if cpu.get_got_sensors() { 6 } else { 8 })
             < self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32
         {
             self.set_sub_column_size(0);
         } else {
             self.set_sub_box_columns(
                 (self.get_parent().get_width() - (self.get_parent().get_width() / 3) as u32)
-                    / (8 + if cpu.get_got_sensors() {
-                        6
-                    } else {
-                        8
-                    }),
+                    / (8 + if cpu.get_got_sensors() { 6 } else { 8 }),
             );
             self.set_sub_column_size(0);
         }
 
         if self.get_sub().get_column_size() == 0 {
             self.set_sub_box_width(
-                8 + if cpu.get_got_sensors() {
-                    6
-                } else {
-                    8
-                } * self.get_sub().get_box_columns()
+                8 + if cpu.get_got_sensors() { 6 } else { 8 } * self.get_sub().get_box_columns()
                     + 1,
             );
         }
@@ -227,16 +191,17 @@ impl CpuBox {
 
     pub fn draw_bg(
         &mut self,
-        key: &OnceCell<Mutex<Key>>,
-        theme: &OnceCell<Mutex<Theme>>,
-        term: &OnceCell<Mutex<Term>>,
-        config: &OnceCell<Mutex<Config>>,
+        key_p: &OnceCell<Mutex<Key>>,
+        theme_p: &OnceCell<Mutex<Theme>>,
+        term_p: &OnceCell<Mutex<Term>>,
+        config_p: &OnceCell<Mutex<Config>>,
     ) -> String {
+        let mut key = key_p.get().unwrap().lock().unwrap();
+        let mut theme = theme_p.get().unwrap().lock().unwrap();
+        let mut term = term_p.get().unwrap().lock().unwrap();
+        let mut config = config_p.get().unwrap().lock().unwrap();
+
         if !key
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap()
             .mouse
             .contains_key(&"M".to_owned())
         {
@@ -247,14 +212,13 @@ impl CpuBox {
                 pusher.push(self.get_parent().get_y() as i32);
                 top.push(pusher);
             }
-            key.get()
-                .unwrap()
-                .lock()
-                .unwrap()
+            key
                 .mouse
                 .insert("M".to_owned(), top);
         }
 
+        let inserter_term = term.to_owned();
+        drop(term);
         return format!(
             "{}{}{}{}{}{}{}{}{}",
             create_box(
@@ -264,12 +228,12 @@ impl CpuBox {
                 0,
                 Some(String::default()),
                 Some(String::default()),
-                Some(theme.get().unwrap().lock().unwrap().colors.cpu_box),
+                Some(theme.colors.cpu_box),
                 None,
                 true,
                 Some(Boxes::CpuBox),
-                term,
-                theme,
+                &inserter_term,
+                &theme.to_owned(),
                 None,
                 Some(self),
                 None,
@@ -278,53 +242,37 @@ impl CpuBox {
             ),
             mv::to(self.get_parent().get_y(), self.get_parent().get_x() + 10),
             theme
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
                 .colors
                 .cpu_box
-                .call(symbol::title_left.to_owned(), term),
+                .call(symbol::title_left.to_owned(), term_p),
             fx::b,
             theme
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
                 .colors
                 .hi_fg
-                .call("M".to_owned(), term),
+                .call("M".to_owned(), term_p),
             theme
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
                 .colors
                 .title
-                .call("enu".to_owned(), term),
+                .call("enu".to_owned(), term_p),
             fx::ub,
             theme
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
                 .colors
                 .cpu_box
-                .call(symbol::title_right.to_owned(), term),
+                .call(symbol::title_right.to_owned(), term_p),
             create_box(
                 self.get_sub().get_box_x(),
                 self.get_sub().get_box_y(),
                 self.get_sub().get_box_width(),
                 self.get_sub().get_box_height(),
                 Some(
-                    if config.get().unwrap().lock().unwrap().custom_cpu_name != String::default() {
+                    if config.custom_cpu_name != String::default() {
                         CPU_NAME.to_owned()[..usize::try_from(
                             self.get_sub().get_box_width() as i32 - 14,
                         )
                         .unwrap_or(0)]
                             .to_owned()
                     } else {
-                        config.get().unwrap().lock().unwrap().custom_cpu_name[..usize::try_from(
+                        config.custom_cpu_name[..usize::try_from(
                             self.get_sub().get_box_width() as i32 - 14,
                         )
                         .unwrap_or(0)]
@@ -332,12 +280,12 @@ impl CpuBox {
                     }
                 ),
                 None,
-                Some(theme.get().unwrap().lock().unwrap().colors.div_line),
+                Some(theme.colors.div_line),
                 None,
                 true,
                 Some(Boxes::CpuBox),
-                term,
-                theme,
+                &inserter_term,
+                &theme.to_owned(),
                 None,
                 Some(self),
                 None,

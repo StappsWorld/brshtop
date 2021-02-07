@@ -117,10 +117,14 @@ impl<'a> ProcBox {
         self.parent.set_resized(true);
     }
 
-    pub fn draw_bg(&self, theme: &OnceCell<Mutex<Theme>>, term : &OnceCell<Mutex<Term>>) -> String {
+    pub fn draw_bg(&self, theme_p: &OnceCell<Mutex<Theme>>, term_p : &OnceCell<Mutex<Term>>) -> String {
         if self.parent.get_stat_mode() {
             return String::default();
         }
+
+        let mut theme = theme_p.get().unwrap().lock().unwrap();
+        let mut term = term_p.get().unwrap().lock().unwrap();
+
         return create_box(
             0,
             0,
@@ -128,12 +132,12 @@ impl<'a> ProcBox {
             0,
             None,
             None,
-            Some(theme.get().unwrap().lock().unwrap().colors.proc_box),
+            Some(theme.colors.proc_box),
             None,
             true,
             Some(Boxes::ProcBox),
-            term,
-            theme,
+            &term.to_owned(),
+            &theme.to_owned(),
             None,
             None,
             None,

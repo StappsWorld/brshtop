@@ -77,7 +77,7 @@ impl Init {
                     .push(Color::fg(format!("{} {} {}", i, i, i)).unwrap_or(Color::default()));
             }
         }
-        
+
         let insert_height = term.get_height();
         drop(draw);
         drop(term);
@@ -88,7 +88,7 @@ impl Init {
             false,
             term_p,
             draw_p,
-            key
+            key,
         );
         term = term_p.get().unwrap().lock().unwrap();
         draw = draw_p.get().unwrap().lock().unwrap();
@@ -140,7 +140,9 @@ impl Init {
                 key,
             );
         }
-        draw.out(vec!["banner".to_owned()], false, key);
+        let mut pass_key = key.get().unwrap().lock().unwrap();
+        draw.out(vec!["banner".to_owned()], false, &mut pass_key);
+        drop(pass_key);
         draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -172,7 +174,7 @@ impl Init {
         let insert_width = term.get_width();
         let insert_height = term.get_height();
         drop(term);
-        
+
         self.initbg_up = Graph::new(
             insert_width as i32,
             insert_height as i32 / 2,
@@ -256,7 +258,7 @@ impl Init {
             thread::sleep(time::Duration::from_secs(2));
         }
         errlog(err);
-        
+
         drop(CONFIG);
         drop(draw);
         clean_quit(
@@ -270,7 +272,6 @@ impl Init {
             draw_p,
             term,
             CONFIG_p,
-            None,
         );
     }
 
@@ -308,38 +309,46 @@ impl Init {
                 false,
                 key,
             );
+            let mut pass_key = key.get().unwrap().lock().unwrap();
             draw.out(
                 vec!["initbg", "banner", "init"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
                     .collect(),
                 false,
-                key,
+                &mut pass_key,
             );
+            drop(pass_key);
         }
     }
 
     pub fn done(
         &mut self,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        term: &OnceCell<Mutex<Term>>,
+        CONFIG_p: &OnceCell<Mutex<Config>>,
+        draw_p: &OnceCell<Mutex<Draw>>,
+        term_p: &OnceCell<Mutex<Term>>,
         key: &OnceCell<Mutex<Key>>,
     ) {
+        let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+        let mut draw = draw_p.get().unwrap().lock().unwrap();
+        let mut term = term_p.get().unwrap().lock().unwrap();
+
         self.running = false;
-        if !CONFIG.get().unwrap().lock().unwrap().show_init {
+        if !CONFIG.show_init {
             return;
         }
         if self.resized {
-            draw.get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .now(vec![term.get().unwrap().lock().unwrap().get_clear()], key);
+            let mut pass_key = key.get().unwrap().lock().unwrap();
+            draw.now(vec![term.get_clear()], &mut pass_key);
+            drop(pass_key);
         } else {
-            self.draw_bg(10, draw, term, key);
+            drop(draw);
+            drop(term);
+            self.draw_bg(10, draw_p, term_p, key);
+            draw = draw_p.get().unwrap().lock().unwrap();
+            term = term_p.get().unwrap().lock().unwrap();
         }
-        draw.get().unwrap().lock().unwrap().clear(
+        draw.clear(
             vec!["initbg", "banner", "init"]
                 .iter()
                 .map(|s| s.to_owned().to_owned())

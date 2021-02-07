@@ -7,7 +7,7 @@ use {
     std::{
         collections::HashMap,
         io::{self, Write},
-        sync::Mutex,
+        sync::{Mutex, MutexGuard},
     },
 };
 
@@ -34,14 +34,34 @@ impl Draw {
     }
 
     /// Wait for input reader and self to be idle then print to screen
-    pub fn now(&mut self, args: Vec<String>, key_p: &OnceCell<Mutex<Key>>) {
+    pub fn now(&mut self, args: Vec<String>, key: &mut MutexGuard<Key>) {
         
-        let mut key = key_p.get().unwrap().lock().unwrap();
 
         key.idle.replace_self(EventEnum::Wait);
         //key.get().unwrap().lock().unwrap().idle.wait(-1.0);
-        drop(key);
 
+        self.idle.replace_self(EventEnum::Wait);
+
+        //self.idle.wait(-1.0);
+
+        self.idle.replace_self(EventEnum::Flag(false));
+
+
+        print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+        for s in args.clone() {
+            print!("{}", s);
+            io::stdout().flush().unwrap();
+        }
+
+        self.idle.replace_self(EventEnum::Flag(true));
+    }
+
+    /// Wait for input reader and self to be idle then print to screen
+    pub fn now_unreferenced_key(&mut self, args: Vec<String>, key: &mut Key) {
+        
+
+        key.idle.replace_self(EventEnum::Wait);
+        //key.get().unwrap().lock().unwrap().idle.wait(-1.0);
 
         self.idle.replace_self(EventEnum::Wait);
 
@@ -110,13 +130,15 @@ impl Draw {
                 .unwrap()
                 .push_str(string.as_str());
             if now_mut {
-                self.out(vec![mutable_name.clone()], false, key);
+                let mut pass_key = key.get().unwrap().lock().unwrap();
+                self.out(vec![mutable_name.clone()], false, &mut pass_key);
+                drop(pass_key);
             }
         }
     }
 
     /// Defaults clear = false
-    pub fn out(&mut self, names: Vec<String>, clear: bool, key: &OnceCell<Mutex<Key>>) {
+    pub fn out(&mut self, names: Vec<String>, clear: bool, key: &mut MutexGuard<Key>) {
         let mut out: String = String::default();
         if self.strings.len() == 0 {
             return;
@@ -147,7 +169,7 @@ impl Draw {
         }
     }
 
-    pub fn saved_buffer(&mut self) -> String {
+    pub fn saved_buffer(&self) -> String {
         let mut out: String = String::default();
 
         let mut z_order_sort: Vec<(&String, &i32)> = self.z_order.iter().collect();

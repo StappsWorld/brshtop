@@ -248,16 +248,14 @@ impl Collector {
                 drop(term);
                 drop(CONFIG);
                 drop(THEME);
-                drop(menu);
                 drop(cpu_box);
                 drop(draw);
                 brshtop_box.draw_clock(
-                    false, term_p, CONFIG_p, THEME_p, menu_p, cpu_box_p, draw_p, key_p,
+                    false, term_p, CONFIG_p, THEME_p, &menu, cpu_box_p, draw_p, key_p,
                 );
                 term = term_p.get().unwrap().lock().unwrap();
                 CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
                 THEME = THEME_p.get().unwrap().lock().unwrap();
-                menu = menu_p.get().unwrap().lock().unwrap();
                 cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
                 draw = draw_p.get().unwrap().lock().unwrap();
             }
@@ -429,27 +427,27 @@ impl Collector {
             }
 
             if self.get_draw_now() && !menu.active && !self.get_collect_interrupt() {
+                let mut key = key_p.get().unwrap().lock().unwrap();
                 if self.get_use_draw_list() {
-                    draw.out(draw_buffers, false, key_p);
+                    draw.out(draw_buffers, false, &mut key);
                 } else {
-                    draw.out(Vec::<String>::new(), false, key_p);
+                    draw.out(Vec::<String>::new(), false, &mut key);
                 }
+                drop(key);
             }
 
             if CONFIG.draw_clock != String::default() && CONFIG.update_ms == 1000 {
                 drop(term);
                 drop(CONFIG);
                 drop(THEME);
-                drop(menu);
                 drop(cpu_box);
                 drop(draw);
                 brshtop_box.draw_clock(
-                    false, term_p, CONFIG_p, THEME_p, menu_p, cpu_box_p, draw_p, key_p,
+                    false, term_p, CONFIG_p, THEME_p, &menu, cpu_box_p, draw_p, key_p,
                 );
                 term = term_p.get().unwrap().lock().unwrap();
                 CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
                 THEME = THEME_p.get().unwrap().lock().unwrap();
-                menu = menu_p.get().unwrap().lock().unwrap();
                 cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
                 draw = draw_p.get().unwrap().lock().unwrap();
             }

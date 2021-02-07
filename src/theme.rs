@@ -127,7 +127,10 @@ impl Color {
         }
     }
 
-    pub fn call(&self, adder: String, term: &OnceCell<Mutex<Term>>) -> Color {
+    pub fn call(&self, adder: String, term_p: &OnceCell<Mutex<Term>>) -> Color {
+
+        let term = term_p.get().unwrap().lock().unwrap();
+
         if adder.len() < 1 {
             return Color::default();
         }
@@ -137,8 +140,8 @@ impl Color {
             self.escape(),
             adder,
             match self.depth {
-                LayerDepth::Fg => term.get().unwrap().lock().unwrap().get_fg(),
-                LayerDepth::Bg => term.get().unwrap().lock().unwrap().get_bg(),
+                LayerDepth::Fg => term.get_fg(),
+                LayerDepth::Bg => term.get_bg(),
             }
         ))
     }
