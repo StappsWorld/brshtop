@@ -23,7 +23,7 @@ impl Timer {
         self.timestamp = SystemTime::now();
     }
 
-    pub fn not_zero(&mut self, CONFIG: &OnceCell<Mutex<Config>>) -> bool {
+    pub fn not_zero(&mut self, CONFIG: &Config) -> bool {
         if self.return_zero {
             self.return_zero = false;
             return false;
@@ -39,7 +39,7 @@ impl Timer {
         }
     }
 
-    pub fn left(&mut self, CONFIG: &OnceCell<Mutex<Config>>) -> Duration {
+    pub fn left(&self, CONFIG: &Config) -> Duration {
         match SystemTime::now().duration_since(
             self.timestamp
                 .checked_add(Duration::from_millis(CONFIG.update_ms as u64))
@@ -55,7 +55,7 @@ impl Timer {
         }
     }
 
-    pub fn finish(&mut self, key: &Key, CONFIG: &Config) {
+    pub fn finish(&mut self, key: &mut Key, CONFIG: &Config) {
         self.return_zero = true;
         self.timestamp = SystemTime::now()
             .checked_sub(Duration::from_millis(CONFIG.update_ms as u64))

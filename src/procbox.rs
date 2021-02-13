@@ -63,7 +63,7 @@ pub struct ProcBox {
     redraw : bool,
 }
 impl<'a> ProcBox {
-    pub fn new(brshtop_box: &BrshtopBox, CONFIG: &Config, ARG_MODE: ViewMode) -> Self {
+    pub fn new(brshtop_box: &mut BrshtopBox, CONFIG: &Config, ARG_MODE: ViewMode) -> Self {
         brshtop_box.push_buffers("proc".to_owned());
         let mut procbox = ProcBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
@@ -149,8 +149,8 @@ impl<'a> ProcBox {
         key: String,
         mouse_pos: (i32, i32),
         proc_collector: &ProcCollector,
-        key_class: &Key,
-        collector: &Collector,
+        key_class: &mut Key,
+        collector: &mut Collector,
         CONFIG: &Config,
     ) {
         let old = (self.start, self.selected);
@@ -264,7 +264,6 @@ impl<'a> ProcBox {
             self.moved = true;
             collector.collect(
                 vec![Collectors::ProcCollector],
-                CONFIG,
                 true,
                 false,
                 true,
@@ -277,11 +276,11 @@ impl<'a> ProcBox {
     pub fn draw_fg(
         &mut self,
         CONFIG: &Config,
-        key: &Key,
+        key: &mut Key,
         THEME: &Theme,
-        graphs: &Graphs,
+        graphs: &mut Graphs,
         term: &Term,
-        draw : &Draw,
+        draw : &mut Draw,
         proc : &ProcCollector,
         menu : &Menu,
     ) {

@@ -55,7 +55,7 @@ impl Graph {
         height: i32,
         color: Option<ColorSwitch>,
         data: Vec<i32>,
-        term: &OnceCell<Mutex<Term>>,
+        term: &Term,
         invert: bool,
         max_value: i32,
         offset: i32,
@@ -281,7 +281,7 @@ impl Graph {
         };
         self
     }
-    pub fn max_value(mut self, max_value: i32, term: &OnceCell<Mutex<Term>>) -> Self {
+    pub fn max_value(mut self, max_value: i32, term: &Term) -> Self {
         self.max_value = max_value;
         self._refresh_data(term);
         self
@@ -304,7 +304,7 @@ impl Graph {
             self._data
                 .iter()
                 .map(|v| {
-                    let mut divider = (self.max_value + self.offset);
+                    let mut divider = self.max_value + self.offset;
                     divider = if divider > 0 {
                         divider
                     } else {
@@ -460,7 +460,7 @@ impl Graph {
         }
 
         if !self.colors.is_empty() {
-            self.out.push_str(&term.get_fg().as_str())
+            self.out.push_str(&term.get_fg().to_string().as_str())
         }
     }
 

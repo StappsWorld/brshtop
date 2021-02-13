@@ -38,7 +38,7 @@ pub struct MemBox {
     swap_names: Vec<String>,
 }
 impl MemBox {
-    pub fn new(brshtop_box: &BrshtopBox, CONFIG: &Config, ARG_MODE: ViewMode) -> Self {
+    pub fn new(brshtop_box: &mut BrshtopBox, CONFIG: &Config, ARG_MODE: ViewMode) -> Self {
         let mut membox = MemBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
             mem_meter: 0,
@@ -264,15 +264,15 @@ impl MemBox {
     pub fn draw_fg(
         &mut self,
         mem: &MemCollector,
-        term: &OnceCell<Mutex<Term>>,
-        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        meters: &OnceCell<Mutex<Meters>>,
-        THEME: &OnceCell<Mutex<Theme>>,
-        key: &OnceCell<Mutex<Key>>,
+        term: &Term,
+        brshtop_box: &mut BrshtopBox,
+        CONFIG: &Config,
+        meters: &mut Meters,
+        THEME: &Theme,
+        key: &mut Key,
         collector: &Collector,
-        draw: &OnceCell<Mutex<Draw>>,
-        menu: &OnceCell<Mutex<Menu>>,
+        draw: &mut Draw,
+        menu: &Menu,
     ) {
         if self.get_parent().get_proc_mode() {
             return;
@@ -295,42 +295,17 @@ impl MemBox {
         let mut h = parent_box.get_height() - 2;
 
         if parent_box.get_resized() || self.get_redraw() {
-            brshtop_box
-                .get()
-                .unwrap()
-                .try_lock()
-                .unwrap()
-                .set_b_mem_h(self.calc_size(
-                    term,
-                    brshtop_box.get_b_mem_h(),
-                    brshtop_box.get_b_cpu_h(),
-                    CONFIG,
-                ));
+            brshtop_box.set_b_mem_h(self.calc_size(
+                term,
+                brshtop_box.get_b_mem_h(),
+                brshtop_box.get_b_cpu_h(),
+                CONFIG,
+            ));
             out_misc.push_str(self.draw_bg(THEME, CONFIG, term).as_str());
-            meters
-                .get()
-                .unwrap()
-                .try_lock()
-                .unwrap()
-                .set_mem(HashMap::<String, MeterUnion>::new());
-            meters
-                .get()
-                .unwrap()
-                .try_lock()
-                .unwrap()
-                .set_swap(HashMap::<String, MeterUnion>::new());
-            meters
-                .get()
-                .unwrap()
-                .try_lock()
-                .unwrap()
-                .set_disks_used(HashMap::<String, Meter>::new());
-            meters
-                .get()
-                .unwrap()
-                .try_lock()
-                .unwrap()
-                .set_disks_free(HashMap::<String, Meter>::new());
+            meters.set_mem(HashMap::<String, MeterUnion>::new());
+            meters.set_swap(HashMap::<String, MeterUnion>::new());
+            meters.set_disks_used(HashMap::<String, Meter>::new());
+            meters.set_disks_free(HashMap::<String, Meter>::new());
             if self.get_mem_meter() > 0 {
                 for name in self.get_mem_names() {
                     if CONFIG.mem_graphs {
@@ -340,15 +315,7 @@ impl MemBox {
                                 self.get_mem_meter(),
                                 self.get_graph_height() as i32,
                                 Some(ColorSwitch::VecString(
-                                    THEME
-                                        .get()
-                                        .unwrap()
-                                        .try_lock()
-                                        .unwrap()
-                                        .gradient
-                                        .get(&name.clone())
-                                        .unwrap()
-                                        .clone(),
+                                    THEME.gradient.get(&name.clone()).unwrap().clone(),
                                 )),
                                 mem.get_vlist_index(name.clone())
                                     .unwrap()
@@ -385,15 +352,7 @@ impl MemBox {
                                     self.get_mem_meter(),
                                     self.get_graph_height() as i32,
                                     Some(ColorSwitch::VecString(
-                                        THEME
-                                            .get()
-                                            .unwrap()
-                                            .try_lock()
-                                            .unwrap()
-                                            .gradient
-                                            .get(&name.clone())
-                                            .unwrap()
-                                            .clone(),
+                                        THEME.gradient.get(&name.clone()).unwrap().clone(),
                                     )),
                                     mem.get_vlist_index(name.clone())
                                         .unwrap_or(vec![])
@@ -498,14 +457,7 @@ impl MemBox {
                     }
                 }
             }
-            if !key
-                .get()
-                .unwrap()
-                .try_lock()
-                .unwrap()
-                .mouse
-                .contains_key(&"g".to_owned())
-            {
+            if !key.mouse.contains_key(&"g".to_owned()) {
                 let mut top = Vec::<Vec<i32>>::new();
                 for i in 0..5 {
                     let mut adder: Vec<i32> = Vec::<i32>::new();
@@ -513,48 +465,21 @@ impl MemBox {
                     adder.push(y as i32 - 1);
                     top.push(adder);
                 }
-                key.get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
-                    .mouse
-                    .insert("g".to_owned(), top);
+                key.mouse.insert("g".to_owned(), top);
             }
             out_misc.push_str(
                 format!(
                     "{}{}{}{}{}{}{}",
                     mv::to(y as u32 - 1, x as u32 + w - 7),
                     THEME
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .colors
                         .mem_box
                         .call(symbol::title_left.to_owned(), term),
                     if CONFIG.mem_graphs { fx::b } else { "" },
-                    THEME
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
-                        .colors
-                        .hi_fg
-                        .call("g".to_owned(), term),
-                    THEME
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
-                        .colors
-                        .title
-                        .call("wap".to_owned(), term),
+                    THEME.colors.hi_fg.call("g".to_owned(), term),
+                    THEME.colors.title.call("wap".to_owned(), term),
                     fx::ub,
                     THEME
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .colors
                         .mem_box
                         .call(symbol::title_right.to_owned(), term),
@@ -562,14 +487,7 @@ impl MemBox {
                 .as_str(),
             );
             if CONFIG.show_disks {
-                if !key
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
-                    .mouse
-                    .contains_key(&"s".to_owned())
-                {
+                if !key.mouse.contains_key(&"s".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
                     for i in 0..4 {
                         let mut adder: Vec<i32> = Vec::<i32>::new();
@@ -577,48 +495,21 @@ impl MemBox {
                         adder.push(y as i32 - 1);
                         top.push(adder);
                     }
-                    key.get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
-                        .mouse
-                        .insert("s".to_owned(), top);
+                    key.mouse.insert("s".to_owned(), top);
                 }
                 out_misc.push_str(
                     format!(
                         "{}{}{}{}{}{}{}",
                         mv::to(y as u32 - 1, x as u32 + w - 7),
                         THEME
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
                             .colors
                             .mem_box
                             .call(symbol::title_left.to_owned(), term),
                         if CONFIG.swap_disk { fx::b } else { "" },
-                        THEME
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
-                            .colors
-                            .hi_fg
-                            .call("s".to_owned(), term),
-                        THEME
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
-                            .colors
-                            .title
-                            .call("raph".to_owned(), term),
+                        THEME.colors.hi_fg.call("s".to_owned(), term),
+                        THEME.colors.title.call("raph".to_owned(), term),
                         fx::ub,
                         THEME
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
                             .colors
                             .mem_box
                             .call(symbol::title_right.to_owned(), term),
@@ -663,10 +554,6 @@ impl MemBox {
                 "{}{}{}{}{}{}{}{}",
                 mv::left(2),
                 THEME
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
                     .colors
                     .mem_box
                     .call(symbol::title_right.to_owned(), term),
@@ -675,14 +562,7 @@ impl MemBox {
                 if CONFIG.show_disks {
                     "".to_owned()
                 } else {
-                    THEME
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
-                        .colors
-                        .mem_box
-                        .to_string()
+                    THEME.colors.mem_box.to_string()
                 },
                 symbol::title_left,
                 mv::left(self.get_mem_width() - 1),
@@ -730,10 +610,6 @@ impl MemBox {
                         mv::to(y + cy + 1, x + cx),
                         gbg,
                         match meters
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
                             .get_mem_index(name.clone())
                             .unwrap_or(MeterUnion::Meter(Meter::default()))
                         {
@@ -750,10 +626,6 @@ impl MemBox {
                                         term,
                                     );
                                 meters
-                                    .get()
-                                    .unwrap()
-                                    .try_lock()
-                                    .unwrap()
                                     .set_mem_index(name.clone(), MeterUnion::Meter(m_callable));
                                 save
                             }
@@ -770,10 +642,6 @@ impl MemBox {
                                         term,
                                     );
                                 meters
-                                    .get()
-                                    .unwrap()
-                                    .try_lock()
-                                    .unwrap()
                                     .set_mem_index(name.clone(), MeterUnion::Graph(g_callable));
                                 save
                             }
@@ -799,10 +667,6 @@ impl MemBox {
                         name.to_title_case(),
                         gbg,
                         match meters
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
                             .get_mem_index(name.clone())
                             .unwrap_or(MeterUnion::Meter(Meter::default()))
                         {
@@ -922,10 +786,6 @@ impl MemBox {
                             mv::to(y + cy + 1, x + cx),
                             gbg,
                             match meters
-                                .get()
-                                .unwrap()
-                                .try_lock()
-                                .unwrap()
                                 .get_swap_index(name.clone())
                                 .unwrap_or(MeterUnion::Meter(Meter::default()))
                             {
@@ -984,10 +844,6 @@ impl MemBox {
                             name.to_title_case(),
                             gbg,
                             match meters
-                                .get()
-                                .unwrap()
-                                .try_lock()
-                                .unwrap()
                                 .get_swap_index(name.clone())
                                 .unwrap_or(MeterUnion::Meter(Meter::default()))
                             {
@@ -1079,10 +935,6 @@ impl MemBox {
                     return;
                 }
                 if !meters
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
                     .get_disks_used()
                     .contains_key(&name)
                 {
@@ -1157,10 +1009,6 @@ impl MemBox {
                     format!(
                         "{}{:>width$}",
                         meters
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
                             .get_disks_used_index(name.clone())
                             .unwrap_or(Meter::default()),
                         insert,
@@ -1192,10 +1040,6 @@ impl MemBox {
                         format!(
                             "{}{:>width$}",
                             meters
-                                .get()
-                                .unwrap()
-                                .try_lock()
-                                .unwrap()
                                 .get_disks_free_index(name.clone())
                                 .unwrap_or(Meter::default()),
                             insert,

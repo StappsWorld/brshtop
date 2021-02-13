@@ -42,7 +42,7 @@ pub struct CpuBox {
     clock_block: bool,
 }
 impl CpuBox {
-    pub fn new(brshtop_box: &BrshtopBox, config: &Config, ARG_MODE: ViewMode) -> Self {
+    pub fn new(brshtop_box: &mut BrshtopBox, config: &Config, ARG_MODE: ViewMode) -> Self {
         let mut bsm: HashMap<String, String> = HashMap::<String, String>::new();
         bsm.insert("Charging".to_owned(), "▲".to_owned());
         bsm.insert("Discharging".to_owned(), "▼".to_owned());
@@ -172,14 +172,7 @@ impl CpuBox {
         set_b_cpu_h
     }
 
-    pub fn draw_bg(
-        &mut self,
-        key: &Key,
-        theme: &Theme,
-        term: &Term,
-        config: &Config,
-    ) -> String {
-
+    pub fn draw_bg(&self, key: &mut Key, theme: &Theme, term: &Term, config: &Config) -> String {
         if !key.mouse.contains_key(&"M".to_owned()) {
             let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
             for i in 0..6 {
@@ -269,7 +262,7 @@ impl CpuBox {
         );
     }
 
-    pub fn battery_activity(&mut self, menu: &OnceCell<Mutex<Menu>>) -> bool {
+    pub fn battery_activity(&mut self, menu: &Menu) -> bool {
         let battery_manager = match Manager::new() {
             Ok(m) => m,
             Err(_) => {
@@ -398,13 +391,13 @@ impl CpuBox {
         &mut self,
         cpu: &CpuCollector,
         config: &Config,
-        key: &Key,
+        key: &mut Key,
         theme: &Theme,
         term: &Term,
-        draw: &Draw,
+        draw: &mut Draw,
         ARG_MODE: ViewMode,
-        graphs: &Graphs,
-        meters: &Meters,
+        graphs: &mut Graphs,
+        meters: &mut Meters,
         menu: &Menu,
         THEME: &Theme,
     ) {
@@ -441,10 +434,7 @@ impl CpuBox {
         };
 
         if parent_box.get_resized() || self.get_redraw() {
-            if !key
-                .mouse
-                .contains_key(&"m".to_owned())
-            {
+            if !key.mouse.contains_key(&"m".to_owned()) {
                 let mut parent = Vec::<Vec<i32>>::new();
                 for i in 0..12 {
                     let mut adder = Vec::<i32>::new();
@@ -452,9 +442,7 @@ impl CpuBox {
                     adder.push(self.get_parent().get_y() as i32);
                     parent.push(adder);
                 }
-                key
-                    .mouse
-                    .insert("m".to_owned(), parent);
+                key.mouse.insert("m".to_owned(), parent);
             }
             out_misc += format!(
                 "{}{}{}{}{}ode:{}{}{}",
@@ -464,10 +452,7 @@ impl CpuBox {
                     .cpu_box
                     .call(symbol::title_left.to_owned(), term),
                 fx::b,
-                theme
-                    .colors
-                    .hi_fg
-                    .call("m".to_owned(), term),
+                theme.colors.hi_fg.call("m".to_owned(), term),
                 theme.colors.title,
                 ARG_MODE.t != ViewModeEnum::None || config.view_mode.t != ViewModeEnum::None,
                 fx::ub,
@@ -482,11 +467,7 @@ impl CpuBox {
                 Graph::new_with_vec::<Color>(
                     (w - bw - 3) as u32,
                     hh as u32,
-                    theme
-                        .gradient
-                        .get(&"cpu".to_owned())
-                        .unwrap()
-                        .clone(),
+                    theme.gradient.get(&"cpu".to_owned()).unwrap().clone(),
                     cpu.get_cpu_usage_index(0)
                         .unwrap()
                         .iter()
@@ -504,11 +485,7 @@ impl CpuBox {
                 Graph::new_with_vec::<Color>(
                     (w - bw - 3) as u32,
                     hh as u32,
-                    theme
-                        .gradient
-                        .get(&"cpu".to_owned())
-                        .unwrap()
-                        .clone(),
+                    theme.gradient.get(&"cpu".to_owned()).unwrap().clone(),
                     cpu.get_cpu_usage_index(0)
                         .unwrap()
                         .iter()
@@ -521,16 +498,15 @@ impl CpuBox {
                     None,
                 ),
             );
-            meters
-                .set_cpu(Meter::new(
-                    cpu.get_cpu_usage_inner_index(0, cpu.get_cpu_usage_index(0).unwrap().len() - 2)
-                        .unwrap() as i32,
-                    bw - (if cpu.get_got_sensors() { 21 } else { 9 }),
-                    "cpu".to_owned(),
-                    false,
-                    THEME,
-                    term,
-                ));
+            meters.set_cpu(Meter::new(
+                cpu.get_cpu_usage_inner_index(0, cpu.get_cpu_usage_index(0).unwrap().len() - 2)
+                    .unwrap() as i32,
+                bw - (if cpu.get_got_sensors() { 21 } else { 9 }),
+                "cpu".to_owned(),
+                false,
+                THEME,
+                term,
+            ));
 
             if sub.get_column_size() > 0 || ct_width > 0 {
                 for n in 0..THREADS.to_owned() as usize {
@@ -617,19 +593,14 @@ impl CpuBox {
             }
 
             if self.get_parent().get_resized() {
-                meters
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
-                    .set_battery(Meter::new(
-                        self.battery_percent as i32,
-                        10,
-                        "cpu".to_owned(),
-                        true,
-                        THEME,
-                        term,
-                    ));
+                meters.set_battery(Meter::new(
+                    self.battery_percent as i32,
+                    10,
+                    "cpu".to_owned(),
+                    true,
+                    THEME,
+                    term,
+                ));
             }
 
             let mut battery_symbol: String = self
@@ -658,10 +629,6 @@ impl CpuBox {
                         "{}{}",
                         mv::to(y - 1, self.old_battery_pos),
                         theme
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
                             .colors
                             .cpu_box
                             .call(symbol::h_line.repeat(self.old_battery_len + 4), term)
@@ -678,10 +645,6 @@ impl CpuBox {
                     "{}{}{}{}BAT{} {}%{}{}{}{}{}",
                     mv::to(y - 1, battery_pos),
                     theme
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .colors
                         .cpu_box
                         .call(symbol::title_left.to_owned(), term),
@@ -696,10 +659,6 @@ impl CpuBox {
                             " {}{}{}",
                             fx::ub,
                             meters
-                                .get()
-                                .unwrap()
-                                .try_lock()
-                                .unwrap()
                                 .get_battery()
                                 .call(Some(self.get_battery_percent() as i32), term),
                             fx::b,
@@ -709,10 +668,6 @@ impl CpuBox {
                     battery_time,
                     fx::ub,
                     theme
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .colors
                         .cpu_box
                         .call(symbol::title_right.to_owned(), term),
@@ -737,10 +692,6 @@ impl CpuBox {
                     "{}{}",
                     mv::to(y - 1, self.old_battery_pos),
                     theme
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .colors
                         .cpu_box
                         .call(symbol::h_line.repeat(self.old_battery_len + 4), term),
@@ -755,11 +706,7 @@ impl CpuBox {
             self.set_old_battery_len(0);
             self.set_battery_path(None);
 
-            draw.get()
-                .unwrap()
-                .try_lock()
-                .unwrap()
-                .clear(vec!["battery".to_owned()], true);
+            draw.clear(vec!["battery".to_owned()], true);
         }
 
         let mut cx: u32 = 0;
@@ -779,28 +726,13 @@ impl CpuBox {
                     "{}{}{}{}{}{}",
                     mv::to(by - 1, bx + bw - 9),
                     theme
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .colors
                         .div_line
                         .call(symbol::title_left.to_owned(), term),
                     fx::b,
-                    theme
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
-                        .colors
-                        .title
-                        .call(freq, term),
+                    theme.colors.title.call(freq, term),
                     fx::ub,
                     theme
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .colors
                         .div_line
                         .call(symbol::title_right.to_owned(), term),
@@ -813,47 +745,31 @@ impl CpuBox {
             format!(
                 "{}{}{}{}{}{}{}{}{}{}{}{:>4}{}%",
                 mv::to(y, x),
-                graphs
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
-                    .cpu
-                    .get_mut(&"up".to_owned())
-                    .unwrap()
-                    .call(
-                        if self.get_parent().get_resized() {
-                            None
-                        } else {
-                            Some(
-                                cpu.get_cpu_usage_index(0).unwrap()
-                                    [cpu.get_cpu_usage_index(0).unwrap().len() - 2]
-                                    as i32,
-                            )
-                        },
-                        term
-                    ),
+                graphs.cpu.get_mut(&"up".to_owned()).unwrap().call(
+                    if self.get_parent().get_resized() {
+                        None
+                    } else {
+                        Some(
+                            cpu.get_cpu_usage_index(0).unwrap()
+                                [cpu.get_cpu_usage_index(0).unwrap().len() - 2]
+                                as i32,
+                        )
+                    },
+                    term
+                ),
                 mv::to(y + hh as u32, x),
-                graphs
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
-                    .cpu
-                    .get_mut(&"up".to_owned())
-                    .unwrap()
-                    .call(
-                        if self.get_parent().get_resized() {
-                            None
-                        } else {
-                            Some(
-                                cpu.get_cpu_usage_index(0).unwrap()
-                                    [cpu.get_cpu_usage_index(0).unwrap().len() - 2]
-                                    as i32,
-                            )
-                        },
-                        term
-                    ),
+                graphs.cpu.get_mut(&"up".to_owned()).unwrap().call(
+                    if self.get_parent().get_resized() {
+                        None
+                    } else {
+                        Some(
+                            cpu.get_cpu_usage_index(0).unwrap()
+                                [cpu.get_cpu_usage_index(0).unwrap().len() - 2]
+                                as i32,
+                        )
+                    },
+                    term
+                ),
                 theme.colors.main_fg,
                 mv::to(by + cy, bx + cx),
                 fx::b,
@@ -1050,10 +966,6 @@ impl CpuBox {
 
             out.push_str(
                 theme
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
                     .colors
                     .div_line
                     .call(symbol::v_line.to_owned(), term)
@@ -1118,14 +1030,7 @@ impl CpuBox {
                     mv::to(by + cy, bx + cx),
                     theme.colors.main_fg,
                     lavg,
-                    theme
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
-                        .colors
-                        .div_line
-                        .call(symbol::v_line.to_owned(), term)
+                    theme.colors.div_line.call(symbol::v_line.to_owned(), term)
                 )
                 .as_str(),
             );

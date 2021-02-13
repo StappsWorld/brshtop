@@ -655,7 +655,7 @@ impl Config {
         }
     }
 
-    pub fn getattr(&mut self, attr: String) -> ConfigAttr {
+    pub fn getattr(&self, attr: String) -> ConfigAttr {
         match attr.clone().as_str() {
             "color_theme" => ConfigAttr::String(self.color_theme.clone()),
             "theme_background" => ConfigAttr::Bool(self.theme_background),
@@ -1000,7 +1000,7 @@ impl Config {
         }
     }
 
-    pub fn save_config(&mut self) -> std::io::Result<String> {
+    pub fn save_config(& self) -> std::io::Result<String> {
         if !self.changed && !self.recreate {
             return Ok("Nothing needs to be changed".into());
         }

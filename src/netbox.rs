@@ -29,7 +29,7 @@ pub struct NetBox {
     buffer: String,
 }
 impl NetBox {
-    pub fn new(CONFIG: &Config, ARG_MODE: ViewMode, brshtop_box: &BrshtopBox) -> Self {
+    pub fn new(CONFIG: &Config, ARG_MODE: ViewMode, brshtop_box: &mut BrshtopBox) -> Self {
         let mut net = NetBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
             sub: SubBox::new(),
@@ -160,8 +160,8 @@ impl NetBox {
         key: &mut Key,
         term: &Term,
         CONFIG: &Config,
-        draw: &Draw,
-        graphs: &Graphs,
+        draw: &mut Draw,
+        graphs: &mut Graphs,
         menu: &Menu,
         net: &mut NetCollector,
     ) {
@@ -437,10 +437,6 @@ impl NetBox {
                             .unwrap()
                             .to_owned(),
                         theme
-                            .get()
-                            .unwrap()
-                            .try_lock()
-                            .unwrap()
                             .gradient
                             .get(&direction.clone())
                             .unwrap()
@@ -497,10 +493,6 @@ impl NetBox {
                         x as u32
                     ),
                     graphs
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .net
                         .get_mut(&direction.to_owned())
                         .unwrap()

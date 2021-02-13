@@ -128,26 +128,26 @@ impl Menu {
 
     pub fn main(
         &mut self,
-        draw: &Draw,
-        term: &Term,
+        draw: &mut Draw,
+        term: &mut Term,
         update_checker: &UpdateChecker,
-        THEME: &Theme,
+        THEME: &mut Theme,
         key_class: &mut Key,
-        timer: &Timer,
-        collector: &Collector,
+        timer: &mut Timer,
+        collector: &mut Collector,
         collectors: Vec<Collectors>,
-        CONFIG: &Config,
+        CONFIG: &mut Config,
         ARG_MODE: &mut ViewMode,
-        netcollector: &NetCollector,
-        brshtop_box: &BrshtopBox,
-        init: &Init,
-        cpubox: &CpuBox,
-        cpucollector: &CpuCollector,
+        netcollector: &mut NetCollector,
+        brshtop_box: &mut BrshtopBox,
+        init: &mut Init,
+        cpubox: &mut CpuBox,
+        cpucollector: &mut CpuCollector,
         boxes: Vec<Boxes>,
-        netbox: &NetBox,
-        proccollector: &ProcCollector,
-        membox: &MemBox,
-        procbox: &ProcBox,
+        netbox: &mut NetBox,
+        proccollector: &mut ProcCollector,
+        membox: &mut MemBox,
+        procbox: &mut ProcBox,
     ) {
         let mut out: String = String::default();
         let mut banner_mut: String = String::default();
@@ -259,19 +259,17 @@ impl Menu {
                 }
             }
 
-            draw = draw;
             if skip && redraw {
-                draw.now(vec![out.clone()], &mut key_class);
+                draw.now(vec![out.clone()], key_class);
             } else if !skip {
                 draw.now(
                     vec![format!("{}{}{}", self.background.clone(), banner_mut, out)],
-                    &mut key_class,
+                    key_class,
                 );
             }
             skip = false;
             redraw = false;
 
-            drop(draw);
             if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), true, draw, term) {
                 if key_class.mouse_moved() {
                     let (mx_set, my_set) = key_class.get_mouse();
@@ -359,8 +357,6 @@ impl Menu {
                             term,
                             CONFIG,
                         );
-                        key_class = key_class; // NEVER REACHED
-                        collector = collector; // NEVER REACHED
                     } else if menu_current == "options".to_owned() {
                         self.options(
                             ARG_MODE,
@@ -405,7 +401,6 @@ impl Menu {
             } else {
                 collector.collect(
                     collectors.clone(),
-                    CONFIG,
                     true,
                     false,
                     false,
@@ -439,22 +434,15 @@ impl Menu {
 
     pub fn help(
         &mut self,
-        THEME: &OnceCell<Mutex<Theme>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        term: &OnceCell<Mutex<Term>>,
-        key_class: &OnceCell<Mutex<Key>>,
-        collector: &OnceCell<Mutex<Collector>>,
+        THEME: &Theme,
+        draw: &mut Draw,
+        term: &Term,
+        key_class: &mut Key,
+        collector: &mut Collector,
         collectors: Vec<Collectors>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        timer: &OnceCell<Mutex<Timer>>,
+        CONFIG: &Config,
+        timer: &mut Timer,
     ) {
-        let mut theme = THEME;
-        let mut draw = draw;
-        let mut term = term;
-        let mut key_class = key_class;
-        let mut collector = collector;
-        let mut CONFIG = CONFIG;
-        let mut timer = timer;
 
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -468,7 +456,7 @@ impl Menu {
         if self.background == String::default() {
             self.background = format!(
                 "{}{}{}",
-                theme.colors.inactive_fg,
+                THEME.colors.inactive_fg,
                 fx::Fx::uncolor(draw.saved_buffer()),
                 term.get_fg()
             );
@@ -531,7 +519,6 @@ impl Menu {
         while !self.close {
             key = String::default();
             if self.resized {
-                term = term;
                 let mut y: u32 = if term.get_height() < (help_items.len() + 10) as u16 {
                     8
                 } else {
@@ -540,8 +527,6 @@ impl Menu {
 
                 let fg_insert = term.get_fg();
                 let bg_insert = term.get_bg();
-                drop(term);
-                drop(key_class);
                 out_misc = format!(
                     "{}{}{}{}{}{}← esc{}{}Version: {}{}{}{}{}",
                     banner::draw_banner(y - 7, 0, true, false, term, draw, key_class),
@@ -558,9 +543,6 @@ impl Menu {
                     bg_insert,
                     fg_insert
                 );
-                term = term;
-                draw = draw;
-                key_class = key_class;
                 let mut x: u32 = (term.get_width() / 2) as u32 - 36;
                 let mut h: u32 = term.get_height() as u32 - 2 - y;
                 let mut w: u32 = 72;
@@ -581,12 +563,12 @@ impl Menu {
                         h + 3,
                         Some("help".to_owned()),
                         None,
-                        Some(theme.colors.div_line),
+                        Some(THEME.colors.div_line),
                         None,
                         true,
                         None,
-                        &term.to_owned(),
-                        &theme.to_owned(),
+                        term,
+                        THEME,
                         None,
                         None,
                         None,
@@ -602,42 +584,40 @@ impl Menu {
                     out = String::default();
                     let mut cy = 0;
                     if pages != 0 {
-                        drop(term);
                         out.push_str(
                             format!(
                                 "{}{}{}{}{}{} {}{}{}/{} pg{}{}{}",
                                 mv::to(y, x + 56),
-                                theme
+                                THEME
                                     .colors
                                     .div_line
                                     .call(symbol::title_left.to_owned(), term),
                                 fx::b,
-                                theme.colors.title.call("pg".to_owned(), term),
+                                THEME.colors.title.call("pg".to_owned(), term),
                                 fx::ub,
-                                theme.colors.main_fg.call(symbol::up.to_owned(), term),
+                                THEME.colors.main_fg.call(symbol::up.to_owned(), term),
                                 fx::b,
-                                theme.colors.title,
+                                THEME.colors.title,
                                 page,
                                 pages,
                                 fx::ub,
-                                theme.colors.main_fg.call(symbol::down.to_owned(), term),
-                                theme
+                                THEME.colors.main_fg.call(symbol::down.to_owned(), term),
+                                THEME
                                     .colors
                                     .div_line
                                     .call(symbol::title_right.to_owned(), term),
                             )
                             .as_str(),
                         );
-                        term = term;
                     }
                     out.push_str(
                         format!(
                             "{}{}{}{:^20}Description:{}",
                             mv::to(y + 1, x + 1),
-                            theme.colors.title,
+                            THEME.colors.title,
                             fx::b,
                             "Keys",
-                            theme.colors.main_fg
+                            THEME.colors.main_fg
                         )
                         .as_str(),
                     );
@@ -684,18 +664,16 @@ impl Menu {
                 }
 
                 if skip && redraw {
-                    draw.now(vec![out.clone()], &mut key_class);
+                    draw.now(vec![out.clone()], key_class);
                 } else if !skip {
                     draw.now(
                         vec![format!("{}{}{}", self.background, out_misc, out)],
-                        &mut key_class,
+                        key_class,
                     );
                 }
                 skip = false;
                 redraw = false;
 
-                drop(draw);
-                drop(term);
                 if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
                     key = match key_class.get() {
                         Some(k) => k,
@@ -729,9 +707,6 @@ impl Menu {
                     }
 
                     if key == "q".to_owned() {
-                        drop(key_class);
-                        drop(collector);
-                        drop(CONFIG);
                         clean_quit(
                             None,
                             None,
@@ -741,11 +716,6 @@ impl Menu {
                             term,
                             CONFIG,
                         );
-                        key_class = key_class; // NEVER REACHED
-                        collector = collector; // NEVER REACHED
-                        draw = draw; // NEVER REACHED
-                        term = term; // NEVER REACHED
-                        CONFIG = CONFIG; // NEVER REACHED
                     } else if vec!["escape", "M", "enter", "backspace", "h", "f1"]
                         .contains(&key.as_str())
                     {
@@ -773,26 +743,21 @@ impl Menu {
                 if timer.not_zero(CONFIG) && !self.resized {
                     skip = true;
                 } else {
-                    drop(CONFIG);
                     collector.collect(
                         collectors.clone(),
-                        CONFIG,
                         true,
                         false,
                         false,
                         false,
                         false,
                     );
-                    CONFIG = CONFIG;
                     collector.set_collect_done(EventEnum::Wait);
                     collector.get_collect_done_reference().wait(2.0);
                     collector.set_collect_done(EventEnum::Flag(false));
                     if CONFIG.background_update {
-                        draw = draw;
-                        term = term;
                         self.background = format!(
                             "{}{}{}",
-                            theme.colors.inactive_fg,
+                            THEME.colors.inactive_fg,
                             fx::Fx::uncolor(draw.saved_buffer()),
                             term.get_fg(),
                         );
@@ -805,9 +770,8 @@ impl Menu {
                 self.close = false;
                 return;
             }
-            draw = draw;
             let saved_buffer_rust_is_dumb = draw.saved_buffer(); // Stupid mutability issues >:(
-            draw.now(vec![saved_buffer_rust_is_dumb], &mut key_class);
+            draw.now(vec![saved_buffer_rust_is_dumb], key_class);
             self.active = false;
             self.close = false;
         }
@@ -816,41 +780,25 @@ impl Menu {
     pub fn options(
         &mut self,
         ARG_MODE: &mut ViewMode,
-        THEME: &OnceCell<Mutex<Theme>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        term: &OnceCell<Mutex<Term>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        key_class: &OnceCell<Mutex<Key>>,
-        timer: &OnceCell<Mutex<Timer>>,
-        netcollector: &OnceCell<Mutex<NetCollector>>,
-        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
+        THEME: &mut Theme,
+        draw: &mut Draw,
+        term: &mut Term,
+        CONFIG: &mut Config,
+        key_class: &mut Key,
+        timer: &mut Timer,
+        netcollector: &mut NetCollector,
+        brshtop_box: &mut BrshtopBox,
         boxes: Vec<Boxes>,
-        collector: &OnceCell<Mutex<Collector>>,
-        init: &OnceCell<Mutex<Init>>,
-        cpubox: &OnceCell<Mutex<CpuBox>>,
-        cpucollector: &OnceCell<Mutex<CpuCollector>>,
-        netbox: &OnceCell<Mutex<NetBox>>,
-        proc_collector: &OnceCell<Mutex<ProcCollector>>,
+        collector: &mut Collector,
+        init: &mut Init,
+        cpubox: &mut CpuBox,
+        cpucollector: &mut CpuCollector,
+        netbox: &mut NetBox,
+        proc_collector: &mut ProcCollector,
         collectors: Vec<Collectors>,
-        procbox: &OnceCell<Mutex<ProcBox>>,
-        membox: &OnceCell<Mutex<MemBox>>,
+        procbox: &mut ProcBox,
+        membox: &mut MemBox,
     ) {
-        let mut THEME = THEME;
-        let mut draw = draw;
-        let mut term = term;
-        let mut CONFIG = CONFIG;
-        let mut key_class = key_class;
-        let mut timer = timer;
-        let mut netcollector = netcollector;
-        let mut brshtop_box = brshtop_box;
-        let mut collector = collector;
-        let mut init = init;
-        let mut cpubox = cpubox;
-        let mut cpucollector = cpucollector;
-        let mut netbox = netbox;
-        let mut proc_collector = proc_collector;
-        let mut procbox = procbox;
-        let mut membox = membox;
 
         let mut out: String = String::default();
         let mut out_misc: String = String::default();
@@ -1238,7 +1186,6 @@ impl Menu {
             let mut selected_int: usize = 0;
             let mut pages: u32 = 0;
             let mut page: u32 = 1;
-            term = term;
             let y: u32 = if (term.get_height() as u32) < (option_len as u32 + 10) {
                 9
             } else {
@@ -1253,8 +1200,6 @@ impl Menu {
             if self.resized {
                 let inserter_bg = term.get_bg();
                 let inserter_fg = term.get_fg();
-                drop(term);
-                drop(key_class);
                 out_misc = format!(
                     "{}{}{}{}{}{}← esc{}{}Version: {}{}{}{}{}",
                     banner::draw_banner(y - 7, 0, true, false, term, draw, key_class),
@@ -1271,9 +1216,6 @@ impl Menu {
                     inserter_bg,
                     inserter_fg
                 );
-                term = term;
-                draw = draw;
-                key_class = key_class;
                 h -= h % 2;
                 color_i = THEME
                     .themes
@@ -1327,7 +1269,6 @@ impl Menu {
                 let mut cy: u32 = 0;
 
                 if pages > 0 {
-                    drop(term);
                     out.push_str(
                         format!(
                             "{}{}{}{}{}{} {}{}{}/{}pg{}{}{}",
@@ -1353,7 +1294,6 @@ impl Menu {
                         )
                         .as_str(),
                     );
-                    term = term;
                 }
 
                 let mut n: usize = 0;
@@ -1362,7 +1302,6 @@ impl Menu {
                         continue;
                     }
 
-                    CONFIG = CONFIG;
                     let mut value: ConfigAttr = CONFIG.getattr(opt.clone());
                     let attr: String = match value {
                         ConfigAttr::Bool(_) => "bool".to_owned(),
@@ -1587,16 +1526,14 @@ impl Menu {
             }
 
             if !skip || redraw {
-                draw = draw;
                 draw.now(
                     vec![format!("{}{}{}", self.background, out_misc, out)],
-                    &mut key_class,
+                    key_class,
                 );
             }
             skip = false;
             redraw = false;
 
-            drop(term);
             if key_class.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
                 key = match key_class.get() {
                     Some(k) => k,
@@ -1644,7 +1581,6 @@ impl Menu {
                     }
                 }
 
-                CONFIG = CONFIG;
                 if inputting {
                     if vec!["escape", "mouse_click"]
                         .iter()
@@ -1694,29 +1630,13 @@ impl Menu {
                                                     brshtop_box
                                                         .set_clock_on(CONFIG.draw_clock.len() > 0);
                                                     if !brshtop_box.get_clock_on() {
-                                                        draw =
-                                                            draw;
                                                         draw.clear(vec!["clock".to_owned()], true);
                                                     }
                                                 }
                                             }
                                             _ => (),
                                         }
-                                        term = term;
-                                        drop(collector);
-                                        drop(init);
-                                        drop(cpubox);
-                                        drop(draw);
-                                        drop(key_class);
-                                        drop(brshtop_box);
-                                        drop(timer);
-                                        drop(CONFIG);
-                                        drop(THEME);
-                                        drop(cpucollector);
-                                        drop(membox);
-                                        drop(netbox);
-                                        drop(procbox);
-                                        term.refresh_dereferenced_menu(
+                                        term.refresh(
                                             vec![],
                                             boxes.clone(),
                                             collector,
@@ -1735,21 +1655,6 @@ impl Menu {
                                             netbox,
                                             procbox,
                                         );
-                                        collector = collector;
-                                        init = init;
-                                        cpubox = cpubox;
-                                        draw = draw;
-                                        key_class = key_class;
-                                        brshtop_box = brshtop_box;
-                                        timer = timer;
-                                        CONFIG = CONFIG;
-                                        THEME = THEME;
-                                        cpucollector =
-                                            cpucollector;
-                                        membox = membox;
-                                        netbox = netbox;
-                                        procbox = procbox;
-                                        CONFIG = CONFIG;
                                         self.resized = false;
                                     }
                                 }
@@ -1776,10 +1681,6 @@ impl Menu {
                         input_val.push_str(key.as_str());
                     }
                 } else if key == "q".to_owned() {
-                    drop(key_class);
-                    drop(collector);
-                    drop(draw);
-                    drop(CONFIG);
                     clean_quit(
                         None,
                         None,
@@ -1789,9 +1690,6 @@ impl Menu {
                         term,
                         CONFIG,
                     );
-                    key_class = key_class; // NEVER REACHED
-                    collector = collector; // NEVER REACHED
-                    draw = draw; // NEVER REACHED
                 } else if ["escape", "o", "M", "f2"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
@@ -1822,12 +1720,7 @@ impl Menu {
                     && CONFIG.update_ms - 100 >= 100
                 {
                     CONFIG.update_ms -= 100;
-                    drop(CONFIG);
-                    drop(cpubox);
-                    drop(key_class);
-                    drop(draw);
-                    drop(THEME);
-                    brshtop_box.draw_update_ms_dereferenced_menu(
+                    brshtop_box.draw_update_ms(
                         true,
                         CONFIG,
                         cpubox,
@@ -1837,22 +1730,12 @@ impl Menu {
                         THEME,
                         term,
                     );
-                    CONFIG = CONFIG;
-                    cpubox = cpubox;
-                    key_class = key_class;
-                    draw = draw;
-                    THEME = THEME;
                 } else if key == "right".to_owned()
                     && selected == "update_ms".to_owned()
                     && CONFIG.update_ms + 100 <= 86399900
                 {
                     CONFIG.update_ms += 100;
-                    drop(CONFIG);
-                    drop(cpubox);
-                    drop(key_class);
-                    drop(draw);
-                    drop(THEME);
-                    brshtop_box.draw_update_ms_dereferenced_menu(
+                    brshtop_box.draw_update_ms(
                         true,
                         CONFIG,
                         cpubox,
@@ -1862,11 +1745,6 @@ impl Menu {
                         THEME,
                         term,
                     );
-                    CONFIG = CONFIG;
-                    cpubox = cpubox;
-                    key_class = key_class;
-                    draw = draw;
-                    THEME = THEME;
                 } else if key == "left".to_owned()
                     && selected == "tree_depth".to_owned()
                     && CONFIG.tree_depth > 0
@@ -1890,9 +1768,7 @@ impl Menu {
                     CONFIG.setattr_configattr(selected.clone(), ConfigAttr::Bool(inserter));
                     if selected == "check_temp".to_owned() {
                         if CONFIG.check_temp {
-                            drop(CONFIG);
                             cpucollector.get_sensors(CONFIG);
-                            CONFIG = CONFIG;
                         } else {
                             cpucollector.set_sensor_method(String::default());
                             cpucollector.set_got_sensors(false);
@@ -1909,31 +1785,16 @@ impl Menu {
                         }
                         netbox.set_redraw(true);
                     } else if selected == "theme_background".to_owned() {
-                        term = term;
                         term.set_bg(if CONFIG.theme_background {
                             THEME.colors.main_bg
                         } else {
                             Color::from("\x1b[49m".to_owned())
                         });
-                        draw.now(vec![term.get_bg().to_string()], &mut key_class);
+                        draw.now(vec![term.get_bg().to_string()], key_class);
                     } else if selected == "show_battery".to_owned() {
                         draw.clear(vec!["battery".to_owned()], true);
                     }
-                    term = term;
-                    drop(collector);
-                    drop(init);
-                    drop(cpubox);
-                    drop(draw);
-                    drop(key_class);
-                    drop(brshtop_box);
-                    drop(timer);
-                    drop(CONFIG);
-                    drop(THEME);
-                    drop(cpucollector);
-                    drop(membox);
-                    drop(netbox);
-                    drop(procbox);
-                    term.refresh_dereferenced_menu(
+                    term.refresh(
                         vec![],
                         boxes.clone(),
                         collector,
@@ -1952,19 +1813,6 @@ impl Menu {
                         netbox,
                         procbox,
                     );
-                    collector = collector;
-                    init = init;
-                    cpubox = cpubox;
-                    draw = draw;
-                    key_class = key_class;
-                    brshtop_box = brshtop_box;
-                    timer = timer;
-                    CONFIG = CONFIG;
-                    THEME = THEME;
-                    cpucollector = cpucollector;
-                    membox = membox;
-                    netbox = netbox;
-                    procbox = procbox;
                     self.resized = true;
                 } else if ["left", "right"]
                     .iter()
@@ -1986,27 +1834,13 @@ impl Menu {
                         }
                     }
                     collector.set_collect_idle(EventEnum::Wait);
-                    collector.get_collect_idle_reference().wait(-1.0);
+                    collector.get_collect_idle_reference().wait(1.0);
                     CONFIG.color_theme =
                         THEME.themes.keys().cloned().collect::<Vec<String>>()[color_i].clone();
                     THEME.replace_self(
                         Theme::from_str(CONFIG.color_theme.clone()).unwrap_or(Theme::default()),
                     );
-                    term = term;
-                    drop(collector);
-                    drop(init);
-                    drop(cpubox);
-                    drop(draw);
-                    drop(key_class);
-                    drop(brshtop_box);
-                    drop(timer);
-                    drop(CONFIG);
-                    drop(THEME);
-                    drop(cpucollector);
-                    drop(membox);
-                    drop(netbox);
-                    drop(procbox);
-                    term.refresh_dereferenced_menu(
+                    term.refresh(
                         vec![],
                         boxes.clone(),
                         collector,
@@ -2025,21 +1859,8 @@ impl Menu {
                         netbox,
                         procbox,
                     );
-                    collector = collector;
-                    init = init;
-                    cpubox = cpubox;
-                    draw = draw;
-                    brshtop_box = brshtop_box;
-                    timer = timer;
-                    THEME = THEME;
-                    cpucollector = cpucollector;
-                    membox = membox;
-                    netbox = netbox;
-                    procbox = procbox;
 
                     timer.finish(key_class, CONFIG);
-                    key_class = key_class;
-                    CONFIG = CONFIG;
                 } else if ["left", "right"]
                     .iter()
                     .map(|s| s.to_owned().to_owned())
@@ -2093,29 +1914,15 @@ impl Menu {
                         }
                     }
                     collector.set_collect_idle(EventEnum::Wait);
-                    collector.get_collect_idle_reference().wait(-1.0);
+                    collector.get_collect_idle_reference().wait(1.0);
                     cpucollector.set_sensor_swap(true);
                     CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i].clone();
                     if CONFIG.check_temp
                         && (cpucollector.get_sensor_method() != "psutil".to_owned()
                             || CONFIG.cpu_sensor == "Auto".to_owned())
                     {
-                        drop(CONFIG);
                         cpucollector.get_sensors(CONFIG);
-                        term = term;
-                        drop(collector);
-                        drop(init);
-                        drop(cpubox);
-                        drop(draw);
-                        drop(key_class);
-                        drop(brshtop_box);
-                        drop(timer);
-                        drop(THEME);
-                        drop(cpucollector);
-                        drop(membox);
-                        drop(netbox);
-                        drop(procbox);
-                        term.refresh_dereferenced_menu(
+                        term.refresh(
                             vec![],
                             boxes.clone(),
                             collector,
@@ -2134,19 +1941,6 @@ impl Menu {
                             netbox,
                             procbox,
                         );
-                        collector = collector;
-                        init = init;
-                        cpubox = cpubox;
-                        draw = draw;
-                        key_class = key_class;
-                        brshtop_box = brshtop_box;
-                        timer = timer;
-                        CONFIG = CONFIG;
-                        THEME = THEME;
-                        cpucollector = cpucollector;
-                        membox = membox;
-                        netbox = netbox;
-                        procbox = procbox;
                         self.resized = false;
                     }
                 } else if ["left", "right"]
@@ -2174,22 +1968,7 @@ impl Menu {
                         ARG_MODE.replace_self(ViewModeEnum::None);
                     }
                     draw.clear(vec![], true);
-                    term = term;
-
-                    drop(collector);
-                    drop(init);
-                    drop(cpubox);
-                    drop(draw);
-                    drop(key_class);
-                    drop(brshtop_box);
-                    drop(timer);
-                    drop(CONFIG);
-                    drop(THEME);
-                    drop(cpucollector);
-                    drop(membox);
-                    drop(netbox);
-                    drop(procbox);
-                    term.refresh_dereferenced_menu(
+                    term.refresh(
                         vec![],
                         boxes.clone(),
                         collector,
@@ -2208,19 +1987,6 @@ impl Menu {
                         netbox,
                         procbox,
                     );
-                    collector = collector;
-                    init = init;
-                    cpubox = cpubox;
-                    draw = draw;
-                    key_class = key_class;
-                    brshtop_box = brshtop_box;
-                    timer = timer;
-                    CONFIG = CONFIG;
-                    THEME = THEME;
-                    cpucollector = cpucollector;
-                    membox = membox;
-                    netbox = netbox;
-                    procbox = procbox;
                     self.resized = false;
                 } else if key == "up".to_owned() {
                     selected_int -= 1;
@@ -2264,7 +2030,6 @@ impl Menu {
             } else {
                 collector.collect(
                     collectors.clone(),
-                    CONFIG,
                     true,
                     false,
                     false,
@@ -2273,9 +2038,7 @@ impl Menu {
                 );
                 collector.set_collect_done(EventEnum::Wait);
                 collector.get_collect_done_reference().wait(2.0);
-                CONFIG = CONFIG;
                 if CONFIG.background_update {
-                    term = term;
                     self.background = format!(
                         "{}{}{}",
                         THEME.colors.inactive_fg,
@@ -2292,7 +2055,7 @@ impl Menu {
             return;
         }
         let inserter = draw.saved_buffer();
-        draw.now(vec![inserter], &mut key_class);
+        draw.now(vec![inserter], key_class);
         self.background = String::default();
         self.active = false;
         self.close = false;

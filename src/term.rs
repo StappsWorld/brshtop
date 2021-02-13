@@ -23,6 +23,7 @@ use {
     once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
+        convert::TryFrom,
         io,
         mem::drop,
         ops::{Deref, DerefMut},
@@ -86,20 +87,20 @@ impl Term {
         args: Vec<String>,
         boxes: Vec<Boxes>,
         collector: &mut Collector,
-        init: &Init,
-        cpu_box: &CpuBox,
-        draw: &Draw,
+        init: &mut Init,
+        cpu_box: &mut CpuBox,
+        draw: &mut Draw,
         force: bool,
         key: &mut Key,
         menu: &mut Menu,
-        brshtop_box: &BrshtopBox,
-        timer: &Timer,
+        brshtop_box: &mut BrshtopBox,
+        timer: &mut Timer,
         config: &Config,
         theme: &Theme,
         cpu: &CpuCollector,
-        mem_box: &MemBox,
-        net_box: &NetBox,
-        proc_box: &ProcBox,
+        mem_box: &mut MemBox,
+        net_box: &mut NetBox,
+        proc_box: &mut ProcBox,
     ) {
         if self.resized {
             self.winch.replace_self(EventEnum::Flag(true));
@@ -136,8 +137,8 @@ impl Term {
             draw.now(
                 vec![
                     create_box(
-                        (self._w as u32 / 2) - 25,
-                        (self._h as u32 / 2) - 2,
+                        u32::try_from((self._w as i32 / 2) - 25).unwrap_or(0),
+                        u32::try_from((self._h as i32 / 2) - 2).unwrap_or(0),
                         50,
                         3,
                         Some(String::from("resizing")),
@@ -147,7 +148,7 @@ impl Term {
                         true,
                         None,
                         self,
-                        &theme.to_owned(),
+                        theme,
                         None,
                         None,
                         None,
@@ -175,8 +176,8 @@ impl Term {
                 draw.now(
                     vec![
                         create_box(
-                            (self._w as u32 / 2) - 25,
-                            (self._h as u32 / 2) - 2,
+                            u32::try_from((self._w as i32 / 2) - 25).unwrap_or(0),
+                            u32::try_from((self._h as i32 / 2) - 2).unwrap_or(0),
                             50,
                             5,
                             Some(String::from("warning")),
@@ -186,7 +187,7 @@ impl Term {
                             true,
                             None,
                             self,
-                            &theme.to_owned(),
+                            theme,
                             None,
                             None,
                             None,
@@ -220,7 +221,7 @@ impl Term {
                         ),
                         format!(
                             "{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}",
-                            mv::to((self._h / 2) as u32, (self._w / 2) as u32 - 23),
+                            mv::to((self._h / 2) as u32, u32::try_from((self._w / 2) as i32 - 23).unwrap_or(0)),
                             Color::Default(),
                             Color::BlackBg(),
                             fx::ub,
@@ -295,9 +296,7 @@ impl Term {
         );
         self.resized = false;
         timer.finish(key, config);
-        println!("Terminal refresh end");
     }
-
 
     /// Toggle input echo
     pub fn echo(on: bool) {

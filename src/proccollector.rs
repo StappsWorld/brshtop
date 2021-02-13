@@ -171,7 +171,7 @@ impl ProcCollector {
         &mut self,
         brshtop_box: &BrshtopBox,
         CONFIG: &Config,
-        procbox: &ProcBox,
+        procbox: &mut ProcBox,
     ) {
         if brshtop_box.get_stat_mode() {
             return;
@@ -336,18 +336,10 @@ impl ProcCollector {
         if self.detailed {
             self.expand = u32::try_from(
                 ((procbox
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
                     .get_parent()
                     .get_width() as i32
                     - 2)
                     - ((procbox
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .get_parent()
                         .get_width() as i32
                         - 2)
@@ -728,10 +720,6 @@ impl ProcCollector {
             ) as u32);
             if self.details_cpu.len() as u32
                 > procbox
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
                     .get_parent()
                     .get_width()
             {
@@ -739,10 +727,6 @@ impl ProcCollector {
             }
             if self.details_mem.len() as u32
                 > procbox
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
                     .get_parent()
                     .get_width()
             {
@@ -1356,14 +1340,14 @@ impl ProcCollector {
     /// JUST CALL ProcBox.draw_fg()
     pub fn draw(
         &mut self,
-        procbox: &OnceCell<Mutex<ProcBox>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        key: &OnceCell<Mutex<Key>>,
-        THEME: &OnceCell<Mutex<Theme>>,
-        graphs: &OnceCell<Mutex<Graphs>>,
-        term: &OnceCell<Mutex<Term>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        menu: &OnceCell<Mutex<Menu>>,
+        procbox: &mut ProcBox,
+        CONFIG: &Config,
+        key: &mut Key,
+        THEME: &Theme,
+        graphs: &mut Graphs,
+        term: &Term,
+        draw: &mut Draw,
+        menu: &Menu,
     ) {
         procbox.draw_fg(
             CONFIG,

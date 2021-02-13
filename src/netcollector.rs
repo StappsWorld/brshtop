@@ -168,8 +168,7 @@ impl<'a> NetCollector<'a> {
     pub fn switch(
         &mut self,
         key: String,
-        collector: &OnceCell<Mutex<Collector>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
+        collector: &mut Collector,
     ) {
         if self.nics.len() < 2 {
             return;
@@ -185,7 +184,6 @@ impl<'a> NetCollector<'a> {
 
         collector.collect(
             vec![Collectors::NetCollector],
-            CONFIG,
             true,
             false,
             false,
@@ -197,7 +195,7 @@ impl<'a> NetCollector<'a> {
     pub fn collect(
         &mut self,
         CONFIG: &Config,
-        netbox: &NetBox,
+        netbox: &mut NetBox,
     ) {
         let mut speed: i32 = 0;
         let mut stat: HashMap<String, NetCollectorStat> =
@@ -668,14 +666,14 @@ impl<'a> NetCollector<'a> {
     /// JUST CALL NETBOX.draw_fg()
     pub fn draw(
         &mut self,
-        netbox: &OnceCell<Mutex<NetBox>>,
-        theme: &OnceCell<Mutex<Theme>>,
-        key: &OnceCell<Mutex<Key>>,
-        term: &OnceCell<Mutex<Term>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        graphs: &OnceCell<Mutex<Graphs>>,
-        menu: &OnceCell<Mutex<Menu>>,
+        netbox: &mut NetBox,
+        theme: &Theme,
+        key: &mut Key,
+        term: &Term,
+        CONFIG: &Config,
+        draw: &mut Draw,
+        graphs: &mut Graphs,
+        menu: &Menu,
     ) {
         netbox.draw_fg(
             theme,

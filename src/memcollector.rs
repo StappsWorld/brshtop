@@ -106,7 +106,7 @@ impl MemCollector {
         mem
     }
 
-    pub fn collect(&mut self, CONFIG: &OnceCell<Mutex<Config>>, membox: &OnceCell<Mutex<MemBox>>) {
+    pub fn collect(&mut self, CONFIG: &Config, membox: &mut MemBox) {
         // * Collect memory
         let mem: VirtualMemory = match virtual_memory() {
             Ok(v) => v,
@@ -150,10 +150,6 @@ impl MemCollector {
                 );
                 if self.get_vlist_index(key.clone()).unwrap_or(vec![]).len() as u32
                     > membox
-                        .get()
-                        .unwrap()
-                        .try_lock()
-                        .unwrap()
                         .get_parent()
                         .get_width()
                 {
@@ -217,10 +213,6 @@ impl MemCollector {
                             .unwrap_or(vec![])
                             .len() as u32
                             > membox
-                                .get()
-                                .unwrap()
-                                .try_lock()
-                                .unwrap()
                                 .get_parent()
                                 .get_width()
                         {
@@ -259,21 +251,14 @@ impl MemCollector {
 
         if CONFIG.disks_filter.len() > 0 {
             if CONFIG
-                .get()
-                .unwrap()
-                .try_lock()
-                .unwrap()
                 .disks_filter
                 .starts_with("exclude=")
             {
                 filter_exclude = true;
                 let mut adder: Vec<String> = Vec::<String>::new();
                 for v in CONFIG
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
                     .disks_filter
+                    .clone()
                     .replace("exclude=", "")
                     .trim()
                     .split(',')
@@ -284,11 +269,8 @@ impl MemCollector {
             } else {
                 let mut adder: Vec<String> = Vec::<String>::new();
                 for v in CONFIG
-                    .get()
-                    .unwrap()
-                    .try_lock()
-                    .unwrap()
                     .disks_filter
+                    .clone()
                     .trim()
                     .split(',')
                 {
@@ -595,16 +577,16 @@ impl MemCollector {
     /// JUST CALL MemBox.draw_fg()
     pub fn draw(
         &mut self,
-        membox: &OnceCell<Mutex<MemBox>>,
-        term: &OnceCell<Mutex<Term>>,
-        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        meters: &OnceCell<Mutex<Meters>>,
-        THEME: &OnceCell<Mutex<Theme>>,
-        key: &OnceCell<Mutex<Key>>,
+        membox: &mut MemBox,
+        term: &Term,
+        brshtop_box: &mut BrshtopBox,
+        CONFIG: &Config,
+        meters: &mut Meters,
+        THEME: &Theme,
+        key: &mut Key,
         collector: &Collector,
-        draw: &OnceCell<Mutex<Draw>>,
-        menu: &OnceCell<Mutex<Menu>>,
+        draw: &mut Draw,
+        menu: &Menu,
     ) {
         membox.draw_fg(
             self,

@@ -127,10 +127,10 @@ impl BrshtopBox {
         term: &Term,
         CONFIG: &Config,
         cpu_collector: &CpuCollector,
-        cpu_box: &CpuBox,
-        mem_box: &MemBox,
-        net_box: &NetBox,
-        proc_box: &ProcBox,
+        cpu_box: &mut CpuBox,
+        mem_box: &mut MemBox,
+        net_box: &mut NetBox,
+        proc_box: &mut ProcBox,
     ) {
         for sub in boxes {
             match sub {
@@ -141,7 +141,6 @@ impl BrshtopBox {
                 }
                 Boxes::MemBox => {
                     let mut _b_mem_h_mutable: i32 = self._b_mem_h.clone();
-                    drop(CONFIG);
                     _b_mem_h_mutable =
                         mem_box.calc_size(term, _b_mem_h_mutable, self.get_b_cpu_h(), CONFIG);
 
@@ -167,7 +166,7 @@ impl BrshtopBox {
         config: &Config,
         cpu_box: &CpuBox,
         key: &mut Key,
-        draw: &Draw,
+        draw: &mut Draw,
         menu: &Menu,
         theme: &Theme,
         term: &Term,
@@ -199,8 +198,6 @@ impl BrshtopBox {
             key.mouse.insert("-".to_owned(), sub_for_mouse_parent);
         }
 
-        drop(term);
-        drop(key);
         draw.buffer(
             if now && !menu.active {
                 String::from("update_ms!")
@@ -244,7 +241,7 @@ impl BrshtopBox {
                 match Manager::new() {
                     Ok(m) => match m.batteries() {
                         Ok(b) => match b.into_iter().size_hint() {
-                            (0, Some(_)) => draw.out(vec!["battery".to_owned()], false, &mut key),
+                            (0, Some(_)) => draw.out(vec!["battery".to_owned()], false, key),
                             _ => (),
                         },
                         _ => (),
@@ -264,7 +261,7 @@ impl BrshtopBox {
         theme: &Theme,
         menu: &Menu,
         cpu_box: &CpuBox,
-        draw: &Draw,
+        draw: &mut Draw,
         key: &mut Key,
     ) {
         let mut out: String = String::default();
@@ -323,7 +320,6 @@ impl BrshtopBox {
         let now: bool = if menu.active { false } else { !force };
 
         let inserter = term.get_fg();
-        drop(term);
         out.push_str(
             format!(
                 "{}{}{}{}{}{}{}{}{}{}",
@@ -346,7 +342,6 @@ impl BrshtopBox {
             )
             .as_str(),
         );
-        drop(key);
         draw.buffer(
             "clock".to_owned(),
             vec![out.clone()],
@@ -363,7 +358,7 @@ impl BrshtopBox {
             match Manager::new() {
                 Ok(m) => match m.batteries() {
                     Ok(b) => match b.into_iter().size_hint() {
-                        (0, Some(_)) => draw.out(vec!["battery".to_owned()], false, &mut key),
+                        (0, Some(_)) => draw.out(vec!["battery".to_owned()], false, key),
                         _ => (),
                     },
                     _ => (),
@@ -378,7 +373,7 @@ impl BrshtopBox {
     pub fn draw_bg(
         &mut self,
         now: bool,
-        draw: &Draw,
+        draw: &mut Draw,
         subclasses: Vec<Boxes>,
         menu: &Menu,
         config: &Config,

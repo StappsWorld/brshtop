@@ -56,29 +56,6 @@ impl Draw {
         self.idle.replace_self(EventEnum::Flag(true));
     }
 
-    /// Wait for input reader and self to be idle then print to screen
-    pub fn now_unreferenced_key(&mut self, args: Vec<String>, key: &mut Key) {
-        
-
-        key.idle.replace_self(EventEnum::Wait);
-        //key.idle.wait(-1.0);
-
-        self.idle.replace_self(EventEnum::Wait);
-
-        //self.idle.wait(-1.0);
-
-        self.idle.replace_self(EventEnum::Flag(false));
-
-
-        print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-        for s in args.clone() {
-            print!("{}", s);
-            io::stdout().flush().unwrap();
-        }
-
-        self.idle.replace_self(EventEnum::Flag(true));
-    }
-
     /// Defaults append: bool = False, now: bool = False, z: int = 100, only_save: bool = False, no_save: bool = False, once: bool = False
     pub fn buffer(
         &mut self,
