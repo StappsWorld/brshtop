@@ -73,7 +73,7 @@ pub struct MemCollector {
     buffer: String,
 }
 impl MemCollector {
-    pub fn new(membox: &OnceCell<Mutex<MemBox>>) -> Self {
+    pub fn new(membox: &MemBox) -> Self {
         let mut mem = MemCollector {
             parent: Collector::new(),
             values: HashMap::<String, Bytes>::new(),
@@ -90,7 +90,7 @@ impl MemCollector {
             io_error: false,
             old_disks: Vec::<String>::new(),
             excludes: vec![FileSystem::Other("squashfs".to_owned())],
-            buffer: membox.get().unwrap().lock().unwrap().get_buffer().clone(),
+            buffer: membox.get_buffer().clone(),
         };
         if SYSTEM.to_owned() == "BSD".to_owned() {
             for s in vec!["devfs", "tmpfs", "procfs", "linprocfs", "gvfs", "fusefs"]
@@ -140,7 +140,7 @@ impl MemCollector {
                 key.clone(),
                 value * 100 / self.get_values_index("total".to_owned()).unwrap_or(1),
             );
-            if CONFIG.get().unwrap().lock().unwrap().mem_graphs {
+            if CONFIG.mem_graphs {
                 if !self.get_vlist().contains_key(&key.clone()) {
                     self.vlist.insert(key.clone(), vec![]);
                 }
@@ -152,7 +152,7 @@ impl MemCollector {
                     > membox
                         .get()
                         .unwrap()
-                        .lock()
+                        .try_lock()
                         .unwrap()
                         .get_parent()
                         .get_width()
@@ -169,8 +169,8 @@ impl MemCollector {
         }
 
         // * Collect swap
-        if CONFIG.get().unwrap().lock().unwrap().show_swap
-            || CONFIG.get().unwrap().lock().unwrap().swap_disk
+        if CONFIG.show_swap
+            || CONFIG.swap_disk
         {
             let swap: SwapMemory = match swap_memory() {
                 Ok(s) => s,
@@ -188,9 +188,9 @@ impl MemCollector {
             self.set_swap_values_index("used".to_owned(), swap.total() / swap.free());
 
             if swap.total() > 0 {
-                if !membox.get().unwrap().lock().unwrap().get_swap_on() {
-                    membox.get().unwrap().lock().unwrap().set_redraw(true);
-                    membox.get().unwrap().lock().unwrap().set_swap_on(true);
+                if !membox.get_swap_on() {
+                    membox.set_redraw(true);
+                    membox.set_swap_on(true);
                 }
                 for (key, value) in self.get_swap_values() {
                     self.set_swap_string_index(
@@ -204,7 +204,7 @@ impl MemCollector {
                         key.clone(),
                         value.clone() * 100 / self.get_swap_values_index(key.clone()).unwrap_or(1),
                     );
-                    if CONFIG.get().unwrap().lock().unwrap().mem_graphs {
+                    if CONFIG.mem_graphs {
                         if !self.get_swap_vlist().contains_key(&key.clone()) {
                             self.set_swap_vlist_index(key.clone(), vec![]);
                         }
@@ -219,7 +219,7 @@ impl MemCollector {
                             > membox
                                 .get()
                                 .unwrap()
-                                .lock()
+                                .try_lock()
                                 .unwrap()
                                 .get_parent()
                                 .get_width()
@@ -229,19 +229,19 @@ impl MemCollector {
                     }
                 }
             } else {
-                if membox.get().unwrap().lock().unwrap().get_swap_on() {
-                    membox.get().unwrap().lock().unwrap().set_redraw(true);
-                    membox.get().unwrap().lock().unwrap().set_swap_on(false);
+                if membox.get_swap_on() {
+                    membox.set_redraw(true);
+                    membox.set_swap_on(false);
                 }
             }
         } else {
-            if membox.get().unwrap().lock().unwrap().get_swap_on() {
-                membox.get().unwrap().lock().unwrap().set_redraw(true);
-                membox.get().unwrap().lock().unwrap().set_swap_on(false);
+            if membox.get_swap_on() {
+                membox.set_redraw(true);
+                membox.set_swap_on(false);
             }
         }
 
-        if !CONFIG.get().unwrap().lock().unwrap().show_disks {
+        if !CONFIG.show_disks {
             return;
         }
 
@@ -257,11 +257,11 @@ impl MemCollector {
         let mut disk_list: Vec<String> = Vec::<String>::new();
         self.set_disks(HashMap::<String, HashMap<String, DiskInfo>>::new());
 
-        if CONFIG.get().unwrap().lock().unwrap().disks_filter.len() > 0 {
+        if CONFIG.disks_filter.len() > 0 {
             if CONFIG
                 .get()
                 .unwrap()
-                .lock()
+                .try_lock()
                 .unwrap()
                 .disks_filter
                 .starts_with("exclude=")
@@ -271,7 +271,7 @@ impl MemCollector {
                 for v in CONFIG
                     .get()
                     .unwrap()
-                    .lock()
+                    .try_lock()
                     .unwrap()
                     .disks_filter
                     .replace("exclude=", "")
@@ -286,7 +286,7 @@ impl MemCollector {
                 for v in CONFIG
                     .get()
                     .unwrap()
-                    .lock()
+                    .try_lock()
                     .unwrap()
                     .disks_filter
                     .trim()
@@ -455,7 +455,7 @@ impl MemCollector {
                         vec![disk_io.read_bytes().value, disk_io.write_bytes().value],
                     );
 
-                    if membox.get().unwrap().lock().unwrap().get_disks_width() > 30 {
+                    if membox.get_disks_width() > 30 {
                         if disk_read > 0 {
                             io_string.push_str(
                                 format!(
@@ -509,8 +509,8 @@ impl MemCollector {
                     );
                 }
 
-                if CONFIG.get().unwrap().lock().unwrap().swap_disk
-                    && membox.get().unwrap().lock().unwrap().get_swap_on()
+                if CONFIG.swap_disk
+                    && membox.get_swap_on()
                 {
                     self.set_disks_index("__swap".to_owned(), {
                         let mut h = vec![
@@ -579,7 +579,7 @@ impl MemCollector {
                 }
 
                 if disk_list != self.get_old_disks() {
-                    membox.get().unwrap().lock().unwrap().set_redraw(true);
+                    membox.set_redraw(true);
                     self.set_old_disks(disk_list.clone());
                 }
 
@@ -606,7 +606,7 @@ impl MemCollector {
         draw: &OnceCell<Mutex<Draw>>,
         menu: &OnceCell<Mutex<Menu>>,
     ) {
-        membox.get().unwrap().lock().unwrap().draw_fg(
+        membox.draw_fg(
             self,
             term,
             brshtop_box,

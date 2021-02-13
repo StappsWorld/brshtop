@@ -63,8 +63,8 @@ pub struct ProcBox {
     redraw : bool,
 }
 impl<'a> ProcBox {
-    pub fn new(brshtop_box: &OnceCell<Mutex<BrshtopBox>>, CONFIG: &OnceCell<Mutex<Config>>, ARG_MODE: ViewMode) -> Self {
-        brshtop_box.get().unwrap().lock().unwrap().push_buffers("proc".to_owned());
+    pub fn new(brshtop_box: &BrshtopBox, CONFIG: &Config, ARG_MODE: ViewMode) -> Self {
+        brshtop_box.push_buffers("proc".to_owned());
         let mut procbox = ProcBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
             current_y: 0,
@@ -96,7 +96,7 @@ impl<'a> ProcBox {
         procbox
     }
 
-    pub fn calc_size(&mut self, term: &OnceCell<Mutex<Term>>, _b_cpu_h : i32) {
+    pub fn calc_size(&mut self, term: &Term, _b_cpu_h : i32) {
         let mut width_p = self.parent.get_width_p();
         let mut height_p = self.parent.get_height_p();
 
@@ -105,25 +105,22 @@ impl<'a> ProcBox {
             height_p = 80;
         }
 
-        self.parent.set_width((term.get().unwrap().lock().unwrap().get_width() as f64 * width_p as f64 / 100.0).round() as u32);
-        self.parent.set_width((term.get().unwrap().lock().unwrap().get_height() as f64 * height_p as f64 / 100.0).round() as u32);
-        if self.parent.get_height() + _b_cpu_h as u32 > term.get().unwrap().lock().unwrap().get_height() as u32 {
-            self.parent.set_height(u32::try_from(term.get().unwrap().lock().unwrap().get_height() as i32 - _b_cpu_h as i32).unwrap_or(0));
+        self.parent.set_width((term.get_width() as f64 * width_p as f64 / 100.0).round() as u32);
+        self.parent.set_width((term.get_height() as f64 * height_p as f64 / 100.0).round() as u32);
+        if self.parent.get_height() + _b_cpu_h as u32 > term.get_height() as u32 {
+            self.parent.set_height(u32::try_from(term.get_height() as i32 - _b_cpu_h as i32).unwrap_or(0));
         }
-        self.parent.set_x(u32::try_from(term.get().unwrap().lock().unwrap().get_width() as i32 - self.parent.get_width() as i32 + 1).unwrap_or(0));
+        self.parent.set_x(u32::try_from(term.get_width() as i32 - self.parent.get_width() as i32 + 1).unwrap_or(0));
         self.parent.set_y(_b_cpu_h as u32 + 1);
         self.select_max = usize::try_from(self.parent.get_height() as i32 - 3).unwrap_or(0);
         self.redraw = true;
         self.parent.set_resized(true);
     }
 
-    pub fn draw_bg(&self, theme_p: &OnceCell<Mutex<Theme>>, term_p : &OnceCell<Mutex<Term>>) -> String {
+    pub fn draw_bg(&self, theme: &Theme, term : &Term) -> String {
         if self.parent.get_stat_mode() {
             return String::default();
         }
-
-        let mut theme = theme_p.get().unwrap().lock().unwrap();
-        let mut term = term_p.get().unwrap().lock().unwrap();
 
         return create_box(
             0,
@@ -132,12 +129,12 @@ impl<'a> ProcBox {
             0,
             None,
             None,
-            Some(theme.colors.proc_box),
+            Some(theme.colors.proc_box.clone()),
             None,
             true,
             Some(Boxes::ProcBox),
-            &term.to_owned(),
-            &theme.to_owned(),
+            term,
+            theme,
             None,
             None,
             None,
@@ -151,10 +148,10 @@ impl<'a> ProcBox {
         &mut self,
         key: String,
         mouse_pos: (i32, i32),
-        proc_collector: &OnceCell<Mutex<ProcCollector>>,
-        key_class: &OnceCell<Mutex<Key>>,
-        collector: &OnceCell<Mutex<Collector>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
+        proc_collector: &ProcCollector,
+        key_class: &Key,
+        collector: &Collector,
+        CONFIG: &Config,
     ) {
         let old = (self.start, self.selected);
 
@@ -169,12 +166,12 @@ impl<'a> ProcBox {
                 self.selected -= 1;
             }
         } else if key == "down".to_owned() {
-            if self.selected == 0 && proc_collector.get().unwrap().lock().unwrap().detailed && self.last_selection > 0 {
+            if self.selected == 0 && proc_collector.detailed && self.last_selection > 0 {
                 self.selected = self.last_selection;
                 self.last_selection = 0;
             }
             if self.selected == self.select_max
-                && self.start < proc_collector.get().unwrap().lock().unwrap().num_procs as i32 - self.select_max as i32 + 1
+                && self.start < proc_collector.num_procs as i32 - self.select_max as i32 + 1
             {
                 self.start += 1;
             } else if self.selected < self.select_max {
@@ -183,13 +180,13 @@ impl<'a> ProcBox {
         } else if key == "mouse_scroll_up".to_owned() && self.start > 1 {
             self.start -= 5;
         } else if key == "mouse_scroll_down".to_owned()
-            && self.start < proc_collector.get().unwrap().lock().unwrap().num_procs as i32 - self.select_max as i32 + 1
+            && self.start < proc_collector.num_procs as i32 - self.select_max as i32 + 1
         {
             self.start += 5;
         } else if key == "page_up".to_owned() && self.start > 1 {
             self.start -= self.select_max as i32;
         } else if key == "page_down".to_owned()
-            && self.start < proc_collector.get().unwrap().lock().unwrap().num_procs as i32 - self.select_max as i32 + 1
+            && self.start < proc_collector.num_procs as i32 - self.select_max as i32 + 1
         {
             self.start += self.select_max as i32;
         } else if key == "home".to_owned() {
@@ -199,8 +196,8 @@ impl<'a> ProcBox {
                 self.selected = 0;
             }
         } else if key == "end".to_owned() {
-            if self.start < proc_collector.get().unwrap().lock().unwrap().num_procs as i32 - self.select_max as i32 + 1 {
-                self.start = proc_collector.get().unwrap().lock().unwrap().num_procs as i32 - self.select_max as i32 + 1;
+            if self.start < proc_collector.num_procs as i32 - self.select_max as i32 + 1 {
+                self.start = proc_collector.num_procs as i32 - self.select_max as i32 + 1;
             } else if self.selected < self.select_max {
                 self.selected = self.select_max;
             }
@@ -212,10 +209,10 @@ impl<'a> ProcBox {
                 if mouse_pos.1 == self.current_y as i32 + 2 {
                     self.start = 1;
                 } else if mouse_pos.1 == (self.current_y + 1 + self.select_max as u32) as i32 {
-                    self.start = proc_collector.get().unwrap().lock().unwrap().num_procs as i32 - self.select_max as i32 + 1;
+                    self.start = proc_collector.num_procs as i32 - self.select_max as i32 + 1;
                 } else {
                     self.start = ((mouse_pos.1 - self.current_y as i32) as f64
-                        * ((proc_collector.get().unwrap().lock().unwrap().num_procs as u32 - self.select_max as u32 - 2) as f64
+                        * ((proc_collector.num_procs as u32 - self.select_max as u32 - 2) as f64
                             / (self.select_max - 2) as f64))
                         .round() as i32;
                 }
@@ -229,7 +226,7 @@ impl<'a> ProcBox {
                     }) as usize;
 
                 if new_sel > 0 && new_sel == self.selected {
-                    key_class.get().unwrap().lock().unwrap().list.insert(0, "enter".to_owned());
+                    key_class.list.insert(0, "enter".to_owned());
                     return;
                 } else if new_sel > 0 && new_sel != self.selected {
                     if self.last_selection != 0 {
@@ -242,20 +239,20 @@ impl<'a> ProcBox {
             self.selected = 0;
         }
 
-        if self.start > (proc_collector.get().unwrap().lock().unwrap().num_procs - self.select_max as u32 + 1) as i32
-            && proc_collector.get().unwrap().lock().unwrap().num_procs > self.select_max as u32
+        if self.start > (proc_collector.num_procs - self.select_max as u32 + 1) as i32
+            && proc_collector.num_procs > self.select_max as u32
         {
-            self.start = (proc_collector.get().unwrap().lock().unwrap().num_procs - self.select_max as u32 + 1) as i32;
-        } else if self.start > proc_collector.get().unwrap().lock().unwrap().num_procs as i32 {
-            self.start = proc_collector.get().unwrap().lock().unwrap().num_procs as i32;
+            self.start = (proc_collector.num_procs - self.select_max as u32 + 1) as i32;
+        } else if self.start > proc_collector.num_procs as i32 {
+            self.start = proc_collector.num_procs as i32;
         }
         if self.start < 1 {
             self.start = 1;
         }
-        if self.selected as u32 > proc_collector.get().unwrap().lock().unwrap().num_procs
-            && proc_collector.get().unwrap().lock().unwrap().num_procs < self.select_max as u32
+        if self.selected as u32 > proc_collector.num_procs
+            && proc_collector.num_procs < self.select_max as u32
         {
-            self.selected = proc_collector.get().unwrap().lock().unwrap().num_procs as usize;
+            self.selected = proc_collector.num_procs as usize;
         } else if self.selected > self.select_max {
             self.selected = self.select_max;
         }
@@ -265,7 +262,7 @@ impl<'a> ProcBox {
 
         if old != (self.start, self.selected) {
             self.moved = true;
-            collector.get().unwrap().lock().unwrap().collect(
+            collector.collect(
                 vec![Collectors::ProcCollector],
                 CONFIG,
                 true,
@@ -279,14 +276,14 @@ impl<'a> ProcBox {
 
     pub fn draw_fg(
         &mut self,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        key: & OnceCell<Mutex<Key>>,
-        THEME: &OnceCell<Mutex<Theme>>,
-        graphs: &OnceCell<Mutex<Graphs>>,
-        term: &OnceCell<Mutex<Term>>,
-        draw : &OnceCell<Mutex<Draw>>,
+        CONFIG: &Config,
+        key: &Key,
+        THEME: &Theme,
+        graphs: &Graphs,
+        term: &Term,
+        draw : &Draw,
         proc : &ProcCollector,
-        menu : &OnceCell<Mutex<Menu>>,
+        menu : &Menu,
     ) {
         if self.parent.get_stat_mode() {
             return;
@@ -385,14 +382,14 @@ impl<'a> ProcBox {
             }
         }
 
-        if CONFIG.get().unwrap().lock().unwrap().proc_tree {
+        if CONFIG.proc_tree {
             tree_len = arg_len + prog_len + 6;
             arg_len = 0;
         }
 
         // * Buttons and titles only redrawn if needed
         if self.parent.get_resized() || self.redraw {
-            s_len += CONFIG.get().unwrap().lock().unwrap().proc_sorting.to_string().len();
+            s_len += CONFIG.proc_sorting.to_string().len();
             if self.parent.get_resized() || s_len != self.s_len || proc.detailed {
                 self.s_len = s_len;
                 for k in [
@@ -402,8 +399,8 @@ impl<'a> ProcBox {
                 .map(|s| s.to_owned().to_owned())
                 .collect::<Vec<String>>()
                 {
-                    if key.get().unwrap().lock().unwrap().mouse.contains_key(&k) {
-                        key.get().unwrap().lock().unwrap().mouse.remove(&k);
+                    if key.mouse.contains_key(&k) {
+                        key.mouse.remove(&k);
                     }
                 }
             }
@@ -416,23 +413,23 @@ impl<'a> ProcBox {
                     },
                 };
                 let mut main: Color = if self.selected == 0 && !killed {
-                    THEME.get().unwrap().lock().unwrap().colors.main_fg
+                    THEME.colors.main_fg
                 } else {
-                    THEME.get().unwrap().lock().unwrap().colors.inactive_fg
+                    THEME.colors.inactive_fg
                 };
                 let mut hi: Color = if self.selected == 0 && !killed {
-                    THEME.get().unwrap().lock().unwrap().colors.hi_fg
+                    THEME.colors.hi_fg
                 } else {
-                    THEME.get().unwrap().lock().unwrap().colors.inactive_fg
+                    THEME.colors.inactive_fg
                 };
                 let mut title: Color = if self.selected == 0 && !killed {
-                    THEME.get().unwrap().lock().unwrap().colors.title
+                    THEME.colors.title
                 } else {
-                    THEME.get().unwrap().lock().unwrap().colors.inactive_fg
+                    THEME.colors.inactive_fg
                 };
                 if self.current_y != self.parent.get_y() + 8
                     || self.parent.get_resized()
-                    || graphs.get().unwrap().lock().unwrap().detailed_cpu.NotImplemented
+                    || graphs.detailed_cpu.NotImplemented
                 {
                     self.current_y = self.parent.get_y() + 8;
                     self.current_h = u32::try_from(self.parent.get_height() as i32 - 8).unwrap_or(0);
@@ -445,23 +442,23 @@ impl<'a> ProcBox {
                         format!(
                             "{}{}{}{}{}{}{}{}{}{}{}{}",
                             mv::to(dy + 7, x - 1),
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box,
+                            THEME.colors.proc_box,
                             symbol::title_right,
                             symbol::h_line.repeat(w as usize),
                             symbol::title_left,
                             mv::to(dy + 7, x + 1),
-                            THEME.get().unwrap().lock().unwrap()
+                            THEME
                                 .colors
                                 .proc_box
                                 .call(symbol::title_left.to_owned(), term),
                             fx::b,
-                            THEME.get().unwrap().lock().unwrap().colors.title.call(self.get_parent().get_name().clone(), term),
+                            THEME.colors.title.call(self.get_parent().get_name().clone(), term),
                             fx::ub,
-                            THEME.get().unwrap().lock().unwrap()
+                            THEME
                                 .colors
                                 .proc_box
                                 .call(symbol::title_right.to_owned(), term),
-                            THEME.get().unwrap().lock().unwrap().colors.div_line,
+                            THEME.colors.div_line,
                         )
                         .as_str(),
                     );
@@ -477,38 +474,38 @@ impl<'a> ProcBox {
                     format!(
                         "{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
                         mv::to(dy - 1, x - 1),
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box,
+                        THEME.colors.proc_box,
                         symbol::left_up,
                         symbol::h_line.repeat(w as usize),
                         symbol::right_up,
                         mv::to(dy - 1, dgx + dgw + 1),
                         symbol::div_up,
                         mv::to(dy - 1, x + 1),
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .proc_box
                             .call(symbol::title_left.to_owned(), term),
                         fx::b,
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .title
                             .call(proc.details[&"pid".to_owned()].to_string(), term),
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .proc_box
                             .call(symbol::title_right.to_owned(), term),
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .proc_box
                             .call(symbol::title_left.to_owned(), term),
                         fx::b,
-                        THEME.get().unwrap().lock().unwrap().colors.title.call(
+                        THEME.colors.title.call(
                             proc.details[&"name".to_owned()].to_string()[..dgw as usize - 11].to_owned(),
                             term
                         ),
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .proc_box
                             .call(symbol::title_right.to_owned(), term),
@@ -526,7 +523,7 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("enter".to_owned(), top.clone());
+                    key.mouse.insert("enter".to_owned(), top.clone());
                 }
 
                 if self.selected == 0 && !killed {
@@ -539,14 +536,14 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("t".to_owned(), top.clone());
+                    key.mouse.insert("t".to_owned(), top.clone());
                 }
 
                 out_misc.push_str(
                     format!(
                         "{}{}{}{}close{} {}{}{}{}{}{}{}t{}erminate{}{}",
                         mv::to(dy - 1, dx + dw - 11),
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .proc_box
                             .call(symbol::title_left.to_owned(), term),
@@ -554,21 +551,21 @@ impl<'a> ProcBox {
                         if self.selected > 0 {
                             title
                         } else {
-                            THEME.get().unwrap().lock().unwrap().colors.title
+                            THEME.colors.title
                         },
                         fx::ub,
                         if self.selected > 0 {
                             main
                         } else {
-                            THEME.get().unwrap().lock().unwrap().colors.main_fg
+                            THEME.colors.main_fg
                         },
                         symbol::enter,
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .proc_box
                             .call(symbol::title_right.to_owned(), term),
                         mv::to(dy - 1, dx + 1),
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .proc_box
                             .call(symbol::title_left.to_owned(), term),
@@ -576,7 +573,7 @@ impl<'a> ProcBox {
                         hi,
                         title,
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap()
+                        THEME
                             .colors
                             .proc_box
                             .call(symbol::title_right.to_owned(), term),
@@ -584,7 +581,7 @@ impl<'a> ProcBox {
                     .as_str(),
                 );
                 if dw > 28 {
-                    if self.selected == 0 && !killed && !key.get().unwrap().lock().unwrap().mouse.contains_key(&"k".to_owned()) {
+                    if self.selected == 0 && !killed && !key.mouse.contains_key(&"k".to_owned()) {
                         let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                         for i in 0..4 {
@@ -594,12 +591,12 @@ impl<'a> ProcBox {
                             top.push(pusher);
                         }
 
-                        key.get().unwrap().lock().unwrap().mouse.insert("k".to_owned(), top.clone());
+                        key.mouse.insert("k".to_owned(), top.clone());
                     }
                     out_misc.push_str(
                         format!(
                             "{}{}{}k{}ill{}{}",
-                            THEME.get().unwrap().lock().unwrap()
+                            THEME
                                 .colors
                                 .proc_box
                                 .call(symbol::title_left.to_owned(), term),
@@ -607,7 +604,7 @@ impl<'a> ProcBox {
                             hi,
                             title,
                             fx::ub,
-                            THEME.get().unwrap().lock().unwrap()
+                            THEME
                                 .colors
                                 .proc_box
                                 .call(symbol::title_right.to_owned(), term),
@@ -617,7 +614,7 @@ impl<'a> ProcBox {
                 }
 
                 if dw > 39 {
-                    if self.selected == 0 && !killed && !key.get().unwrap().lock().unwrap().mouse.contains_key(&"i".to_owned()) {
+                    if self.selected == 0 && !killed && !key.mouse.contains_key(&"i".to_owned()) {
                         let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                         for i in 0..9 {
@@ -627,12 +624,12 @@ impl<'a> ProcBox {
                             top.push(pusher);
                         }
 
-                        key.get().unwrap().lock().unwrap().mouse.insert("i".to_owned(), top.clone());
+                        key.mouse.insert("i".to_owned(), top.clone());
                     }
                     out_misc.push_str(
                         format!(
                             "{}{}{}i{}nterrupt{}{}",
-                            THEME.get().unwrap().lock().unwrap()
+                            THEME
                                 .colors
                                 .proc_box
                                 .call(symbol::title_left.to_owned(), term),
@@ -640,7 +637,7 @@ impl<'a> ProcBox {
                             hi,
                             title,
                             fx::ub,
-                            THEME.get().unwrap().lock().unwrap()
+                            THEME
                                 .colors
                                 .proc_box
                                 .call(symbol::title_right.to_owned(), term),
@@ -649,11 +646,11 @@ impl<'a> ProcBox {
                     );
                 }
 
-                if graphs.get().unwrap().lock().unwrap().detailed_cpu.NotImplemented || self.parent.get_resized() {
-                    graphs.get().unwrap().lock().unwrap().detailed_cpu = Graph::new(
+                if graphs.detailed_cpu.NotImplemented || self.parent.get_resized() {
+                    graphs.detailed_cpu = Graph::new(
                         (dgw + 1) as i32,
                         7,
-                        Some(ColorSwitch::VecString(THEME.get().unwrap().lock().unwrap().gradient.get(&"cpu".to_owned()).unwrap().clone())),
+                        Some(ColorSwitch::VecString(THEME.gradient.get(&"cpu".to_owned()).unwrap().clone())),
                         proc.details_cpu.iter().map(|i| i.to_owned() as i32).collect(),
                         term,
                         false,
@@ -661,7 +658,7 @@ impl<'a> ProcBox {
                         0,
                         None,
                     );
-                    graphs.get().unwrap().lock().unwrap().detailed_mem = Graph::new(
+                    graphs.detailed_mem = Graph::new(
                         (dw / 3) as i32,
                         1,
                         None,
@@ -684,20 +681,20 @@ impl<'a> ProcBox {
                     h = u32::try_from(self.parent.get_height() as i32 - 2).unwrap_or(0);
                     out_misc.push_str(format!("{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
                             mv::to(y - 1, x - 1),
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box,
+                            THEME.colors.proc_box,
                             symbol::left_up,
                             symbol::h_line.repeat(w as usize),
                             symbol::right_up,
                             mv::to(y - 1, x + 1),
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                            THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                             fx::b,
-                            THEME.get().unwrap().lock().unwrap().colors.title.call(self.get_parent().get_name().clone(), term),
+                            THEME.colors.title.call(self.get_parent().get_name().clone(), term),
                             fx::ub,
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                            THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                             mv::to(y + 7, x - 1),
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::v_line.to_owned(), term),
+                            THEME.colors.proc_box.call(symbol::v_line.to_owned(), term),
                             mv::right(w),
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::v_line.to_owned(), term),
+                            THEME.colors.proc_box.call(symbol::v_line.to_owned(), term),
                         )
                         .as_str()
                     );
@@ -705,8 +702,8 @@ impl<'a> ProcBox {
                 self.select_max = usize::try_from(self.parent.get_height() as i32 - 3).unwrap_or(0);
             }
 
-            sort_pos = (x + w) as usize - CONFIG.get().unwrap().lock().unwrap().proc_sorting.to_string().len() - 7;
-            if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"left".to_owned()) {
+            sort_pos = (x + w) as usize - CONFIG.proc_sorting.to_string().len() - 7;
+            if !key.mouse.contains_key(&"left".to_owned()) {
                 let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                 for i in 0..3 {
@@ -716,45 +713,45 @@ impl<'a> ProcBox {
                     top.push(pusher);
                 }
 
-                key.get().unwrap().lock().unwrap().mouse.insert("left".to_owned(), top.clone());
+                key.mouse.insert("left".to_owned(), top.clone());
 
                 top = Vec::<Vec<i32>>::new();
 
                 for i in 0..3 {
                     let mut pusher: Vec<i32> = Vec::<i32>::new();
-                    pusher.push(sort_pos as i32 + CONFIG.get().unwrap().lock().unwrap().proc_sorting.to_string().len() as i32 + 3 + i);
+                    pusher.push(sort_pos as i32 + CONFIG.proc_sorting.to_string().len() as i32 + 3 + i);
                     pusher.push(y as i32 - 1);
                     top.push(pusher);
                 }
 
-                key.get().unwrap().lock().unwrap().mouse.insert("right".to_owned(), top.clone());
+                key.mouse.insert("right".to_owned(), top.clone());
             }
 
             out_misc.push_str(format!("{}{}{}{}{}{}{} {} {}{}{}",
                     mv::to(y - 1, x + 8),
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::h_line.repeat(w as usize - 9).to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::h_line.repeat(w as usize - 9).to_owned(), term),
                     if !proc.detailed {
                         "".to_owned()
                     } else {
                         format!("{}{}", 
                             mv::to(dy + 7, dgx + dgw + 1),
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::div_down.to_owned(), term)
+                            THEME.colors.proc_box.call(symbol::div_down.to_owned(), term)
                         )
                     },
                     mv::to(y - 1, sort_pos as u32),
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                     fx::b,
-                    THEME.get().unwrap().lock().unwrap().colors.hi_fg.call("<".to_owned(), term),
-                    THEME.get().unwrap().lock().unwrap().colors.title.call(CONFIG.get().unwrap().lock().unwrap().proc_sorting.to_string(), term),
-                    THEME.get().unwrap().lock().unwrap().colors.hi_fg.call(">".to_owned(), term),
+                    THEME.colors.hi_fg.call("<".to_owned(), term),
+                    THEME.colors.title.call(CONFIG.proc_sorting.to_string(), term),
+                    THEME.colors.hi_fg.call(">".to_owned(), term),
                     fx::ub,
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                 )
                 .as_str()
             );
 
             if w > 29 + s_len as u32 {
-                if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"e".to_owned()) {
+                if !key.mouse.contains_key(&"e".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..4 {
@@ -764,27 +761,27 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("e".to_owned(), top.clone());
+                    key.mouse.insert("e".to_owned(), top.clone());
                 }
                 out_misc.push_str(format!("{}{}{}{}{}{}{}",
                         mv::to(y - 1, sort_pos as u32 - 6),
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
-                        if CONFIG.get().unwrap().lock().unwrap().proc_tree {
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        if CONFIG.proc_tree {
                             fx::b
                         } else {
                             ""
                         },
-                        THEME.get().unwrap().lock().unwrap().colors.title.call("tre".to_owned(), term),
-                        THEME.get().unwrap().lock().unwrap().colors.hi_fg.call("e".to_owned(), term),
+                        THEME.colors.title.call("tre".to_owned(), term),
+                        THEME.colors.hi_fg.call("e".to_owned(), term),
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                     )
                     .as_str()
                 );
             }
 
             if w > 37 + s_len as u32 {
-                if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"r".to_owned()) {
+                if !key.mouse.contains_key(&"r".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..7 {
@@ -794,27 +791,27 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("r".to_owned(), top.clone());
+                    key.mouse.insert("r".to_owned(), top.clone());
                 }
                 out_misc.push_str(format!("{}{}{}{}{}{}{}",
                         mv::to(y - 1, sort_pos as u32 - 15),
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
-                        if CONFIG.get().unwrap().lock().unwrap().proc_reversed {
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        if CONFIG.proc_reversed {
                             fx::b
                         } else {
                             ""
                         },
-                        THEME.get().unwrap().lock().unwrap().colors.hi_fg.call("r".to_owned(), term),
-                        THEME.get().unwrap().lock().unwrap().colors.title.call("everse".to_owned(), term),
+                        THEME.colors.hi_fg.call("r".to_owned(), term),
+                        THEME.colors.title.call("everse".to_owned(), term),
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                     )
                     .as_str()
                 );
             }
 
             if w > 47 + s_len as u32 {
-                if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"c".to_owned()) {
+                if !key.mouse.contains_key(&"c".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0.. if proc.search_filter.len() == 0 {6} else {2 + proc.search_filter[(proc.search_filter.len() - 11)..].len()} {
@@ -824,27 +821,27 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("c".to_owned(), top.clone());
+                    key.mouse.insert("c".to_owned(), top.clone());
                 }
                 out_misc.push_str(format!("{}{}{}{}{}{}{}{}",
                         mv::to(y - 1, sort_pos as u32 - 25),
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
-                        if CONFIG.get().unwrap().lock().unwrap().proc_per_core {
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        if CONFIG.proc_per_core {
                             fx::b
                         } else {
                             ""
                         },
-                        THEME.get().unwrap().lock().unwrap().colors.title.call("per-".to_owned(), term),
-                        THEME.get().unwrap().lock().unwrap().colors.hi_fg.call("c".to_owned(), term),
-                        THEME.get().unwrap().lock().unwrap().colors.title.call("ore".to_owned(), term),
+                        THEME.colors.title.call("per-".to_owned(), term),
+                        THEME.colors.hi_fg.call("c".to_owned(), term),
+                        THEME.colors.title.call("ore".to_owned(), term),
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                     )
                     .as_str()
                 );
             }
 
-            if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"f".to_owned()) || self.parent.get_resized() {
+            if !key.mouse.contains_key(&"f".to_owned()) || self.parent.get_resized() {
                 let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0.. if proc.search_filter.len() == 0 {6} else {2 + proc.search_filter[(proc.search_filter.len() - 11)..].len()} {
@@ -854,10 +851,10 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("f".to_owned(), top.clone());
+                    key.mouse.insert("f".to_owned(), top.clone());
             }
             if proc.search_filter.len() > 0 {
-                if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"delete".to_owned()) {
+                if !key.mouse.contains_key(&"delete".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..3 {
@@ -867,22 +864,22 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("delete".to_owned(), top.clone());
+                    key.mouse.insert("delete".to_owned(), top.clone());
                 }
-            } else if key.get().unwrap().lock().unwrap().mouse.contains_key(&"delete".to_owned()) {
-                key.get().unwrap().lock().unwrap().mouse.remove(&"delete".to_owned());
+            } else if key.mouse.contains_key(&"delete".to_owned()) {
+                key.mouse.remove(&"delete".to_owned());
             }
 
             out_misc.push_str(format!("{}{}{}{}{}{}{}",
                     mv::to(y - 1, x + 7),
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                     if self.filtering || proc.search_filter.len() > 0 {
                         fx::b
                     } else {
                         ""
                     },
-                    THEME.get().unwrap().lock().unwrap().colors.hi_fg.call("f".to_owned(), term),
-                    THEME.get().unwrap().lock().unwrap().colors.title,
+                    THEME.colors.hi_fg.call("f".to_owned(), term),
+                    THEME.colors.title,
                     if proc.search_filter.len() == 0 && !self.filtering {
                         "ilter".to_owned()
                     } else {
@@ -893,60 +890,60 @@ impl<'a> ProcBox {
                             if self.filtering {
                                 fx::bl.to_owned() + "█" + fx::ubl
                             } else {
-                                THEME.get().unwrap().lock().unwrap().colors.hi_fg.call(" del".to_owned(), term).to_string()
+                                THEME.colors.hi_fg.call(" del".to_owned(), term).to_string()
                             }
                         )
                     },
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                 )
                 .as_str()
             );
 
             let main : Color = if self.selected == 0 {
-                THEME.get().unwrap().lock().unwrap().colors.inactive_fg
+                THEME.colors.inactive_fg
             } else {
-                THEME.get().unwrap().lock().unwrap().colors.main_fg
+                THEME.colors.main_fg
             };
             let hi : Color = if self.selected == 0 {
-                THEME.get().unwrap().lock().unwrap().colors.inactive_fg
+                THEME.colors.inactive_fg
             } else {
-                THEME.get().unwrap().lock().unwrap().colors.hi_fg
+                THEME.colors.hi_fg
             };
             let title : Color = if self.selected == 0 {
-                THEME.get().unwrap().lock().unwrap().colors.inactive_fg
+                THEME.colors.inactive_fg
             } else {
-                THEME.get().unwrap().lock().unwrap().colors.title
+                THEME.colors.title
             };
 
             out_misc.push_str(format!("{}{}{}{}{}{}{} {}{} {}{}{}{}{}{}{}info {}{}{}{}",
                     mv::to(y + h, x + 1),
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box,
+                    THEME.colors.proc_box,
                     symbol::h_line.repeat(w as usize - 4),
                     mv::to(y + h, x + 1),
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                     main,
                     symbol::up,
                     fx::b,
-                    THEME.get().unwrap().lock().unwrap().colors.main_fg.call("select".to_owned(), term),
+                    THEME.colors.main_fg.call("select".to_owned(), term),
                     fx::ub,
                     if self.selected == self.select_max {
-                        THEME.get().unwrap().lock().unwrap().colors.inactive_fg
+                        THEME.colors.inactive_fg
                     } else {
-                        THEME.get().unwrap().lock().unwrap().colors.main_fg
+                        THEME.colors.main_fg
                     },
                     symbol::down,
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                     title,
                     fx::b,
                     fx::ub,
                     main,
                     symbol::enter,
-                    THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                    THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                 )
                 .as_str()
             );
-            if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"enter".to_owned()) {
+            if !key.mouse.contains_key(&"enter".to_owned()) {
                 let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                 for i in 0..6 {
@@ -956,10 +953,10 @@ impl<'a> ProcBox {
                     top.push(pusher);
                 }
 
-                key.get().unwrap().lock().unwrap().mouse.insert("enter".to_owned(), top.clone());
+                key.mouse.insert("enter".to_owned(), top.clone());
             }
             if w - loc_string.len() as u32 > 34 {
-                if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"t".to_owned()) {
+                if !key.mouse.contains_key(&"t".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..9 {
@@ -969,21 +966,21 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("t".to_owned(), top.clone());
+                    key.mouse.insert("t".to_owned(), top.clone());
                 }
                 out_misc.push_str(format!("{}{}{}t{}erminate{}{}",
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                         fx::b,
                         hi,
                         title,
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                     )
                     .as_str()
                 );
             }
             if w - loc_string.len() as u32 > 40 {
-                if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"k".to_owned()) {
+                if !key.mouse.contains_key(&"k".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..4 {
@@ -993,21 +990,21 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("k".to_owned(), top.clone());
+                    key.mouse.insert("k".to_owned(), top.clone());
                 }
                 out_misc.push_str(format!("{}{}{}k{}ill{}{}",
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                         fx::b,
                         hi,
                         title,
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                     )
                     .as_str()
                 );
             }
             if w - loc_string.len() as u32 > 51 {
-                if !key.get().unwrap().lock().unwrap().mouse.contains_key(&"i".to_owned()) {
+                if !key.mouse.contains_key(&"i".to_owned()) {
                     let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..9 {
@@ -1017,22 +1014,22 @@ impl<'a> ProcBox {
                         top.push(pusher);
                     }
 
-                    key.get().unwrap().lock().unwrap().mouse.insert("i".to_owned(), top.clone());
+                    key.mouse.insert("i".to_owned(), top.clone());
                 }
                 out_misc.push_str(format!("{}{}{}i{}terrupt{}{}",
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                         fx::b,
                         hi,
                         title,
                         fx::ub,
-                        THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                        THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                     )
                     .as_str()
                 );
             }
-            if CONFIG.get().unwrap().lock().unwrap().proc_tree && w - loc_string.len() as u32 > 65 {
+            if CONFIG.proc_tree && w - loc_string.len() as u32 > 65 {
                 if w - loc_string.len() as u32 > 40 {
-                    if !key.get().unwrap().lock().unwrap().mouse.contains_key(&" ".to_owned()) {
+                    if !key.mouse.contains_key(&" ".to_owned()) {
                         let mut top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
     
                         for i in 0..12 {
@@ -1042,15 +1039,15 @@ impl<'a> ProcBox {
                             top.push(pusher);
                         }
     
-                        key.get().unwrap().lock().unwrap().mouse.insert(" ".to_owned(), top.clone());
+                        key.mouse.insert(" ".to_owned(), top.clone());
                     }
                     out_misc.push_str(format!("{}{}{}spc {}collapse{}{}",
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_left.to_owned(), term),
+                            THEME.colors.proc_box.call(symbol::title_left.to_owned(), term),
                             fx::b,
                             hi,
                             title,
                             fx::ub,
-                            THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                            THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
                         )
                         .as_str()
                     );
@@ -1060,22 +1057,22 @@ impl<'a> ProcBox {
             // * Processes labels
             let mut selected : String = String::default();
             let mut label : String = String::default();
-            selected = match CONFIG.get().unwrap().lock().unwrap().proc_sorting {
+            selected = match CONFIG.proc_sorting {
                 SortingOption::Memory => String::from("mem"),
-                SortingOption::Threads => if !CONFIG.get().unwrap().lock().unwrap().proc_tree && arg_len == 0 {
+                SortingOption::Threads => if !CONFIG.proc_tree && arg_len == 0 {
                         String::from("tr")
                     } else {
                         String::default()
                     },
                 _ => {
-                    errlog("Wrong sorting option in CONFIG.get().unwrap().lock().unwrap().proc_sorting when processing lables...".to_owned());
+                    errlog("Wrong sorting option in CONFIG.proc_sorting when processing lables...".to_owned());
                     String::default()
                 },
             };
 
-            if CONFIG.get().unwrap().lock().unwrap().proc_tree {
+            if CONFIG.proc_tree {
                 label = format!("{}{}{}{:<width$}{}{}Mem%{:>11}{}{} {}",
-                    THEME.get().unwrap().lock().unwrap().colors.title,
+                    THEME.colors.title,
                     fx::b,
                     mv::to(y , x),
                     " Tree:",
@@ -1091,7 +1088,7 @@ impl<'a> ProcBox {
                     },
                     "Cpu%",
                     fx::ub,
-                    THEME.get().unwrap().lock().unwrap().colors.main_fg,
+                    THEME.colors.main_fg,
                     width = tree_len - 2,
                 );
                 if ["pid", "program", "arguments"].iter().map(|s| s.to_owned().to_owned()).collect::<Vec<String>>().contains(&selected) {
@@ -1099,7 +1096,7 @@ impl<'a> ProcBox {
                 }
             } else {
                 label = format!("{}{}{}{:>7} {}{}{}{}Mem%{:>11}{}{} {}",
-                    THEME.get().unwrap().lock().unwrap().colors.title,
+                    THEME.colors.title,
                     fx::b,
                     mv::to(y, x),
                     "Pid:",
@@ -1129,7 +1126,7 @@ impl<'a> ProcBox {
                     },
                     "Cpu%",
                     fx::ub,
-                    THEME.get().unwrap().lock().unwrap().colors.main_fg,
+                    THEME.colors.main_fg,
                     if proc.num_procs > self.select_max as u32 {
                         " "
                     } else {
@@ -1143,12 +1140,12 @@ impl<'a> ProcBox {
             }
 
             selected = selected.split(" ").map(|s| s.to_owned().to_owned()).collect::<Vec<String>>()[0].to_title_case();
-            if CONFIG.get().unwrap().lock().unwrap().proc_mem_bytes {
+            if CONFIG.proc_mem_bytes {
                 label = label.replace("Mem%", "MemB");
             }
             label = label.replace(selected.as_str(), format!("{}{}{}", fx::u, selected, fx::uu).as_str());
             out_misc.push_str(label.as_str());
-            draw.get().unwrap().lock().unwrap().buffer("proc_misc".to_owned(), vec![out_misc.clone()], false, false, 100, true, false, false, key);
+            draw.buffer("proc_misc".to_owned(), vec![out_misc.clone()], false, false, 100, true, false, false, key);
         }
 
         // * Detailed box draw
@@ -1156,9 +1153,9 @@ impl<'a> ProcBox {
             let mut stat_color : String = match proc.details[&"status".to_owned()] {
                 ProcCollectorDetails::Status(s) => match s {
                     Status::Running => fx::b.to_owned(),
-                    Status::Dead => THEME.get().unwrap().lock().unwrap().colors.inactive_fg.to_string(),
-                    Status::Stopped => THEME.get().unwrap().lock().unwrap().colors.inactive_fg.to_string(),
-                    Status::Zombie => THEME.get().unwrap().lock().unwrap().colors.inactive_fg.to_string(),
+                    Status::Dead => THEME.colors.inactive_fg.to_string(),
+                    Status::Stopped => THEME.colors.inactive_fg.to_string(),
+                    Status::Zombie => THEME.colors.inactive_fg.to_string(),
                     _ => String::default(),
                 },
                 _ => {
@@ -1172,7 +1169,7 @@ impl<'a> ProcBox {
 
             out.push_str(format!("{}{}{}{}{}%{}{}{}",
                     mv::to(dy, dgx),
-                    graphs.get().unwrap().lock().unwrap().detailed_cpu.call(
+                    graphs.detailed_cpu.call(
                         if self.moved || match proc.details[&"killed".to_owned()] {
                             ProcCollectorDetails::Bool(b) => b,
                             _ => {
@@ -1187,7 +1184,7 @@ impl<'a> ProcBox {
                         term
                     ),
                     mv::to(dy , dgx),
-                    THEME.get().unwrap().lock().unwrap().colors.title,
+                    THEME.colors.title,
                     fx::b,
                     if match proc.details[&"killed".to_owned()] {
                         ProcCollectorDetails::Bool(b) => b,
@@ -1272,13 +1269,13 @@ impl<'a> ProcBox {
                         String::default()
                     },
                     mv::to(dy + 3, dx),
-                    THEME.get().unwrap().lock().unwrap().colors.title,
+                    THEME.colors.title,
                     fx::ub,
-                    THEME.get().unwrap().lock().unwrap().colors.main_fg,
+                    THEME.colors.main_fg,
                     stat_color,
                     proc.details[&"status".to_owned()],
                     fx::ub,
-                    THEME.get().unwrap().lock().unwrap().colors.main_fg,
+                    THEME.colors.main_fg,
                     proc.details[&"uptime".to_owned()],
                     if dw > 28 {
                         format!("{:^first$.second$}", proc.details[&"parent_name".to_owned()], first = iw as usize, second = iw2 as usize)
@@ -1316,7 +1313,7 @@ impl<'a> ProcBox {
                         String::default()
                     },
                     mv::to(dy + 3, dx),
-                    THEME.get().unwrap().lock().unwrap().colors.title,
+                    THEME.colors.title,
                     fx::b,
                     format!("{:>width$}",
                         (if dw > 42 {
@@ -1327,11 +1324,11 @@ impl<'a> ProcBox {
                         width = (dw as usize / 3) - 1,
                     ),
                     fx::ub,
-                    THEME.get().unwrap().lock().unwrap().colors.inactive_fg,
+                    THEME.colors.inactive_fg,
                     ". ".repeat(dw as usize / 3),
                     mv::left(dw / 3),
-                    THEME.get().unwrap().lock().unwrap().colors.proc_misc,
-                    graphs.get().unwrap().lock().unwrap().detailed_mem.call(
+                    THEME.colors.proc_misc,
+                    graphs.detailed_mem.call(
                         if self.moved 
                         {
                             None
@@ -1352,10 +1349,10 @@ impl<'a> ProcBox {
                         }, 
                         term
                     ),
-                    THEME.get().unwrap().lock().unwrap().colors.title,
+                    THEME.colors.title,
                     fx::b,
                     format!("{:.width$}", proc.details[&"memory_bytes".to_owned()], width = (dw as usize / 3) - 2),
-                    THEME.get().unwrap().lock().unwrap().colors.main_fg,
+                    THEME.colors.main_fg,
                     fx::ub,
                 )
                 .as_str()
@@ -1553,7 +1550,7 @@ impl<'a> ProcBox {
                 }
             };
 
-            if CONFIG.get().unwrap().lock().unwrap().proc_tree {
+            if CONFIG.proc_tree {
                 arg_len = 0;
                 let size_set = format!("{}{}", indent, pid).len();
                 offset = size_set as u32;
@@ -1573,24 +1570,24 @@ impl<'a> ProcBox {
             } else {
                 offset = prog_len as u32 - 1;
             }
-            if cpu > 1.0 || graphs.get().unwrap().lock().unwrap().pid_cpu.contains_key(pid) {
-                if !graphs.get().unwrap().lock().unwrap().pid_cpu.contains_key(pid) {
-                    graphs.get().unwrap().lock().unwrap().pid_cpu.insert(pid.to_owned(),Graph::new(5, 1, None, vec![0], term, false, 0, 0, None));
+            if cpu > 1.0 || graphs.pid_cpu.contains_key(pid) {
+                if !graphs.pid_cpu.contains_key(pid) {
+                    graphs.pid_cpu.insert(pid.to_owned(),Graph::new(5, 1, None, vec![0], term, false, 0, 0, None));
                     self.pid_counter.insert(pid.to_owned(), 0);
                 } else if cpu < 1.0 {
                     let mut pcp : u32 = self.pid_counter.get(pid).unwrap().to_owned();
                     self.pid_counter.insert(pid.to_owned(), pcp + 1);
                     if self.pid_counter[pid] > 10 {
                         self.pid_counter.remove(pid);
-                        graphs.get().unwrap().lock().unwrap().pid_cpu.remove(pid);
+                        graphs.pid_cpu.remove(pid);
                     }
                 } else {
                     self.pid_counter.insert(pid.to_owned(), 0);
                 }
             }
 
-            end = if CONFIG.get().unwrap().lock().unwrap().proc_colors {
-                format!("{}{}", THEME.get().unwrap().lock().unwrap().colors.main_fg, fx::ub)
+            end = if CONFIG.proc_colors {
+                format!("{}{}", THEME.colors.main_fg, fx::ub)
             } else {
                 fx::ub.to_owned()
             };
@@ -1601,17 +1598,17 @@ impl<'a> ProcBox {
             } else {
                 calc = cy;
             }
-            if CONFIG.get().unwrap().lock().unwrap().proc_colors && !is_selected {
+            if CONFIG.proc_colors && !is_selected {
                 vals = Vec::<String>::new();
                 for v in vec![cpu as u64, mem.rss(), (threads / 3)] {
-                    if CONFIG.get().unwrap().lock().unwrap().proc_gradient {
+                    if CONFIG.proc_gradient {
                         val = (if v <= 100 {
                             v
                         } else {
                             100
                         } + 100) - calc as u64 * 100 / self.select_max as u64;
                         vals.push(
-                            THEME.get().unwrap().lock().unwrap().gradient[
+                            THEME.gradient[
                                 &(if v < 100 {
                                     "proc_color".to_owned()
                                 } else {
@@ -1628,7 +1625,7 @@ impl<'a> ProcBox {
                         );
                     } else {
                         vals.push(
-                            THEME.get().unwrap().lock().unwrap().gradient.get(&"process".to_owned()).unwrap().get(
+                            THEME.gradient.get(&"process".to_owned()).unwrap().get(
                                 if v <= 100 {
                                     v
                                 } else {
@@ -1646,8 +1643,8 @@ impl<'a> ProcBox {
                 m_color = fx::b.to_owned();
                 t_color = fx::b.to_owned();
             }
-            if CONFIG.get().unwrap().lock().unwrap().proc_gradient && !is_selected {
-                g_color = THEME.get().unwrap().lock().unwrap().gradient[&"proc".to_owned()][calc as usize * 100 / self.select_max].clone();
+            if CONFIG.proc_gradient && !is_selected {
+                g_color = THEME.gradient[&"proc".to_owned()][calc as usize * 100 / self.select_max].clone();
             }
             if is_selected {
                 c_color = String::default();
@@ -1655,7 +1652,7 @@ impl<'a> ProcBox {
                 t_color = String::default();
                 g_color = String::default();
                 end = String::default();
-                out.push_str(format!("{}{}{}", THEME.get().unwrap().lock().unwrap().colors.selected_bg, THEME.get().unwrap().lock().unwrap().colors.selected_fg, fx::b).as_str());
+                out.push_str(format!("{}{}{}", THEME.colors.selected_bg, THEME.colors.selected_fg, fx::b).as_str());
             }
 
             // * Creates one line for a process with all gathered information
@@ -1692,7 +1689,7 @@ impl<'a> ProcBox {
                         String::default()
                     },
                     m_color + (
-                        if !CONFIG.get().unwrap().lock().unwrap().proc_mem_bytes {
+                        if !CONFIG.proc_mem_bytes {
                             if mem.rss() < 100 {
                                 format!("{mem:>width$.*}", 1, mem = mem.rss(), width = 4)
                             } else {
@@ -1702,7 +1699,7 @@ impl<'a> ProcBox {
                             format!("{:>4.4}", floating_humanizer(mem_b as f64, true, false, 0, false))
                         }
                     ).as_str() + end.as_str(),
-                    format!(" {}{}{}{}{}", THEME.get().unwrap().lock().unwrap().colors.inactive_fg, ".".repeat(5), THEME.get().unwrap().lock().unwrap().colors.main_fg, g_color, c_color) + if cpu < 100.0 {
+                    format!(" {}{}{}{}{}", THEME.colors.inactive_fg, ".".repeat(5), THEME.colors.main_fg, g_color, c_color) + if cpu < 100.0 {
                         format!(" {cpu:>width$.*} ",1, cpu = cpu, width = 4)
                     } else {
                         format!("{cpu:>width$.*} ", 0, cpu = cpu, width = 5)
@@ -1712,7 +1709,7 @@ impl<'a> ProcBox {
                     } else {
                         ""
                     },
-                    width = if CONFIG.get().unwrap().lock().unwrap().proc_tree {
+                    width = if CONFIG.proc_tree {
                         1
                     } else {
                         7
@@ -1724,24 +1721,24 @@ impl<'a> ProcBox {
             );
 
             // * Draw small cpu graph for process if cpu usage was above 1% in the last 10 updates
-            if graphs.get().unwrap().lock().unwrap().pid_cpu.contains_key(&pid) {
+            if graphs.pid_cpu.contains_key(&pid) {
                 out.push_str(format!("{}{}{}{}",
                         mv::to(y + cy, x + w - if proc.num_procs > self.select_max as u32 {
                             12
                         } else {
                             11
                         }),
-                        if CONFIG.get().unwrap().lock().unwrap().proc_colors {
+                        if CONFIG.proc_colors {
                             c_color
                         } else {
-                            THEME.get().unwrap().lock().unwrap().colors.proc_misc.to_string()
+                            THEME.colors.proc_misc.to_string()
                         },
-                        graphs.get().unwrap().lock().unwrap().pid_cpu.get_mut(&pid.clone()).unwrap().call(if self.moved {
+                        graphs.pid_cpu.get_mut(&pid.clone()).unwrap().call(if self.moved {
                             None
                         } else {
                             Some(cpu.round() as i32)
                         }, term),
-                        THEME.get().unwrap().lock().unwrap().colors.main_fg,
+                        THEME.colors.main_fg,
                     )
                     .as_str()
                 );
@@ -1750,8 +1747,8 @@ impl<'a> ProcBox {
             if is_selected {
                 out.push_str(format!("{}{}{}{}{}",
                         fx::ub,
-                        term.get().unwrap().lock().unwrap().get_fg(),
-                        term.get().unwrap().lock().unwrap().get_bg(),
+                        term.get_fg(),
+                        term.get_bg(),
                         mv::to(y + cy, x + w - 1),
                         if proc.num_procs > self.select_max as u32 {
                             " "
@@ -1777,7 +1774,7 @@ impl<'a> ProcBox {
         // * Draw scrollbar if needed
         if proc.num_procs > self.select_max as u32 {
             if self.parent.get_resized() {
-                match key.get().unwrap().lock().unwrap().mouse.get(&"mouse_scroll_up".to_owned()) {
+                match key.mouse.get(&"mouse_scroll_up".to_owned()) {
                     Some(_) => {
                         let mut top = Vec::<Vec<i32>>::new();
                         for i in 0..3 {
@@ -1786,14 +1783,14 @@ impl<'a> ProcBox {
                             adder.push(y as i32);
                             top.push(adder);
                         }
-                        key.get().unwrap().lock().unwrap().mouse.insert("mouse_scroll_up".to_owned(), top.clone());
+                        key.mouse.insert("mouse_scroll_up".to_owned(), top.clone());
                     },
                     None => {
                         errlog("key.mouse does not have 'mouse_scroll_up'!".to_owned());
                         ()
                     }
                 };
-                match key.get().unwrap().lock().unwrap().mouse.get_mut(&"mouse_scroll_down".to_owned()) {
+                match key.mouse.get_mut(&"mouse_scroll_down".to_owned()) {
                     Some(v) => {
                         let mut top = Vec::<Vec<i32>>::new();
                         for i in 0..3 {
@@ -1802,7 +1799,7 @@ impl<'a> ProcBox {
                             adder.push((y + h - 1) as i32);
                             top.push(adder);
                         }
-                        key.get().unwrap().lock().unwrap().mouse.insert("mouse_scroll_down".to_owned(), top.clone());
+                        key.mouse.insert("mouse_scroll_down".to_owned(), top.clone());
                     },
                     None => {
                         errlog("key.mouse does not have 'mouse_scroll_down'!".to_owned());
@@ -1817,28 +1814,28 @@ impl<'a> ProcBox {
             out.push_str(format!("{}{}{}↑{}↓{}{}█",
                     mv::to(y, x + w - 1),
                     fx::b,
-                    THEME.get().unwrap().lock().unwrap().colors.main_fg,
+                    THEME.colors.main_fg,
                     mv::to(y + h - 1, x + w - 1),
                     fx::ub,
                     mv::to(y + 1 + scroll_pos, x + w - 1),
                 )
                 .as_str()
             );
-        } else if key.get().unwrap().lock().unwrap().mouse.contains_key(&"scroll_up".to_owned()) {
-            key.get().unwrap().lock().unwrap().mouse.remove(&"scroll_up".to_owned());
-            key.get().unwrap().lock().unwrap().mouse.remove(&"scroll_down".to_owned());
+        } else if key.mouse.contains_key(&"scroll_up".to_owned()) {
+            key.mouse.remove(&"scroll_up".to_owned());
+            key.mouse.remove(&"scroll_down".to_owned());
         }
 
         // * Draw current selection and number of processes
         out.push_str(format!("{}{}{}{}{}{}{}{}",
                 mv::to(y + h, x + w - 3 - loc_string.len() as u32),
-                THEME.get().unwrap().lock().unwrap().colors.proc_box,
+                THEME.colors.proc_box,
                 symbol::title_left,
-                THEME.get().unwrap().lock().unwrap().colors.title,
+                THEME.colors.title,
                 fx::b,
                 loc_string,
                 fx::ub,
-                THEME.get().unwrap().lock().unwrap().colors.proc_box.call(symbol::title_right.to_owned(), term),
+                THEME.colors.proc_box.call(symbol::title_right.to_owned(), term),
             )
             .as_str()
         );
@@ -1850,12 +1847,12 @@ impl<'a> ProcBox {
             for (pid, _) in self.pid_counter.clone() {
                 if !psutil::process::pid_exists(pid) {
                     self.pid_counter.remove(&pid);
-                    graphs.get().unwrap().lock().unwrap().pid_cpu.remove(&pid);
+                    graphs.pid_cpu.remove(&pid);
                 }
             }
         }
 
-        draw.get().unwrap().lock().unwrap().buffer(self.buffer.clone(), vec![format!("{}{}{}", out_misc.clone(), out, term.get().unwrap().lock().unwrap().get_fg())], false, false, 100, menu.get().unwrap().lock().unwrap().active, false, false, key);
+        draw.buffer(self.buffer.clone(), vec![format!("{}{}{}", out_misc.clone(), out, term.get_fg())], false, false, 100, menu.active, false, false, key);
         self.redraw = false;
         self.parent.set_resized(false);
         self.moved = false;

@@ -173,8 +173,8 @@ impl Key {
         draw_p: &OnceCell<Mutex<Draw>>,
         term_p: &OnceCell<Mutex<Term>>,
     ) -> bool {
-        let mut draw = draw_p.get().unwrap().lock().unwrap();
-        let mut term = term_p.get().unwrap().lock().unwrap();
+        let mut draw = draw_p.get().unwrap().try_lock().unwrap();
+        let mut term = term_p.get().unwrap().try_lock().unwrap();
 
         if self.list.len() > 0 {
             return true;
@@ -239,11 +239,11 @@ impl Key {
                                     self.idle.replace_self(EventEnum::Flag(false));
                                     draw.get()
                                         .unwrap()
-                                        .lock()
+                                        .try_lock()
                                         .unwrap()
                                         .idle
                                         .replace_self(EventEnum::Wait);
-                                    draw.get().unwrap().lock().unwrap().idle.wait(-1.0);
+                                    draw.get().unwrap().try_lock().unwrap().idle.wait(-1.0);
 
                                     let mut nonblocking = Nonblocking::new();
                                     nonblocking.enter();
@@ -289,7 +289,7 @@ impl Key {
                                     } else if input_key.starts_with("\x1b[<0;")
                                         && input_key.ends_with("m")
                                     {
-                                        if menu.get().unwrap().lock().unwrap().active {
+                                        if menu.get().unwrap().try_lock().unwrap().active {
                                             clean_key = "mouse_click".to_owned();
                                         } else {
                                             let mut broke: bool = false;

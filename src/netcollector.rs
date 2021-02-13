@@ -73,10 +73,10 @@ pub struct NetCollector<'a> {
     sync_string: String,
 }
 impl<'a> NetCollector<'a> {
-    pub fn new(netbox: &OnceCell<Mutex<NetBox>>, CONFIG: &OnceCell<Mutex<Config>>) -> Self {
+    pub fn new(netbox: &NetBox, CONFIG: &Config) -> Self {
         NetCollector {
             parent: Collector::new(),
-            buffer: netbox.get().unwrap().lock().unwrap().get_buffer().clone(),
+            buffer: netbox.get_buffer(),
             up_stat: HashMap::<String, Nic>::new(),
             nics: Vec::<&'a Nic>::new(),
             nic_i: 0,
@@ -100,7 +100,7 @@ impl<'a> NetCollector<'a> {
                 .iter()
                 .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
                 .collect::<HashMap<String, i32>>(),
-            auto_min: CONFIG.get().unwrap().lock().unwrap().net_auto,
+            auto_min: CONFIG.net_auto,
             sync_top: 0,
             sync_string: String::default(),
         }
@@ -183,7 +183,7 @@ impl<'a> NetCollector<'a> {
         self.new_nic = Some(self.nics[self.nic_i as usize]);
         self.switched = true;
 
-        collector.get().unwrap().lock().unwrap().collect(
+        collector.collect(
             vec![Collectors::NetCollector],
             CONFIG,
             true,
@@ -196,12 +196,9 @@ impl<'a> NetCollector<'a> {
 
     pub fn collect(
         &mut self,
-        CONFIG_p: &OnceCell<Mutex<Config>>,
-        netbox_p: &OnceCell<Mutex<NetBox>>,
+        CONFIG: &Config,
+        netbox: &NetBox,
     ) {
-        let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-        let mut netbox = netbox_p.get().unwrap().lock().unwrap();
-
         let mut speed: i32 = 0;
         let mut stat: HashMap<String, NetCollectorStat> =
             HashMap::<String, NetCollectorStat>::new();
@@ -680,7 +677,7 @@ impl<'a> NetCollector<'a> {
         graphs: &OnceCell<Mutex<Graphs>>,
         menu: &OnceCell<Mutex<Menu>>,
     ) {
-        netbox.get().unwrap().lock().unwrap().draw_fg(
+        netbox.draw_fg(
             theme,
             key,
             term,

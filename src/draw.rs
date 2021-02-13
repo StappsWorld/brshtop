@@ -34,11 +34,11 @@ impl Draw {
     }
 
     /// Wait for input reader and self to be idle then print to screen
-    pub fn now(&mut self, args: Vec<String>, key: &mut MutexGuard<Key>) {
+    pub fn now(&mut self, args: Vec<String>, key: &mut Key) {
         
 
         key.idle.replace_self(EventEnum::Wait);
-        //key.get().unwrap().lock().unwrap().idle.wait(-1.0);
+        //key.idle.wait(-1.0);
 
         self.idle.replace_self(EventEnum::Wait);
 
@@ -61,7 +61,7 @@ impl Draw {
         
 
         key.idle.replace_self(EventEnum::Wait);
-        //key.get().unwrap().lock().unwrap().idle.wait(-1.0);
+        //key.idle.wait(-1.0);
 
         self.idle.replace_self(EventEnum::Wait);
 
@@ -90,7 +90,7 @@ impl Draw {
         only_save: bool,
         no_save: bool,
         once: bool,
-        key: &OnceCell<Mutex<Key>>,
+        key: &mut Key,
     ) {
         let mut string: String = String::default();
         let mut append_mut: bool = append.clone();
@@ -130,15 +130,13 @@ impl Draw {
                 .unwrap()
                 .push_str(string.as_str());
             if now_mut {
-                let mut pass_key = key.get().unwrap().lock().unwrap();
-                self.out(vec![mutable_name.clone()], false, &mut pass_key);
-                drop(pass_key);
+                self.out(vec![mutable_name.clone()], false, key);
             }
         }
     }
 
     /// Defaults clear = false
-    pub fn out(&mut self, names: Vec<String>, clear: bool, key: &mut MutexGuard<Key>) {
+    pub fn out(&mut self, names: Vec<String>, clear: bool, key: &mut Key) {
         let mut out: String = String::default();
         if self.strings.len() == 0 {
             return;

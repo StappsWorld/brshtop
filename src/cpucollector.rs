@@ -84,7 +84,7 @@ impl CpuCollector {
             Err(_) => (),
         }
 
-        if self.cpu_usage[0].len() > (term.get().unwrap().lock().unwrap().get_width() * 4) as usize
+        if self.cpu_usage[0].len() > (term.get().unwrap().try_lock().unwrap().get_width() * 4) as usize
         {
             self.cpu_usage[0].remove(0);
         }
@@ -102,7 +102,7 @@ impl CpuCollector {
         for (n, thread) in cpu_percentages.iter().enumerate() {
             self.cpu_usage[n].push(format!("{:.2}", *thread as u32).parse::<u32>().unwrap());
             if self.cpu_usage[n].len()
-                > (term.get().unwrap().lock().unwrap().get_width() * 2) as usize
+                > (term.get().unwrap().try_lock().unwrap().get_width() * 2) as usize
             {
                 self.cpu_usage[n].remove(0);
             }
@@ -150,7 +150,7 @@ impl CpuCollector {
             }
         };
 
-        if CONFIG.get().unwrap().lock().unwrap().check_temp && self.got_sensors {
+        if CONFIG.get().unwrap().try_lock().unwrap().check_temp && self.got_sensors {
             self.collect_temps(CONFIG, cpu_box, brshtop_box, term);
         }
     }
@@ -168,7 +168,7 @@ impl CpuCollector {
         meters: &OnceCell<Mutex<Meters>>,
         menu: &OnceCell<Mutex<Menu>>,
     ) {
-        cpu_box.get().unwrap().lock().unwrap().draw_fg(
+        cpu_box.get().unwrap().try_lock().unwrap().draw_fg(
             self,
             CONFIG,
             key,
@@ -184,7 +184,7 @@ impl CpuCollector {
     }
 
     pub fn get_sensors(&mut self, CONFIG_p: &OnceCell<Mutex<Config>>) {
-        let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+        let mut CONFIG = CONFIG_p.get().unwrap().try_lock().unwrap();
         self.sensor_method = String::from("");
 
         if SYSTEM.to_owned() == "MacOS".to_owned() {
@@ -287,8 +287,8 @@ impl CpuCollector {
         let mut s_label: String = String::from("_-_");
 
         if self.sensor_method == "psutil" {
-            if CONFIG.get().unwrap().lock().unwrap().cpu_sensor != "Auto" {
-                let cpu_sensor_string = CONFIG.get().unwrap().lock().unwrap().cpu_sensor.clone();
+            if CONFIG.get().unwrap().try_lock().unwrap().cpu_sensor != "Auto" {
+                let cpu_sensor_string = CONFIG.get().unwrap().try_lock().unwrap().cpu_sensor.clone();
                 let mut splitter = cpu_sensor_string.splitn(2, ":");
                 s_name = String::from(splitter.next().unwrap());
                 s_label = String::from(splitter.next().unwrap());
@@ -541,10 +541,10 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            brshtop_box.get().unwrap().lock().unwrap().set_b_cpu_h(
-                                cpu_box.get().unwrap().lock().unwrap().calc_size(
+                            brshtop_box.get().unwrap().try_lock().unwrap().set_b_cpu_h(
+                                cpu_box.get().unwrap().try_lock().unwrap().calc_size(
                                     term,
-                                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                                    brshtop_box.get().unwrap().try_lock().unwrap().get_b_cpu_h(),
                                     self,
                                 ),
                             );
@@ -568,10 +568,10 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            brshtop_box.get().unwrap().lock().unwrap().set_b_cpu_h(
-                                cpu_box.get().unwrap().lock().unwrap().calc_size(
+                            brshtop_box.get().unwrap().try_lock().unwrap().set_b_cpu_h(
+                                cpu_box.get().unwrap().try_lock().unwrap().calc_size(
                                     term,
-                                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                                    brshtop_box.get().unwrap().try_lock().unwrap().get_b_cpu_h(),
                                     self,
                                 ),
                             );
@@ -627,10 +627,10 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            brshtop_box.get().unwrap().lock().unwrap().set_b_cpu_h(
-                                cpu_box.get().unwrap().lock().unwrap().calc_size(
+                            brshtop_box.get().unwrap().try_lock().unwrap().set_b_cpu_h(
+                                cpu_box.get().unwrap().try_lock().unwrap().calc_size(
                                     term,
-                                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                                    brshtop_box.get().unwrap().try_lock().unwrap().get_b_cpu_h(),
                                     self,
                                 ),
                             );
@@ -659,10 +659,10 @@ impl CpuCollector {
                                 e
                             ));
                             self.got_sensors = false;
-                            brshtop_box.get().unwrap().lock().unwrap().set_b_cpu_h(
-                                cpu_box.get().unwrap().lock().unwrap().calc_size(
+                            brshtop_box.get().unwrap().try_lock().unwrap().set_b_cpu_h(
+                                cpu_box.get().unwrap().try_lock().unwrap().calc_size(
                                     term,
-                                    brshtop_box.get().unwrap().lock().unwrap().get_b_cpu_h(),
+                                    brshtop_box.get().unwrap().try_lock().unwrap().get_b_cpu_h(),
                                     self,
                                 ),
                             );

@@ -127,9 +127,9 @@ impl Color {
         }
     }
 
-    pub fn call(&self, adder: String, term_p: &OnceCell<Mutex<Term>>) -> Color {
+    pub fn call(&self, adder: String, term_p: &Term) -> Color {
 
-        let term = term_p.get().unwrap().lock().unwrap();
+        let term = term_p;
 
         if adder.len() < 1 {
             return Color::default();

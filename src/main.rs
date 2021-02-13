@@ -401,9 +401,6 @@ pub fn main() {
             Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
         }
     };
-    let mut mutex_CONFIG: Mutex<Config> = Mutex::new(CONFIG);
-    let mut passable_CONFIG: OnceCell<Mutex<Config>> = OnceCell::new();
-    passable_CONFIG.set(mutex_CONFIG);
 
     errlog(format!(
         "New instance of brshtop version {} started with pid {}",
@@ -412,7 +409,7 @@ pub fn main() {
     ));
     errlog(format!(
         "Loglevel set to {} (even though, currently, this doesn't work)",
-        passable_CONFIG.get().unwrap().lock().unwrap().log_level
+        CONFIG.log_level
     ));
 
     let mut arg_output = String::new();
@@ -446,101 +443,47 @@ pub fn main() {
         }
     };
     let mut mutex_THEME: Mutex<Theme> = Mutex::new(THEME);
-    let mut passable_THEME: OnceCell<Mutex<Theme>> = OnceCell::new();
-    passable_THEME.set(mutex_THEME);
+    let mut THEME: OnceCell<Mutex<Theme>> = OnceCell::new();
+    THEME.set(mutex_THEME);
 
     //println!("Made it through global variables");
 
     // Pre main ---------------------------------------------------------------------------------------------
     let mut term: Term = Term::new();
-    let mut mutex_term: Mutex<Term> = Mutex::new(term);
-    let mut passable_term: OnceCell<Mutex<Term>> = OnceCell::new();
-    passable_term.set(mutex_term);
 
     let mut key: Key = Key::new();
-    let mut mutex_key: Mutex<Key> = Mutex::new(key);
-    let mut passable_key: OnceCell<Mutex<Key>> = OnceCell::new();
-    passable_key.set(mutex_key);
 
     let mut draw: Draw = Draw::new();
-    let mut mutex_draw: Mutex<Draw> = Mutex::new(draw);
-    let mut passable_draw: OnceCell<Mutex<Draw>> = OnceCell::new();
-    passable_draw.set(mutex_draw);
 
-    let mut brshtop_box: BrshtopBox = BrshtopBox::new(&passable_CONFIG, ARG_MODE);
-    let mut mutex_brshtop_box: Mutex<BrshtopBox> = Mutex::new(brshtop_box);
-    let mut passable_brshtop_box: OnceCell<Mutex<BrshtopBox>> = OnceCell::new();
-    passable_brshtop_box.set(mutex_brshtop_box);
+    let mut brshtop_box: BrshtopBox = BrshtopBox::new(&CONFIG, ARG_MODE);
 
-    let mut cpu_box: CpuBox = CpuBox::new(&passable_brshtop_box, &passable_CONFIG, ARG_MODE);
-    let mut mutex_cpu_box: Mutex<CpuBox> = Mutex::new(cpu_box);
-    let mut passable_cpu_box: OnceCell<Mutex<CpuBox>> = OnceCell::new();
-    passable_cpu_box.set(mutex_cpu_box);
+    let mut cpu_box: CpuBox = CpuBox::new(&brshtop_box, &CONFIG, ARG_MODE);
 
-    let mut mem_box: MemBox = MemBox::new(&passable_brshtop_box, &passable_CONFIG, ARG_MODE);
-    let mut mutex_mem_box: Mutex<MemBox> = Mutex::new(mem_box);
-    let mut passable_mem_box: OnceCell<Mutex<MemBox>> = OnceCell::new();
-    passable_mem_box.set(mutex_mem_box);
+    let mut mem_box: MemBox = MemBox::new(&brshtop_box, &CONFIG, ARG_MODE);
 
-    let mut net_box: NetBox = NetBox::new(&passable_CONFIG, ARG_MODE, &passable_brshtop_box);
-    let mut mutex_net_box: Mutex<NetBox> = Mutex::new(net_box);
-    let mut passable_net_box: OnceCell<Mutex<NetBox>> = OnceCell::new();
-    passable_net_box.set(mutex_net_box);
+    let mut net_box: NetBox = NetBox::new(&CONFIG, ARG_MODE, &brshtop_box);
 
-    let mut proc_box: ProcBox = ProcBox::new(&passable_brshtop_box, &passable_CONFIG, ARG_MODE);
-    let mut mutex_proc_box: Mutex<ProcBox> = Mutex::new(proc_box);
-    let mut passable_proc_box: OnceCell<Mutex<ProcBox>> = OnceCell::new();
-    passable_proc_box.set(mutex_proc_box);
+    let mut proc_box: ProcBox = ProcBox::new(&brshtop_box, &CONFIG, ARG_MODE);
 
     let mut collector: Collector = Collector::new();
-    let mut mutex_collector: Mutex<Collector> = Mutex::new(collector);
-    let mut passable_collector: OnceCell<Mutex<Collector>> = OnceCell::new();
-    passable_collector.set(mutex_collector);
 
     let mut cpu_collector: CpuCollector = CpuCollector::new();
-    let mut mutex_cpu_collector: Mutex<CpuCollector> = Mutex::new(cpu_collector);
-    let mut passable_cpu_collector: OnceCell<Mutex<CpuCollector>> = OnceCell::new();
-    passable_cpu_collector.set(mutex_cpu_collector);
 
-    let mut mem_collector: MemCollector = MemCollector::new(&passable_mem_box);
-    let mut mutex_mem_collector: Mutex<MemCollector> = Mutex::new(mem_collector);
-    let mut passable_mem_collector: OnceCell<Mutex<MemCollector>> = OnceCell::new();
-    passable_mem_collector.set(mutex_mem_collector);
+    let mut mem_collector: MemCollector = MemCollector::new(&mem_box);
 
-    let mut net_collector: NetCollector = NetCollector::new(&passable_net_box, &passable_CONFIG);
-    let mut mutex_net_collector: Mutex<NetCollector> = Mutex::new(net_collector);
-    let mut passable_net_collector: OnceCell<Mutex<NetCollector>> = OnceCell::new();
-    passable_net_collector.set(mutex_net_collector);
+    let mut net_collector: NetCollector = NetCollector::new(&net_box, &CONFIG);
 
-    let mut proc_collector: ProcCollector = ProcCollector::new(&passable_proc_box);
-    let mut mutex_proc_collector: Mutex<ProcCollector> = Mutex::new(proc_collector);
-    let mut passable_proc_collector: OnceCell<Mutex<ProcCollector>> = OnceCell::new();
-    passable_proc_collector.set(mutex_proc_collector);
+    let mut proc_collector: ProcCollector = ProcCollector::new(&proc_box);
 
     let mut menu: Menu = Menu::new(MENUS, MENU_COLORS);
-    let mut mutex_menu: Mutex<Menu> = Mutex::new(menu);
-    let mut passable_menu: OnceCell<Mutex<Menu>> = OnceCell::new();
-    passable_menu.set(mutex_menu);
 
     let mut timer: Timer = Timer::new();
-    let mut mutex_timer: Mutex<Timer> = Mutex::new(timer);
-    let mut passable_timer: OnceCell<Mutex<Timer>> = OnceCell::new();
-    passable_timer.set(mutex_timer);
 
     let mut timeit: TimeIt = TimeIt::new();
-    let mut mutex_timeit: Mutex<TimeIt> = Mutex::new(timeit);
-    let mut passable_timeit: OnceCell<Mutex<TimeIt>> = OnceCell::new();
-    passable_timeit.set(mutex_timeit);
 
     let mut init: Init = Init::new();
-    let mut mutex_init: Mutex<Init> = Mutex::new(init);
-    let mut passable_init: OnceCell<Mutex<Init>> = OnceCell::new();
-    passable_init.set(mutex_init);
 
     let mut updatechecker: UpdateChecker = UpdateChecker::new();
-    let mut mutex_updatechecker: Mutex<UpdateChecker> = Mutex::new(updatechecker);
-    let mut passable_updatechecker: OnceCell<Mutex<UpdateChecker>> = OnceCell::new();
-    passable_updatechecker.set(mutex_updatechecker);
 
     let mut collectors: Vec<Collectors> = vec![
         Collectors::MemCollector,
@@ -552,14 +495,8 @@ pub fn main() {
     let mut boxes: Vec<Boxes> = vec![Boxes::CpuBox, Boxes::MemBox, Boxes::NetBox, Boxes::ProcBox];
 
     let mut graphs: Graphs = Graphs::default();
-    let mut mutex_graphs: Mutex<Graphs> = Mutex::new(graphs);
-    let mut passable_graphs: OnceCell<Mutex<Graphs>> = OnceCell::new();
-    passable_graphs.set(mutex_graphs);
 
     let mut meters: Meters = Meters::default();
-    let mut mutex_meters: Mutex<Meters> = Mutex::new(meters);
-    let mut passable_meters: OnceCell<Mutex<Meters>> = OnceCell::new();
-    passable_meters.set(mutex_meters);
 
     //println!("Made it through pre-main");
 
@@ -568,8 +505,8 @@ pub fn main() {
     let term_size = terminal_size();
     match term_size {
         Some((Width(w), Height(h))) => {
-            &passable_term.get().unwrap().lock().unwrap().set_width(w);
-            &passable_term.get().unwrap().lock().unwrap().set_height(h);
+            term.set_width(w);
+            term.set_height(h);
         }
         None => error::throw_error("Unable to get size of terminal!"),
     };
@@ -577,68 +514,56 @@ pub fn main() {
     // Init ----------------------------------------------------------------------------------
 
     if DEBUG {
-        let mut init_timeit = passable_timeit.get().unwrap().lock().unwrap();
-        init_timeit.start("Init".to_owned());
-        drop(init_timeit);
+        timeit.start("Init".to_owned());
     }
 
     // Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
-    let mut init_term = passable_term.get().unwrap().lock().unwrap();
-    let mut init_draw = passable_draw.get().unwrap().lock().unwrap();
-    let mut init_key = passable_key.get().unwrap().lock().unwrap();
-    init_draw.now(
+    draw.now(
         vec![
-            init_term.get_alt_screen(),
-            init_term.get_clear(),
-            init_term.get_hide_cursor(),
-            init_term.get_mouse_on(),
+            term.get_alt_screen(),
+            term.get_clear(),
+            term.get_hide_cursor(),
+            term.get_mouse_on(),
             Term::title("BRShtop".to_owned()),
         ],
-        &mut init_key,
+        &mut key,
     );
 
     Term::echo(false);
 
-    drop(init_draw);
-    drop(init_key);
-    let mut init_menu = passable_menu.get().unwrap().lock().unwrap();
-    init_term.refresh(
+    term.refresh(
         vec![],
         boxes.clone(),
-        &passable_collector,
-        &passable_init,
-        &passable_cpu_box,
-        &passable_draw,
+        &mut collector,
+        &init,
+        &cpu_box,
+        &draw,
         true,
-        &passable_key,
-        &mut init_menu,
-        &passable_brshtop_box,
-        &passable_timer,
-        &passable_CONFIG,
-        &passable_THEME,
-        &passable_cpu_collector,
-        &passable_mem_box,
-        &passable_net_box,
-        &passable_proc_box,
+        &key,
+        &mut menu,
+        &brshtop_box,
+        &timer,
+        &CONFIG,
+        &THEME,
+        &cpu_collector,
+        &mem_box,
+        &net_box,
+        &proc_box,
     );
 
     // Start a thread checking for updates while running init
-    let mut init_CONFIG = passable_CONFIG.get().unwrap().lock().unwrap();
-    let mut init_updatechecker = passable_updatechecker.get().unwrap().lock().unwrap();
-    if init_CONFIG.update_check {
-        init_updatechecker.run();
+    if CONFIG.update_check {
+        updatechecker.run();
     }
 
     // Draw banner and init status
-    let mut init_init = passable_init.get().unwrap().lock().unwrap();
-    if init_CONFIG.show_init && !init_init.resized {
-        drop(init_term);
-        init_init.start(&passable_draw, &passable_key, &passable_term);
+    if CONFIG.show_init && !init.resized {
+        init.start(&passable_draw, &passable_key, &passable_term);
     }
 
     // Load theme
     if init_CONFIG.show_init {
-        init_draw = passable_draw.get().unwrap().lock().unwrap();
+        init_draw = passable_draw;
         init_draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -655,24 +580,26 @@ pub fn main() {
             false,
             &passable_key,
         );
+        drop(init_draw);
     }
+
     THEME = match Theme::from_str(init_CONFIG.color_theme.clone()) {
         Ok(t) => {
             drop(init_CONFIG);
             init_init.success(
-                &passable_CONFIG,
+                &CONFIG,
                 &passable_draw,
                 &passable_term,
                 &passable_key,
             );
-            init_CONFIG = passable_CONFIG.get().unwrap().lock().unwrap();
             t
         }
         Err(e) => {
             errlog(format!("Unable to read theme from config (error {})...", e));
+            drop(init_CONFIG);
             Init::fail(
                 e,
-                &passable_CONFIG,
+                &CONFIG,
                 &passable_draw,
                 &passable_collector,
                 &passable_key,
@@ -681,11 +608,12 @@ pub fn main() {
             Theme::default()
         }
     };
+    init_CONFIG = CONFIG;
 
     // Setup boxes
     if init_CONFIG.show_init {
         println!("Showing init");
-        init_draw = passable_draw.get().unwrap().lock().unwrap();
+        init_draw = passable_draw;
         init_draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -702,43 +630,43 @@ pub fn main() {
             false,
             &passable_key,
         );
+        drop(init_draw);
         if init_CONFIG.check_temp {
-            let mut init_cpu_collector = passable_cpu_collector.get().unwrap().lock().unwrap();
+            let mut init_cpu_collector = cpu_collector;
 
             drop(init_CONFIG);
-            init_cpu_collector.get_sensors(&passable_CONFIG);
-            init_CONFIG = passable_CONFIG.get().unwrap().lock().unwrap();
+            init_cpu_collector.get_sensors(&CONFIG);
+            init_CONFIG = CONFIG;
         }
-        let mut init_brshtop_box = passable_brshtop_box.get().unwrap().lock().unwrap();
+        let mut init_brshtop_box = brshtop_box;
 
         drop(init_CONFIG);
         init_brshtop_box.calc_sizes(
             boxes.clone(),
             &passable_term,
-            &passable_CONFIG,
-            &passable_cpu_collector,
+            &CONFIG,
+            &cpu_collector,
             &passable_cpu_box,
-            &passable_mem_box,
-            &passable_net_box,
-            &passable_proc_box,
+            &mem_box,
+            &net_box,
+            &proc_box,
         );
-        drop(init_draw);
         init_brshtop_box.draw_bg(
             false,
             &passable_draw,
             boxes.clone(),
             &init_menu,
-            &passable_CONFIG,
+            &CONFIG,
             &passable_cpu_box,
-            &passable_mem_box,
-            &passable_net_box,
-            &passable_proc_box,
+            &mem_box,
+            &net_box,
+            &proc_box,
             &passable_key,
-            &passable_THEME,
+            &THEME,
             &passable_term,
         );
         init_init.success(
-            &passable_CONFIG,
+            &CONFIG,
             &passable_draw,
             &passable_term,
             &passable_key,
@@ -746,9 +674,9 @@ pub fn main() {
     }
 
     // Setup signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH
-    init_CONFIG = passable_CONFIG.get().unwrap().lock().unwrap();
+    init_CONFIG = CONFIG;
     if init_CONFIG.show_init {
-        init_draw = passable_draw.get().unwrap().lock().unwrap();
+        init_draw = passable_draw;
         init_draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -765,6 +693,7 @@ pub fn main() {
             false,
             &passable_key,
         );
+        drop(init_draw);
     }
 
     drop(init_CONFIG);
@@ -774,7 +703,7 @@ pub fn main() {
         Err(e) => {
             Init::fail(
                 e.to_string(),
-                &passable_CONFIG,
+                &CONFIG,
                 &passable_draw,
                 &passable_collector,
                 &passable_key,
@@ -802,32 +731,32 @@ pub fn main() {
                             &passable_collector,
                             &passable_draw,
                             &passable_term,
-                            &passable_CONFIG,
+                            &CONFIG,
                         ),
                     },
                     SIGCONT => now_awake(
                         &passable_draw,
                         &passable_term,
                         &passable_key,
-                        &passable_brshtop_box,
+                        &brshtop_box,
                         &passable_collector,
                         boxes.clone(),
                         &passable_init,
                         &passable_cpu_box,
                         &passable_menu,
-                        &passable_timer,
-                        &passable_CONFIG,
-                        &passable_THEME,
+                        &timer,
+                        &CONFIG,
+                        &THEME,
                         DEBUG,
                         collectors.clone(),
                         &passable_timeit,
                         ARG_MODE,
                         &passable_graphs,
                         &passable_meters,
-                        &passable_net_box,
-                        &passable_proc_box,
-                        &passable_mem_box,
-                        &passable_cpu_collector,
+                        &net_box,
+                        &proc_box,
+                        &mem_box,
+                        &cpu_collector,
                         &passable_mem_collector,
                         &passable_net_collector,
                         &passable_proc_collector,
@@ -839,11 +768,11 @@ pub fn main() {
                         &passable_collector,
                         &passable_draw,
                         &passable_term,
-                        &passable_CONFIG,
+                        &CONFIG,
                     ),
                     SIGWINCH => {
-                        let mut SIG_term = passable_term.get().unwrap().lock().unwrap();
-                        let mut SIG_menu = passable_menu.get().unwrap().lock().unwrap();
+                        let mut SIG_term = passable_term;
+                        let mut SIG_menu = passable_menu;
                         SIG_term.refresh(
                             vec![],
                             boxes.clone(),
@@ -854,14 +783,14 @@ pub fn main() {
                             true,
                             &passable_key,
                             &mut SIG_menu,
-                            &passable_brshtop_box,
-                            &passable_timer,
-                            &passable_CONFIG,
-                            &passable_THEME,
-                            &passable_cpu_collector,
-                            &passable_mem_box,
-                            &passable_net_box,
-                            &passable_proc_box,
+                            &brshtop_box,
+                            &timer,
+                            &CONFIG,
+                            &THEME,
+                            &cpu_collector,
+                            &mem_box,
+                            &net_box,
+                            &proc_box,
                         );
                         drop(SIG_term);
                     }
@@ -872,19 +801,19 @@ pub fn main() {
     }) {
         _ => (),
     };
-    init_menu = passable_menu.get().unwrap().lock().unwrap();
+    init_menu = passable_menu;
 
     init_init.success(
-        &passable_CONFIG,
+        &CONFIG,
         &passable_draw,
         &passable_term,
         &passable_key,
     );
 
     // Start a separate thread for reading keyboard input
-    init_CONFIG = passable_CONFIG.get().unwrap().lock().unwrap();
+    init_CONFIG = CONFIG;
     if init_CONFIG.show_init {
-        init_draw = passable_draw.get().unwrap().lock().unwrap();
+        init_draw = passable_draw;
         init_draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -901,24 +830,25 @@ pub fn main() {
             false,
             &passable_key,
         );
+        drop(init_draw);
     }
-    let mut init_key = passable_key.get().unwrap().lock().unwrap();
+    let mut init_key = passable_key;
 
     init_key.start(&passable_draw, &passable_menu);
 
     drop(init_CONFIG);
     drop(init_key);
     init_init.success(
-        &passable_CONFIG,
+        &CONFIG,
         &passable_draw,
         &passable_term,
         &passable_key,
     );
 
     // Start a separate thread for data collection and drawing
-    init_CONFIG = passable_CONFIG.get().unwrap().lock().unwrap();
+    init_CONFIG = CONFIG;
     if init_CONFIG.show_init {
-        init_draw = passable_draw.get().unwrap().lock().unwrap();
+        init_draw = passable_draw;
         init_draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -935,35 +865,36 @@ pub fn main() {
             false,
             &passable_key,
         );
+        drop(init_draw);
     }
 
-    let mut init_collector = passable_collector.get().unwrap().lock().unwrap();
+    let mut init_collector = passable_collector;
     init_collector.start(
-        &passable_CONFIG,
+        &CONFIG,
         DEBUG,
         collectors.clone(),
-        &passable_brshtop_box,
+        &brshtop_box,
         &passable_timeit,
         &passable_menu,
         &passable_draw,
         &passable_term,
         &passable_cpu_box,
         &passable_key,
-        &passable_THEME,
+        &THEME,
         ARG_MODE,
         &passable_graphs,
         &passable_meters,
-        &passable_net_box,
-        &passable_proc_box,
-        &passable_mem_box,
-        &passable_cpu_collector,
+        &net_box,
+        &proc_box,
+        &mem_box,
+        &cpu_collector,
         &passable_mem_collector,
         &passable_net_collector,
         &passable_proc_collector,
     );
-    init_init = passable_init.get().unwrap().lock().unwrap();
+    init_init = passable_init;
     init_init.success(
-        &passable_CONFIG,
+        &CONFIG,
         &passable_draw,
         &passable_term,
         &passable_key,
@@ -971,7 +902,7 @@ pub fn main() {
 
     // Collect data and draw to buffer
     if init_CONFIG.show_init {
-        init_draw = passable_draw.get().unwrap().lock().unwrap();
+        init_draw = passable_draw;
         init_draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -988,11 +919,12 @@ pub fn main() {
             false,
             &passable_key,
         );
+        drop(init_draw);
     }
     drop(init_CONFIG);
     init_collector.collect(
         collectors.clone(),
-        &passable_CONFIG,
+        &CONFIG,
         false,
         false,
         false,
@@ -1000,16 +932,16 @@ pub fn main() {
         false,
     );
     init_init.success(
-        &passable_CONFIG,
+        &CONFIG,
         &passable_draw,
         &passable_term,
         &passable_key,
     );
 
     // Draw to screen
-    init_CONFIG = passable_CONFIG.get().unwrap().lock().unwrap();
+    init_CONFIG = CONFIG;
     if init_CONFIG.show_init {
-        init_draw = passable_draw.get().unwrap().lock().unwrap();
+        init_draw = passable_draw;
         init_draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -1026,25 +958,26 @@ pub fn main() {
             false,
             &passable_key,
         );
+        drop(init_draw);
     }
-    init_collector = passable_collector.get().unwrap().lock().unwrap();
+    init_collector = passable_collector;
     init_collector.set_collect_done(EventEnum::Wait);
     init_collector.get_collect_done_reference().wait(-1.0);
     drop(init_CONFIG);
     init_init.success(
-        &passable_CONFIG,
+        &CONFIG,
         &passable_draw,
         &passable_term,
         &passable_key,
     );
 
     init_init.done(
-        &passable_CONFIG,
+        &CONFIG,
         &passable_draw,
         &passable_term,
         &passable_key,
     );
-    init_term = passable_term.get().unwrap().lock().unwrap();
+    init_term = passable_term;
     drop(init_init);
     drop(init_collector);
     init_term.refresh(
@@ -1057,27 +990,27 @@ pub fn main() {
         false,
         &passable_key,
         &mut init_menu,
-        &passable_brshtop_box,
-        &passable_timer,
-        &passable_CONFIG,
-        &passable_THEME,
-        &passable_cpu_collector,
-        &passable_mem_box,
-        &passable_net_box,
-        &passable_proc_box,
+        &brshtop_box,
+        &timer,
+        &CONFIG,
+        &THEME,
+        &cpu_collector,
+        &mem_box,
+        &net_box,
+        &proc_box,
     );
-    init_key = passable_key.get().unwrap().lock().unwrap();
-    init_draw = passable_draw.get().unwrap().lock().unwrap();
+    init_key = passable_key;
+    init_draw = passable_draw;
     init_draw.out(vec![], true, &mut init_key);
     drop(init_key);
-    init_CONFIG = passable_CONFIG.get().unwrap().lock().unwrap();
+    init_CONFIG = CONFIG;
     if init_CONFIG.draw_clock.len() > 0 {
-        let mut init_brshtop_box = passable_brshtop_box.get().unwrap().lock().unwrap();
+        let mut init_brshtop_box = brshtop_box;
         init_brshtop_box.set_clock_on(true);
         drop(init_brshtop_box);
     }
     if DEBUG {
-        let mut init_timeit = passable_timeit.get().unwrap().lock().unwrap();
+        let mut init_timeit = passable_timeit;
         init_timeit.stop("Init".to_owned());
         drop(init_timeit);
     }
@@ -1092,27 +1025,27 @@ pub fn main() {
     run(
         &passable_term,
         &passable_key,
-        &passable_timer,
+        &timer,
         &passable_collector,
         boxes.clone(),
         &passable_init,
         &passable_cpu_box,
         &passable_draw,
         &passable_menu,
-        &passable_brshtop_box,
-        &passable_CONFIG,
-        &passable_THEME,
+        &brshtop_box,
+        &CONFIG,
+        &THEME,
         &mut ARG_MODE,
-        &passable_proc_box,
+        &proc_box,
         &passable_proc_collector,
         &passable_net_collector,
-        &passable_cpu_collector,
-        &passable_net_box,
+        &cpu_collector,
+        &net_box,
         &passable_updatechecker,
         collectors.clone(),
         &passable_mem_collector,
         &passable_graphs,
-        &passable_mem_box,
+        &mem_box,
     );
 }
 
@@ -1142,26 +1075,26 @@ pub fn run(
     mem_box_p: &OnceCell<Mutex<MemBox>>,
 ) {
     loop {
-        let mut term = term_p.get().unwrap().lock().unwrap();
-        let mut key = key_p.get().unwrap().lock().unwrap();
-        let mut timer = timer_p.get().unwrap().lock().unwrap();
-        let mut collector = collector_p.get().unwrap().lock().unwrap();
-        let mut init = init_p.get().unwrap().lock().unwrap();
-        let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-        let mut draw = draw_p.get().unwrap().lock().unwrap();
-        let mut menu = menu_p.get().unwrap().lock().unwrap();
-        let mut brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-        let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-        let mut THEME = THEME_p.get().unwrap().lock().unwrap();
-        let mut procbox = procbox_p.get().unwrap().lock().unwrap();
-        let mut proccollector = proccollector_p.get().unwrap().lock().unwrap();
-        let mut netcollector = netcollector_p.get().unwrap().lock().unwrap();
-        let mut cpucollector = cpucollector_p.get().unwrap().lock().unwrap();
-        let mut netbox = netbox_p.get().unwrap().lock().unwrap();
-        let mut update_checker = update_checker_p.get().unwrap().lock().unwrap();
-        let mut memcollector = memcollector_p.get().unwrap().lock().unwrap();
-        let mut graphs = graphs_p.get().unwrap().lock().unwrap();
-        let mut mem_box = mem_box_p.get().unwrap().lock().unwrap();
+        let mut term = term_p;
+        let mut key = key_p;
+        let mut timer = timer_p;
+        let mut collector = collector_p;
+        let mut init = init_p;
+        let mut cpu_box = cpu_box_p;
+        let mut draw = draw_p;
+        let mut menu = menu_p;
+        let mut brshtop_box = brshtop_box_p;
+        let mut CONFIG = CONFIG_p;
+        let mut THEME = THEME_p;
+        let mut procbox = procbox_p;
+        let mut proccollector = proccollector_p;
+        let mut netcollector = netcollector_p;
+        let mut cpucollector = cpucollector_p;
+        let mut netbox = netbox_p;
+        let mut update_checker = update_checker_p;
+        let mut memcollector = memcollector_p;
+        let mut graphs = graphs_p;
+        let mut mem_box = mem_box_p;
 
         drop(collector);
         drop(init);
@@ -1196,18 +1129,18 @@ pub fn run(
             procbox_p,
         );
 
-        collector = collector_p.get().unwrap().lock().unwrap();
-        init = init_p.get().unwrap().lock().unwrap();
-        cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-        draw = draw_p.get().unwrap().lock().unwrap();
-        key = key_p.get().unwrap().lock().unwrap();
-        brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-        timer = timer_p.get().unwrap().lock().unwrap();
-        THEME = THEME_p.get().unwrap().lock().unwrap();
-        cpucollector = cpucollector_p.get().unwrap().lock().unwrap();
-        mem_box = mem_box_p.get().unwrap().lock().unwrap();
-        netbox = netbox_p.get().unwrap().lock().unwrap();
-        procbox = procbox_p.get().unwrap().lock().unwrap();
+        collector = collector_p;
+        init = init_p;
+        cpu_box = cpu_box_p;
+        draw = draw_p;
+        key = key_p;
+        brshtop_box = brshtop_box_p;
+        timer = timer_p;
+        THEME = THEME_p;
+        cpucollector = cpucollector_p;
+        mem_box = mem_box_p;
+        netbox = netbox_p;
+        procbox = procbox_p;
 
         timer.stamp();
 
@@ -1258,26 +1191,26 @@ pub fn run(
                     mem_box_p,
                     procbox_p,
                 );
-                key = key_p.get().unwrap().lock().unwrap();
-                procbox = procbox_p.get().unwrap().lock().unwrap();
-                collector = collector_p.get().unwrap().lock().unwrap();
-                proccollector = proccollector_p.get().unwrap().lock().unwrap();
-                draw = draw_p.get().unwrap().lock().unwrap();
-                term = term_p.get().unwrap().lock().unwrap();
-                brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-                cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-                menu = menu_p.get().unwrap().lock().unwrap();
-                THEME = THEME_p.get().unwrap().lock().unwrap();
-                netcollector = netcollector_p.get().unwrap().lock().unwrap();
-                init = init_p.get().unwrap().lock().unwrap();
-                cpucollector = cpucollector_p.get().unwrap().lock().unwrap();
-                netbox = netbox_p.get().unwrap().lock().unwrap();
-                update_checker = update_checker_p.get().unwrap().lock().unwrap();
-                timer = timer_p.get().unwrap().lock().unwrap();
-                memcollector = memcollector_p.get().unwrap().lock().unwrap();
-                graphs = graphs_p.get().unwrap().lock().unwrap();
-                mem_box = mem_box_p.get().unwrap().lock().unwrap();
-                procbox = procbox_p.get().unwrap().lock().unwrap();
+                key = key_p;
+                procbox = procbox_p;
+                collector = collector_p;
+                proccollector = proccollector_p;
+                draw = draw_p;
+                term = term_p;
+                brshtop_box = brshtop_box_p;
+                cpu_box = cpu_box_p;
+                menu = menu_p;
+                THEME = THEME_p;
+                netcollector = netcollector_p;
+                init = init_p;
+                cpucollector = cpucollector_p;
+                netbox = netbox_p;
+                update_checker = update_checker_p;
+                timer = timer_p;
+                memcollector = memcollector_p;
+                graphs = graphs_p;
+                mem_box = mem_box_p;
+                procbox = procbox_p;
             }
         }
 
@@ -1290,6 +1223,23 @@ pub fn run(
             false,
             false,
         );
+        drop(key);
+        drop(timer);
+        drop(collector);
+        drop(init);
+        drop(cpu_box);
+        drop(menu);
+        drop(brshtop_box);
+        drop(THEME);
+        drop(procbox);
+        drop(proccollector);
+        drop(netcollector);
+        drop(cpucollector);
+        drop(netbox);
+        drop(update_checker);
+        drop(memcollector);
+        drop(graphs);
+        drop(mem_box);
     }
 }
 
@@ -1335,27 +1285,27 @@ pub fn create_box(
     match box_to_use {
         Some(o) => match o {
             Boxes::BrshtopBox => {
-                wx = brshtop_box.unwrap().get().unwrap().lock().unwrap().get_x();
-                wy = brshtop_box.unwrap().get().unwrap().lock().unwrap().get_y();
+                wx = brshtop_box.unwrap().get_x();
+                wy = brshtop_box.unwrap().get_y();
                 ww = brshtop_box
                     .unwrap()
                     .get()
                     .unwrap()
-                    .lock()
+                    .try_lock()
                     .unwrap()
                     .get_width();
                 wh = brshtop_box
                     .unwrap()
                     .get()
                     .unwrap()
-                    .lock()
+                    .try_lock()
                     .unwrap()
                     .get_height();
                 wt = brshtop_box
                     .unwrap()
                     .get()
                     .unwrap()
-                    .lock()
+                    .try_lock()
                     .unwrap()
                     .get_name();
             }
@@ -1519,18 +1469,12 @@ pub fn min_max(value: i32, min_value: i32, max_value: i32) -> i32 {
 pub fn clean_quit(
     errcode: Option<i32>,
     errmsg: Option<String>,
-    key_p: &OnceCell<Mutex<Key>>,
-    collector_p: &OnceCell<Mutex<Collector>>,
-    draw_p: &OnceCell<Mutex<Draw>>,
-    term_p: &OnceCell<Mutex<Term>>,
-    CONFIG_p: &OnceCell<Mutex<Config>>,
+    key: &mut Key,
+    collector: &Collector,
+    draw: &Draw,
+    term: &Term,
+    CONFIG: &Config,
 ) {
-    let mut key = key_p.get().unwrap().lock().unwrap();
-    let mut collector = collector_p.get().unwrap().lock().unwrap();
-    let mut draw = draw_p.get().unwrap().lock().unwrap();
-    let mut term = term_p.get().unwrap().lock().unwrap();
-    let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-
     key.stop();
     collector.stop();
     if errcode == None {
@@ -1758,27 +1702,27 @@ pub fn process_keys<'a>(
     mem_box_p: &OnceCell<Mutex<MemBox>>,
     proc_box_p: &OnceCell<Mutex<ProcBox>>,
 ) {
-    let mut key_class = key_class_p.get().unwrap().lock().unwrap();
-    let mut procbox = procbox_p.get().unwrap().lock().unwrap();
-    let mut collector = collector_p.get().unwrap().lock().unwrap();
-    let mut proccollector = proccollector_p.get().unwrap().lock().unwrap();
-    let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-    let mut draw = draw_p.get().unwrap().lock().unwrap();
-    let mut term = term_p.get().unwrap().lock().unwrap();
-    let mut brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-    let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-    let mut menu = menu_p.get().unwrap().lock().unwrap();
-    let mut THEME = THEME_p.get().unwrap().lock().unwrap();
-    let mut netcollector = netcollector_p.get().unwrap().lock().unwrap();
-    let mut init = init_p.get().unwrap().lock().unwrap();
-    let mut cpucollector = cpucollector_p.get().unwrap().lock().unwrap();
-    let mut netbox = netbox_p.get().unwrap().lock().unwrap();
-    let mut update_checker = update_checker_p.get().unwrap().lock().unwrap();
-    let mut timer = timer_p.get().unwrap().lock().unwrap();
-    let mut memcollector = memcollector_p.get().unwrap().lock().unwrap();
-    let mut graphs = graphs_p.get().unwrap().lock().unwrap();
-    let mut mem_box = mem_box_p.get().unwrap().lock().unwrap();
-    let mut proc_box = proc_box_p.get().unwrap().lock().unwrap();
+    let mut key_class = key_class_p;
+    let mut procbox = procbox_p;
+    let mut collector = collector_p;
+    let mut proccollector = proccollector_p;
+    let mut CONFIG = CONFIG_p;
+    let mut draw = draw_p;
+    let mut term = term_p;
+    let mut brshtop_box = brshtop_box_p;
+    let mut cpu_box = cpu_box_p;
+    let mut menu = menu_p;
+    let mut THEME = THEME_p;
+    let mut netcollector = netcollector_p;
+    let mut init = init_p;
+    let mut cpucollector = cpucollector_p;
+    let mut netbox = netbox_p;
+    let mut update_checker = update_checker_p;
+    let mut timer = timer_p;
+    let mut memcollector = memcollector_p;
+    let mut graphs = graphs_p;
+    let mut mem_box = mem_box_p;
+    let mut proc_box = proc_box_p;
 
     let mut mouse_pos: (i32, i32) = (0, 0);
     let mut filtered: bool = false;
@@ -1857,7 +1801,7 @@ pub fn process_keys<'a>(
             continue;
         }
 
-        CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+        CONFIG = CONFIG_p;
         if key == "_null".to_owned() {
             continue;
         } else if key == "q".to_owned() {
@@ -1875,11 +1819,11 @@ pub fn process_keys<'a>(
                 term_p,
                 CONFIG_p,
             );
-            key_class = key_class_p.get().unwrap().lock().unwrap(); // NEVER REACHED
-            collector = collector_p.get().unwrap().lock().unwrap(); // NEVER REACHED
-            draw = draw_p.get().unwrap().lock().unwrap(); // NEVER REACHED
-            term = term_p.get().unwrap().lock().unwrap(); // NEVER REACHED
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap(); // NEVER REACHED
+            key_class = key_class_p; // NEVER REACHED
+            collector = collector_p; // NEVER REACHED
+            draw = draw_p; // NEVER REACHED
+            term = term_p; // NEVER REACHED
+            CONFIG = CONFIG_p; // NEVER REACHED
         } else if key == "+" && CONFIG.update_ms + 100 <= 86399900 {
             CONFIG.update_ms += 100;
             drop(key_class);
@@ -1899,13 +1843,13 @@ pub fn process_keys<'a>(
                 THEME_p,
                 term_p,
             );
-            key_class = key_class_p.get().unwrap().lock().unwrap();
-            collector = collector_p.get().unwrap().lock().unwrap();
-            draw = draw_p.get().unwrap().lock().unwrap();
-            term = term_p.get().unwrap().lock().unwrap();
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-            cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-            THEME = THEME_p.get().unwrap().lock().unwrap();
+            key_class = key_class_p;
+            collector = collector_p;
+            draw = draw_p;
+            term = term_p;
+            CONFIG = CONFIG_p;
+            cpu_box = cpu_box_p;
+            THEME = THEME_p;
         } else if key == "-".to_owned() && CONFIG.update_ms - 100 >= 100 {
             CONFIG.update_ms -= 100;
             drop(key_class);
@@ -1925,13 +1869,13 @@ pub fn process_keys<'a>(
                 THEME_p,
                 term_p,
             );
-            key_class = key_class_p.get().unwrap().lock().unwrap();
-            collector = collector_p.get().unwrap().lock().unwrap();
-            draw = draw_p.get().unwrap().lock().unwrap();
-            term = term_p.get().unwrap().lock().unwrap();
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-            cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-            THEME = THEME_p.get().unwrap().lock().unwrap();
+            key_class = key_class_p;
+            collector = collector_p;
+            draw = draw_p;
+            term = term_p;
+            CONFIG = CONFIG_p;
+            cpu_box = cpu_box_p;
+            THEME = THEME_p;
         } else if vec!["b", "n"]
             .iter()
             .map(|s| s.to_owned().to_owned())
@@ -1941,8 +1885,8 @@ pub fn process_keys<'a>(
             drop(collector);
             drop(CONFIG);
             netcollector.switch(key, collector_p, CONFIG_p);
-            collector = collector_p.get().unwrap().lock().unwrap();
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            collector = collector_p;
+            CONFIG = CONFIG_p;
         } else if vec!["M", "escape"]
             .iter()
             .map(|s| s.to_owned().to_owned())
@@ -1988,23 +1932,23 @@ pub fn process_keys<'a>(
                 mem_box_p,
                 proc_box_p,
             );
-            draw = draw_p.get().unwrap().lock().unwrap();
-            term = term_p.get().unwrap().lock().unwrap();
-            update_checker = update_checker_p.get().unwrap().lock().unwrap();
-            THEME = THEME_p.get().unwrap().lock().unwrap();
-            key_class = key_class_p.get().unwrap().lock().unwrap();
-            timer = timer_p.get().unwrap().lock().unwrap();
-            collector = collector_p.get().unwrap().lock().unwrap();
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-            netcollector = netcollector_p.get().unwrap().lock().unwrap();
-            brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-            init = init_p.get().unwrap().lock().unwrap();
-            cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-            cpucollector = cpucollector_p.get().unwrap().lock().unwrap();
-            netbox = netbox_p.get().unwrap().lock().unwrap();
-            proccollector = proccollector_p.get().unwrap().lock().unwrap();
-            mem_box = mem_box_p.get().unwrap().lock().unwrap();
-            proc_box = proc_box_p.get().unwrap().lock().unwrap();
+            draw = draw_p;
+            term = term_p;
+            update_checker = update_checker_p;
+            THEME = THEME_p;
+            key_class = key_class_p;
+            timer = timer_p;
+            collector = collector_p;
+            CONFIG = CONFIG_p;
+            netcollector = netcollector_p;
+            brshtop_box = brshtop_box_p;
+            init = init_p;
+            cpu_box = cpu_box_p;
+            cpucollector = cpucollector_p;
+            netbox = netbox_p;
+            proccollector = proccollector_p;
+            mem_box = mem_box_p;
+            proc_box = proc_box_p;
         } else if vec!["o", "f2"]
             .iter()
             .map(|s| s.to_owned().to_owned())
@@ -2048,22 +1992,22 @@ pub fn process_keys<'a>(
                 proc_box_p,
                 mem_box_p,
             );
-            THEME = THEME_p.get().unwrap().lock().unwrap();
-            draw = draw_p.get().unwrap().lock().unwrap();
-            term = term_p.get().unwrap().lock().unwrap();
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-            key_class = key_class_p.get().unwrap().lock().unwrap();
-            timer = timer_p.get().unwrap().lock().unwrap();
-            netcollector = netcollector_p.get().unwrap().lock().unwrap();
-            brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-            collector = collector_p.get().unwrap().lock().unwrap();
-            init = init_p.get().unwrap().lock().unwrap();
-            cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-            cpucollector = cpucollector_p.get().unwrap().lock().unwrap();
-            netbox = netbox_p.get().unwrap().lock().unwrap();
-            proccollector = proccollector_p.get().unwrap().lock().unwrap();
-            proc_box = proc_box_p.get().unwrap().lock().unwrap();
-            mem_box = mem_box_p.get().unwrap().lock().unwrap();
+            THEME = THEME_p;
+            draw = draw_p;
+            term = term_p;
+            CONFIG = CONFIG_p;
+            key_class = key_class_p;
+            timer = timer_p;
+            netcollector = netcollector_p;
+            brshtop_box = brshtop_box_p;
+            collector = collector_p;
+            init = init_p;
+            cpu_box = cpu_box_p;
+            cpucollector = cpucollector_p;
+            netbox = netbox_p;
+            proccollector = proccollector_p;
+            proc_box = proc_box_p;
+            mem_box = mem_box_p;
         } else if vec!["h", "f1"]
             .iter()
             .map(|s| s.to_owned().to_owned())
@@ -2087,13 +2031,13 @@ pub fn process_keys<'a>(
                 CONFIG_p,
                 timer_p,
             );
-            THEME = THEME_p.get().unwrap().lock().unwrap();
-            draw = draw_p.get().unwrap().lock().unwrap();
-            term = term_p.get().unwrap().lock().unwrap();
-            key_class = key_class_p.get().unwrap().lock().unwrap();
-            collector = collector_p.get().unwrap().lock().unwrap();
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-            timer = timer_p.get().unwrap().lock().unwrap();
+            THEME = THEME_p;
+            draw = draw_p;
+            term = term_p;
+            key_class = key_class_p;
+            collector = collector_p;
+            CONFIG = CONFIG_p;
+            timer = timer_p;
         } else if key == "z".to_owned() {
             let inserter = netcollector.get_reset();
             netcollector.set_reset(!inserter);
@@ -2107,7 +2051,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "y".to_owned() {
             CONFIG.net_sync = !CONFIG.net_sync;
             drop(CONFIG);
@@ -2120,7 +2064,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "a".to_owned() {
             let inserter = netcollector.get_auto_min();
             netcollector.set_auto_min(!inserter);
@@ -2140,7 +2084,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if vec!["left", "right"]
             .iter()
             .map(|s| s.to_owned().to_owned())
@@ -2173,7 +2117,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "e".to_owned() {
             CONFIG.proc_tree = !CONFIG.proc_tree;
             drop(CONFIG);
@@ -2186,7 +2130,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "r".to_owned() {
             CONFIG.proc_reversed = !CONFIG.proc_reversed;
             drop(CONFIG);
@@ -2199,7 +2143,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "c".to_owned() {
             CONFIG.proc_per_core = !CONFIG.proc_per_core;
             drop(CONFIG);
@@ -2212,7 +2156,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "g".to_owned() {
             CONFIG.mem_graphs = !CONFIG.mem_graphs;
             drop(CONFIG);
@@ -2225,7 +2169,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "s".to_owned() {
             collector.set_collect_idle(EventEnum::Wait);
             collector.get_collect_idle_reference().wait(-1.0);
@@ -2240,7 +2184,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "f".to_owned() {
             procbox.set_filtering(true);
             if proccollector.search_filter.len() == 0 {
@@ -2256,7 +2200,7 @@ pub fn process_keys<'a>(
                 true,
                 true,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "m".to_owned() {
             if ARG_MODE.t != ViewModeEnum::None {
                 ARG_MODE.replace_self(ViewModeEnum::None);
@@ -2313,18 +2257,18 @@ pub fn process_keys<'a>(
                 procbox_p,
             );
 
-            collector = collector_p.get().unwrap().lock().unwrap();
-            init = init_p.get().unwrap().lock().unwrap();
-            cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-            draw = draw_p.get().unwrap().lock().unwrap();
-            key_class = key_class_p.get().unwrap().lock().unwrap();
-            brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-            timer = timer_p.get().unwrap().lock().unwrap();
-            THEME = THEME_p.get().unwrap().lock().unwrap();
-            cpucollector = cpucollector_p.get().unwrap().lock().unwrap();
-            mem_box = mem_box_p.get().unwrap().lock().unwrap();
-            netbox = netbox_p.get().unwrap().lock().unwrap();
-            procbox = procbox_p.get().unwrap().lock().unwrap();
+            collector = collector_p;
+            init = init_p;
+            cpu_box = cpu_box_p;
+            draw = draw_p;
+            key_class = key_class_p;
+            brshtop_box = brshtop_box_p;
+            timer = timer_p;
+            THEME = THEME_p;
+            cpucollector = cpucollector_p;
+            mem_box = mem_box_p;
+            netbox = netbox_p;
+            procbox = procbox_p;
         } else if vec!["t", "k", "i"]
             .iter()
             .map(|s| s.to_owned().to_owned())
@@ -2365,7 +2309,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if key == "enter".to_owned() {
             if procbox.get_selected() > 0
                 && proccollector.detailed_pid.unwrap_or(0) != procbox.get_selected_pid()
@@ -2402,7 +2346,7 @@ pub fn process_keys<'a>(
                 true,
                 false,
             );
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            CONFIG = CONFIG_p;
         } else if vec![
             "up",
             "down",
@@ -2432,10 +2376,10 @@ pub fn process_keys<'a>(
                 collector_p,
                 CONFIG_p,
             );
-            proccollector = proccollector_p.get().unwrap().lock().unwrap();
-            key_class = key_class_p.get().unwrap().lock().unwrap();
-            collector = collector_p.get().unwrap().lock().unwrap();
-            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
+            proccollector = proccollector_p;
+            key_class = key_class_p;
+            collector = collector_p;
+            CONFIG = CONFIG_p;
         }
     }
 }
@@ -2497,10 +2441,10 @@ pub fn now_sleeping(
     draw_p: &OnceCell<Mutex<Draw>>,
     term_p: &OnceCell<Mutex<Term>>,
 ) -> Option<()> {
-    let mut key = key_p.get().unwrap().lock().unwrap();
-    let mut collector = collector_p.get().unwrap().lock().unwrap();
-    let mut draw = draw_p.get().unwrap().lock().unwrap();
-    let mut term = term_p.get().unwrap().lock().unwrap();
+    let mut key = key_p;
+    let mut collector = collector_p;
+    let mut draw = draw_p;
+    let mut term = term_p;
 
     key.stop();
     collector.stop();
@@ -2552,27 +2496,27 @@ pub fn now_awake(
     net_collector_p: &OnceCell<Mutex<NetCollector>>,
     proc_collector_p: &OnceCell<Mutex<ProcCollector>>,
 ) {
-    let mut draw = draw_p.get().unwrap().lock().unwrap();
-    let mut term = term_p.get().unwrap().lock().unwrap();
-    let mut key = key_p.get().unwrap().lock().unwrap();
-    let mut brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-    let mut collector = collector_p.get().unwrap().lock().unwrap();
-    let mut init = init_p.get().unwrap().lock().unwrap();
-    let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-    let mut menu = menu_p.get().unwrap().lock().unwrap();
-    let mut timer = timer_p.get().unwrap().lock().unwrap();
-    let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-    let mut THEME = THEME_p.get().unwrap().lock().unwrap();
-    let mut timeit = timeit_p.get().unwrap().lock().unwrap();
-    let mut graphs = graphs_p.get().unwrap().lock().unwrap();
-    let mut meters = meters_p.get().unwrap().lock().unwrap();
-    let mut netbox = netbox_p.get().unwrap().lock().unwrap();
-    let mut procbox = procbox_p.get().unwrap().lock().unwrap();
-    let mut membox = membox_p.get().unwrap().lock().unwrap();
-    let mut cpu_collector = cpu_collector_p.get().unwrap().lock().unwrap();
-    let mut mem_collector = mem_collector_p.get().unwrap().lock().unwrap();
-    let mut net_collector = net_collector_p.get().unwrap().lock().unwrap();
-    let mut proc_collector = proc_collector_p.get().unwrap().lock().unwrap();
+    let mut draw = draw_p;
+    let mut term = term_p;
+    let mut key = key_p;
+    let mut brshtop_box = brshtop_box_p;
+    let mut collector = collector_p;
+    let mut init = init_p;
+    let mut cpu_box = cpu_box_p;
+    let mut menu = menu_p;
+    let mut timer = timer_p;
+    let mut CONFIG = CONFIG_p;
+    let mut THEME = THEME_p;
+    let mut timeit = timeit_p;
+    let mut graphs = graphs_p;
+    let mut meters = meters_p;
+    let mut netbox = netbox_p;
+    let mut procbox = procbox_p;
+    let mut membox = membox_p;
+    let mut cpu_collector = cpu_collector_p;
+    let mut mem_collector = mem_collector_p;
+    let mut net_collector = net_collector_p;
+    let mut proc_collector = proc_collector_p;
 
     draw.now(
         vec![
@@ -2599,7 +2543,7 @@ pub fn now_awake(
     drop(cpu_collector);
     drop(netbox);
     drop(procbox);
-    menu = menu_p.get().unwrap().lock().unwrap();
+    menu = menu_p;
     term.refresh(
         vec![],
         boxes.clone(),
@@ -2619,10 +2563,10 @@ pub fn now_awake(
         netbox_p,
         procbox_p,
     );
-    collector = collector_p.get().unwrap().lock().unwrap();
-    init = init_p.get().unwrap().lock().unwrap();
-    brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-    timer = timer_p.get().unwrap().lock().unwrap();
+    collector = collector_p;
+    init = init_p;
+    brshtop_box = brshtop_box_p;
+    timer = timer_p;
 
     drop(term);
     brshtop_box.calc_sizes(

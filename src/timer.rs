@@ -30,9 +30,7 @@ impl Timer {
         }
         match self
             .timestamp
-            .checked_add(Duration::from_millis(
-                CONFIG.get().unwrap().lock().unwrap().update_ms as u64,
-            ))
+            .checked_add(Duration::from_millis(CONFIG.update_ms as u64))
             .unwrap()
             .duration_since(SystemTime::now())
         {
@@ -44,30 +42,24 @@ impl Timer {
     pub fn left(&mut self, CONFIG: &OnceCell<Mutex<Config>>) -> Duration {
         match SystemTime::now().duration_since(
             self.timestamp
-                .checked_add(Duration::from_millis(
-                    CONFIG.get().unwrap().lock().unwrap().update_ms as u64,
-                ))
+                .checked_add(Duration::from_millis(CONFIG.update_ms as u64))
                 .unwrap(),
         ) {
             Ok(_) => Duration::from_millis(0),
             Err(_) => self
                 .timestamp
-                .checked_add(Duration::from_millis(
-                    CONFIG.get().unwrap().lock().unwrap().update_ms as u64,
-                ))
+                .checked_add(Duration::from_millis(CONFIG.update_ms as u64))
                 .unwrap()
                 .duration_since(SystemTime::now())
                 .unwrap(),
         }
     }
 
-    pub fn finish(&mut self, key: &OnceCell<Mutex<Key>>, CONFIG: &OnceCell<Mutex<Config>>) {
+    pub fn finish(&mut self, key: &Key, CONFIG: &Config) {
         self.return_zero = true;
         self.timestamp = SystemTime::now()
-            .checked_sub(Duration::from_millis(
-                CONFIG.get().unwrap().lock().unwrap().update_ms as u64,
-            ))
+            .checked_sub(Duration::from_millis(CONFIG.update_ms as u64))
             .unwrap();
-        key.get().unwrap().lock().unwrap().break_wait();
+        key.break_wait();
     }
 }
