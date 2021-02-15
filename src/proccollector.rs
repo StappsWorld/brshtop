@@ -131,10 +131,10 @@ pub struct ProcCollector {
     pub p_values: Vec<String>,
 }
 impl ProcCollector {
-    pub fn new(procbox: &OnceCell<Mutex<ProcBox>>) -> Self {
+    pub fn new(procbox: &ProcBox) -> Self {
         let mut proc = ProcCollector {
             parent: Collector::new(),
-            buffer: procbox.get().unwrap().lock().unwrap().get_buffer().clone(),
+            buffer: procbox.get_buffer(),
             search_filter: String::default(),
             processes: HashMap::<Pid, HashMap<String, ProcessInfo>>::new(),
             num_procs: 0,
@@ -169,29 +169,29 @@ impl ProcCollector {
     /// List all processess with pid, name, arguments, threads, username, memory percent and cpu percent
     pub fn collect(
         &mut self,
-        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        procbox: &OnceCell<Mutex<ProcBox>>,
+        brshtop_box: &BrshtopBox,
+        CONFIG: &Config,
+        procbox: &mut ProcBox,
     ) {
-        if brshtop_box.get().unwrap().lock().unwrap().get_stat_mode() {
+        if brshtop_box.get_stat_mode() {
             return;
         }
 
         let mut out: HashMap<Pid, HashMap<String, ProcessInfo>> =
             HashMap::<Pid, HashMap<String, ProcessInfo>>::new();
         self.det_cpu = 0.0;
-        let mut sorting: SortingOption = CONFIG.get().unwrap().lock().unwrap().proc_sorting;
-        let reverse = !CONFIG.get().unwrap().lock().unwrap().proc_reversed;
-        let proc_per_cpu: bool = CONFIG.get().unwrap().lock().unwrap().proc_per_core;
+        let mut sorting: SortingOption = CONFIG.proc_sorting;
+        let reverse = !CONFIG.proc_reversed;
+        let proc_per_cpu: bool = CONFIG.proc_per_core;
         let search: String = self.search_filter.clone();
         let err: f64 = 0.0;
         let mut n: usize = 0;
 
-        if CONFIG.get().unwrap().lock().unwrap().proc_tree && sorting == SortingOption::Arguments {
+        if CONFIG.proc_tree && sorting == SortingOption::Arguments {
             sorting = SortingOption::Program;
         }
 
-        if CONFIG.get().unwrap().lock().unwrap().proc_tree {
+        if CONFIG.proc_tree {
             self.tree(sorting, reverse, proc_per_cpu, search, CONFIG);
         } else {
             let mut processes = ProcCollector::get_sorted_processes(sorting, reverse);
@@ -336,18 +336,10 @@ impl ProcCollector {
         if self.detailed {
             self.expand = u32::try_from(
                 ((procbox
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
                     .get_parent()
                     .get_width() as i32
                     - 2)
                     - ((procbox
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
                         .get_parent()
                         .get_width() as i32
                         - 2)
@@ -382,7 +374,7 @@ impl ProcCollector {
                         "status".to_owned(),
                         ProcCollectorDetails::Status(Status::Dead),
                     );
-                    procbox.get().unwrap().lock().unwrap().set_redraw(true);
+                    procbox.set_redraw(true);
                     return;
                 }
             };
@@ -396,7 +388,7 @@ impl ProcCollector {
                         "status".to_owned(),
                         ProcCollectorDetails::Status(Status::Dead),
                     );
-                    procbox.get().unwrap().lock().unwrap().set_redraw(true);
+                    procbox.set_redraw(true);
                     return;
                 }
             };
@@ -564,7 +556,7 @@ impl ProcCollector {
                     "cpu_percent".to_owned(),
                     ProcCollectorDetails::F32(
                         cpu_percent_push
-                            * if CONFIG.get().unwrap().lock().unwrap().proc_per_core {
+                            * if CONFIG.proc_per_core {
                                 1.0
                             } else {
                                 THREADS.to_owned() as f32
@@ -728,10 +720,6 @@ impl ProcCollector {
             ) as u32);
             if self.details_cpu.len() as u32
                 > procbox
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
                     .get_parent()
                     .get_width()
             {
@@ -739,10 +727,6 @@ impl ProcCollector {
             }
             if self.details_mem.len() as u32
                 > procbox
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
                     .get_parent()
                     .get_width()
             {
@@ -833,7 +817,7 @@ impl ProcCollector {
         reverse: bool,
         proc_per_cpu: bool,
         search: String,
-        CONFIG: &OnceCell<Mutex<Config>>,
+        CONFIG: &Config,
     ) {
         let mut out: HashMap<Pid, HashMap<String, ProcCollectorDetails>> =
             HashMap::<Pid, HashMap<String, ProcCollectorDetails>>::new();
@@ -1011,7 +995,7 @@ impl ProcCollector {
         search: String,
         out: &mut HashMap<Pid, HashMap<String, ProcCollectorDetails>>,
         det_cpu_p: f64,
-        CONFIG: &OnceCell<Mutex<Config>>,
+        CONFIG: &Config,
     ) -> f64 {
         let mut name: String = String::default();
         let mut threads: u64 = 0;
@@ -1187,7 +1171,7 @@ impl ProcCollector {
                     },
                     None => String::default(),
                 };
-                if CONFIG.get().unwrap().lock().unwrap().proc_mem_bytes {
+                if CONFIG.proc_mem_bytes {
                     mem_b = match getinfo.get(&"memory_info".to_owned()) {
                         Some(p) => match p {
                             ProcCollectorDetails::MemoryInfo(m) => m.rss(),
@@ -1210,7 +1194,7 @@ impl ProcCollector {
             collapse = match self.collapsed.get(&pid) {
                 Some(b) => b.clone(),
                 None => {
-                    let b = depth as i32 > CONFIG.get().unwrap().lock().unwrap().tree_depth;
+                    let b = depth as i32 > CONFIG.tree_depth;
                     self.collapsed.insert(pid, b);
                     b
                 }
@@ -1356,16 +1340,16 @@ impl ProcCollector {
     /// JUST CALL ProcBox.draw_fg()
     pub fn draw(
         &mut self,
-        procbox: &OnceCell<Mutex<ProcBox>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        key: &OnceCell<Mutex<Key>>,
-        THEME: &OnceCell<Mutex<Theme>>,
-        graphs: &OnceCell<Mutex<Graphs>>,
-        term: &OnceCell<Mutex<Term>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        menu: &OnceCell<Mutex<Menu>>,
+        procbox: &mut ProcBox,
+        CONFIG: &Config,
+        key: &mut Key,
+        THEME: &Theme,
+        graphs: &mut Graphs,
+        term: &Term,
+        draw: &mut Draw,
+        menu: &Menu,
     ) {
-        procbox.get().unwrap().lock().unwrap().draw_fg(
+        procbox.draw_fg(
             CONFIG,
             key,
             THEME,

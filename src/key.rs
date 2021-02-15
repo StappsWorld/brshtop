@@ -107,7 +107,7 @@ impl Key {
         }
     }
 
-    pub fn start(&mut self, draw: &OnceCell<Mutex<Draw>>, menu: &OnceCell<Mutex<Menu>>) {
+    pub fn start(&mut self, draw: &mut Draw, menu: &Menu) {
         self.stopping = false;
         crossbeam::thread::scope(|s| {
             s.spawn(|_| self.get_key(draw, menu));
@@ -170,32 +170,21 @@ impl Key {
         &mut self,
         sec: f64,
         mouse: bool,
-        draw_p: &OnceCell<Mutex<Draw>>,
-        term_p: &OnceCell<Mutex<Term>>,
+        draw: &mut Draw,
+        term: &Term,
     ) -> bool {
-        let mut draw = draw_p.get().unwrap().lock().unwrap();
-        let mut term = term_p.get().unwrap().lock().unwrap();
 
         if self.list.len() > 0 {
             return true;
         }
         if mouse {
-            draw.now_unreferenced_key(
-                vec![term.get_mouse_direct_on()],
-                self,
-            );
+            draw.now(vec![term.get_mouse_direct_on()], self);
         }
         self.new.replace_self(EventEnum::Flag(false));
         self.new.wait(if sec > 0.0 { sec } else { 0.0 });
         self.new.replace_self(EventEnum::Flag(false));
         if mouse {
-            draw.now_unreferenced_key(
-                vec![
-                    term.get_mouse_direct_off(),
-                    term.get_mouse_on(),
-                ],
-                self,
-            );
+            draw.now(vec![term.get_mouse_direct_off(), term.get_mouse_on()], self);
         }
 
         if self.new.is_set() {
@@ -215,7 +204,7 @@ impl Key {
     }
 
     /// Get a key or escape sequence from stdin, convert to readable format and save to keys list. Meant to be run in it's own thread
-    pub fn get_key(&mut self, draw: &OnceCell<Mutex<Draw>>, menu: &OnceCell<Mutex<Menu>>) {
+    pub fn get_key(&mut self, draw: &mut Draw, menu: &Menu) {
         let mut input_key: String = String::default();
         let mut clean_key: String = String::default();
 
@@ -237,13 +226,8 @@ impl Key {
                             Ok(_) => {
                                 if input_key == String::from("\x1b") {
                                     self.idle.replace_self(EventEnum::Flag(false));
-                                    draw.get()
-                                        .unwrap()
-                                        .lock()
-                                        .unwrap()
-                                        .idle
-                                        .replace_self(EventEnum::Wait);
-                                    draw.get().unwrap().lock().unwrap().idle.wait(-1.0);
+                                    draw.idle.replace_self(EventEnum::Wait);
+                                    draw.idle.wait(1.0);
 
                                     let mut nonblocking = Nonblocking::new();
                                     nonblocking.enter();
@@ -289,7 +273,7 @@ impl Key {
                                     } else if input_key.starts_with("\x1b[<0;")
                                         && input_key.ends_with("m")
                                     {
-                                        if menu.get().unwrap().lock().unwrap().active {
+                                        if menu.active {
                                             clean_key = "mouse_click".to_owned();
                                         } else {
                                             let mut broke: bool = false;

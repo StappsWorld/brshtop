@@ -91,7 +91,6 @@ impl Collector {
     pub fn collect(
         &mut self,
         collectors: Vec<Collectors>,
-        CONFIG: &OnceCell<Mutex<Config>>,
         draw_now: bool,
         interrupt: bool,
         proc_interrupt: bool,
@@ -101,7 +100,7 @@ impl Collector {
         self.set_collect_interrupt(interrupt.clone());
         self.set_proc_interrupt(proc_interrupt.clone());
         self.set_collect_idle(EventEnum::Wait);
-        self.get_collect_idle_reference().wait(-1.0);
+        self.get_collect_idle_reference().wait(1.0);
         self.set_collect_interrupt(false);
         self.set_proc_interrupt(false);
         self.set_use_draw_list(false);
@@ -121,27 +120,27 @@ impl Collector {
 
     pub fn start(
         &mut self,
-        CONFIG: &OnceCell<Mutex<Config>>,
+        CONFIG: &Config,
         DEBUG: bool,
         collectors: Vec<Collectors>,
-        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-        timeit: &OnceCell<Mutex<TimeIt>>,
-        menu: &OnceCell<Mutex<Menu>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        term: &OnceCell<Mutex<Term>>,
-        cpu_box: &OnceCell<Mutex<CpuBox>>,
-        key: &OnceCell<Mutex<Key>>,
-        THEME: &OnceCell<Mutex<Theme>>,
+        brshtop_box: &mut BrshtopBox,
+        timeit: &mut TimeIt,
+        menu: &Menu,
+        draw: &mut Draw,
+        term: &Term,
+        cpu_box: &mut CpuBox,
+        key: &mut Key,
+        THEME: &Theme,
         ARG_MODE: ViewMode,
-        graphs: &OnceCell<Mutex<Graphs>>,
-        meters: &OnceCell<Mutex<Meters>>,
-        netbox: &OnceCell<Mutex<NetBox>>,
-        procbox: &OnceCell<Mutex<ProcBox>>,
-        membox: &OnceCell<Mutex<MemBox>>,
-        cpu_collector: &OnceCell<Mutex<CpuCollector>>,
-        mem_collector: &OnceCell<Mutex<MemCollector>>,
-        net_collector: &OnceCell<Mutex<NetCollector>>,
-        proc_collector: &OnceCell<Mutex<ProcCollector>>,
+        graphs: &mut Graphs,
+        meters: &mut Meters,
+        netbox: &mut NetBox,
+        procbox: &mut ProcBox,
+        membox: &mut MemBox,
+        cpu_collector: &mut CpuCollector,
+        mem_collector: &mut MemCollector,
+        net_collector: &mut NetCollector,
+        proc_collector: &mut ProcCollector,
     ) {
         self.set_stopping(false);
         match crossbeam::scope(|s| {
@@ -200,64 +199,34 @@ impl Collector {
 
     pub fn runner(
         &mut self,
-        CONFIG_p: &OnceCell<Mutex<Config>>,
+        CONFIG: &Config,
         DEBUG: bool,
-        brshtop_box_p: &OnceCell<Mutex<BrshtopBox>>,
-        timeit_p: &OnceCell<Mutex<TimeIt>>,
-        menu_p: &OnceCell<Mutex<Menu>>,
-        draw_p: &OnceCell<Mutex<Draw>>,
-        term_p: &OnceCell<Mutex<Term>>,
-        cpu_box_p: &OnceCell<Mutex<CpuBox>>,
-        key_p: &OnceCell<Mutex<Key>>,
-        THEME_p: &OnceCell<Mutex<Theme>>,
+        brshtop_box: &mut BrshtopBox,
+        timeit: &mut TimeIt,
+        menu: &Menu,
+        draw: &mut Draw,
+        term: &Term,
+        cpu_box: &mut CpuBox,
+        key: &mut Key,
+        THEME: &Theme,
         ARG_MODE: ViewMode,
-        graphs_p: &OnceCell<Mutex<Graphs>>,
-        meters_p: &OnceCell<Mutex<Meters>>,
-        netbox_p: &OnceCell<Mutex<NetBox>>,
-        procbox_p: &OnceCell<Mutex<ProcBox>>,
-        membox_p: &OnceCell<Mutex<MemBox>>,
-        cpu_collector_p: &OnceCell<Mutex<CpuCollector>>,
-        net_collector_p: &OnceCell<Mutex<NetCollector>>,
-        proc_collector_p: &OnceCell<Mutex<ProcCollector>>,
-        mem_collector_p: &OnceCell<Mutex<MemCollector>>,
+        graphs: &mut Graphs,
+        meters: &mut Meters,
+        netbox: &mut NetBox,
+        procbox: &mut ProcBox,
+        membox: &mut MemBox,
+        cpu_collector: &mut CpuCollector,
+        net_collector: &mut NetCollector,
+        proc_collector: &mut ProcCollector,
+        mem_collector: &mut MemCollector,
     ) {
-        let mut CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-        let mut brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-        let mut timeit = timeit_p.get().unwrap().lock().unwrap();
-        let mut menu = menu_p.get().unwrap().lock().unwrap();
-        let mut draw = draw_p.get().unwrap().lock().unwrap();
-        let mut term = term_p.get().unwrap().lock().unwrap();
-        let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-        let mut THEME = THEME_p.get().unwrap().lock().unwrap();
-        let mut graphs = graphs_p.get().unwrap().lock().unwrap();
-        let mut meters = meters_p.get().unwrap().lock().unwrap();
-        let mut netbox = netbox_p.get().unwrap().lock().unwrap();
-        let mut procbox = procbox_p.get().unwrap().lock().unwrap();
-        let mut membox = membox_p.get().unwrap().lock().unwrap();
-        let mut cpu_collector = cpu_collector_p.get().unwrap().lock().unwrap();
-        let mut net_collector = net_collector_p.get().unwrap().lock().unwrap();
-        let mut proc_collector = proc_collector_p.get().unwrap().lock().unwrap();
-        let mut mem_collector = mem_collector_p.get().unwrap().lock().unwrap();
-
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
 
         while !self.get_stopping() {
             if CONFIG.draw_clock != String::default() && CONFIG.update_ms != 1000 {
-                drop(term);
-                drop(CONFIG);
-                drop(THEME);
-                drop(cpu_box);
-                drop(draw);
-                brshtop_box.draw_clock(
-                    false, term_p, CONFIG_p, THEME_p, &menu, cpu_box_p, draw_p, key_p,
-                );
-                term = term_p.get().unwrap().lock().unwrap();
-                CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                THEME = THEME_p.get().unwrap().lock().unwrap();
-                cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-                draw = draw_p.get().unwrap().lock().unwrap();
+                brshtop_box.draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
             }
             self.set_collect_run(EventEnum::Wait);
             self.get_collect_run_reference().wait(0.1);
@@ -279,131 +248,44 @@ impl Collector {
                 if !self.get_only_draw() {
                     match collector {
                         Collectors::CpuCollector => {
-                            drop(CONFIG);
-                            drop(term);
-                            drop(cpu_box);
-                            drop(brshtop_box);
-                            cpu_collector.collect(CONFIG_p, term_p, cpu_box_p, brshtop_box_p);
-                            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                            term = term_p.get().unwrap().lock().unwrap();
-                            cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-                            brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
+                            cpu_collector.collect(CONFIG, term, cpu_box, brshtop_box);
                         }
                         Collectors::NetCollector => {
-                            drop(CONFIG);
-                            drop(netbox);
-                            net_collector.collect(CONFIG_p, netbox_p);
-                            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                            netbox = netbox_p.get().unwrap().lock().unwrap();
+                            net_collector.collect(CONFIG, netbox);
                         }
                         Collectors::ProcCollector => {
-                            drop(brshtop_box);
-                            drop(CONFIG);
-                            drop(procbox);
-                            proc_collector.collect(brshtop_box_p, CONFIG_p, procbox_p);
-                            brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-                            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                            procbox = procbox_p.get().unwrap().lock().unwrap();
+                            proc_collector.collect(brshtop_box, CONFIG, procbox);
                         }
                         Collectors::MemCollector => {
-                            drop(CONFIG);
-                            drop(membox);
-                            mem_collector.collect(CONFIG_p, membox_p);
-                            CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                            membox = membox_p.get().unwrap().lock().unwrap();
+                            mem_collector.collect(CONFIG, membox);
                         }
                     }
                 }
                 match collector {
                     Collectors::CpuCollector => {
-                        drop(cpu_box);
-                        drop(CONFIG);
-                        drop(THEME);
-                        drop(term);
-                        drop(draw);
-                        drop(graphs);
-                        drop(meters);
-                        drop(menu);
                         cpu_collector.draw(
-                            cpu_box_p, CONFIG_p, key_p, THEME_p, term_p, draw_p, ARG_MODE,
-                            graphs_p, meters_p, menu_p,
+                            cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu,
                         );
-                        cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-                        CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                        THEME = THEME_p.get().unwrap().lock().unwrap();
-                        term = term_p.get().unwrap().lock().unwrap();
-                        draw = draw_p.get().unwrap().lock().unwrap();
-                        graphs = graphs_p.get().unwrap().lock().unwrap();
-                        meters = meters_p.get().unwrap().lock().unwrap();
-                        menu = menu_p.get().unwrap().lock().unwrap();
                     }
                     Collectors::NetCollector => {
-                        drop(netbox);
-                        drop(THEME);
-                        drop(term);
-                        drop(CONFIG);
-                        drop(draw);
-                        drop(graphs);
-                        drop(menu);
-                        net_collector.draw(
-                            netbox_p, THEME_p, key_p, term_p, CONFIG_p, draw_p, graphs_p, menu_p,
-                        );
-                        netbox = netbox_p.get().unwrap().lock().unwrap();
-                        THEME = THEME_p.get().unwrap().lock().unwrap();
-                        term = term_p.get().unwrap().lock().unwrap();
-                        CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                        draw = draw_p.get().unwrap().lock().unwrap();
-                        graphs = graphs_p.get().unwrap().lock().unwrap();
-                        menu = menu_p.get().unwrap().lock().unwrap();
+                        net_collector.draw(netbox, THEME, key, term, CONFIG, draw, graphs, menu);
                     }
                     Collectors::ProcCollector => {
-                        drop(procbox);
-                        drop(CONFIG);
-                        drop(THEME);
-                        drop(graphs);
-                        drop(term);
-                        drop(draw);
-                        drop(menu);
-                        proc_collector.draw(
-                            procbox_p, CONFIG_p, key_p, THEME_p, graphs_p, term_p, draw_p, menu_p,
-                        );
-                        procbox = procbox_p.get().unwrap().lock().unwrap();
-                        CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                        THEME = THEME_p.get().unwrap().lock().unwrap();
-                        graphs = graphs_p.get().unwrap().lock().unwrap();
-                        term = term_p.get().unwrap().lock().unwrap();
-                        draw = draw_p.get().unwrap().lock().unwrap();
-                        menu = menu_p.get().unwrap().lock().unwrap();
+                        proc_collector.draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu);
                     }
                     Collectors::MemCollector => {
-                        drop(membox);
-                        drop(term);
-                        drop(brshtop_box);
-                        drop(CONFIG);
-                        drop(meters);
-                        drop(THEME);
-                        drop(draw);
-                        drop(menu);
                         mem_collector.draw(
-                            membox_p,
-                            term_p,
-                            brshtop_box_p,
-                            CONFIG_p,
-                            meters_p,
-                            THEME_p,
-                            key_p,
+                            membox,
+                            term,
+                            brshtop_box,
+                            CONFIG,
+                            meters,
+                            THEME,
+                            key,
                             self,
-                            draw_p,
-                            menu_p,
+                            draw,
+                            menu,
                         );
-                        membox = membox_p.get().unwrap().lock().unwrap();
-                        term = term_p.get().unwrap().lock().unwrap();
-                        brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-                        CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                        meters = meters_p.get().unwrap().lock().unwrap();
-                        THEME = THEME_p.get().unwrap().lock().unwrap();
-                        draw = draw_p.get().unwrap().lock().unwrap();
-                        menu = menu_p.get().unwrap().lock().unwrap();
                     }
                 }
 
@@ -427,29 +309,15 @@ impl Collector {
             }
 
             if self.get_draw_now() && !menu.active && !self.get_collect_interrupt() {
-                let mut key = key_p.get().unwrap().lock().unwrap();
                 if self.get_use_draw_list() {
-                    draw.out(draw_buffers, false, &mut key);
+                    draw.out(draw_buffers.clone(), false, key);
                 } else {
-                    draw.out(Vec::<String>::new(), false, &mut key);
+                    draw.out(Vec::<String>::new(), false, key);
                 }
-                drop(key);
             }
 
             if CONFIG.draw_clock != String::default() && CONFIG.update_ms == 1000 {
-                drop(term);
-                drop(CONFIG);
-                drop(THEME);
-                drop(cpu_box);
-                drop(draw);
-                brshtop_box.draw_clock(
-                    false, term_p, CONFIG_p, THEME_p, &menu, cpu_box_p, draw_p, key_p,
-                );
-                term = term_p.get().unwrap().lock().unwrap();
-                CONFIG = CONFIG_p.get().unwrap().lock().unwrap();
-                THEME = THEME_p.get().unwrap().lock().unwrap();
-                cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-                draw = draw_p.get().unwrap().lock().unwrap();
+                brshtop_box.draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
             }
 
             self.set_collect_idle(EventEnum::Flag(true));

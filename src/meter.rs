@@ -135,13 +135,13 @@ impl Meter {
         width: u32,
         gradient_name: String,
         invert: bool,
-        THEME: &OnceCell<Mutex<Theme>>,
-        term: &OnceCell<Mutex<Term>>,
+        THEME: &Theme,
+        term: &Term,
     ) -> Self {
         let mut meter = Meter {
             out: gradient_name.clone(),
-            color_gradient: THEME.get().unwrap().lock().unwrap().gradient[&gradient_name.clone()].clone(),
-            color_inactive: THEME.get().unwrap().lock().unwrap().colors.meter_bg,
+            color_gradient: THEME.gradient[&gradient_name.clone()].clone(),
+            color_inactive: THEME.colors.meter_bg,
             gradient_name: String::default(),
             width: width,
             invert: invert,
@@ -152,7 +152,7 @@ impl Meter {
         meter
     }
 
-    pub fn call(&mut self, value: Option<i32>, term: &OnceCell<Mutex<Term>>) -> String {
+    pub fn call(&mut self, value: Option<i32>, term: &Term) -> String {
         match value {
             Some(i) => {
                 let mut new_val: i32 = 0;
@@ -172,7 +172,7 @@ impl Meter {
         }
     }
 
-    pub fn _create(&mut self, value: i32, term: &OnceCell<Mutex<Term>>) -> String {
+    pub fn _create(&mut self, value: i32, term: &Term) -> String {
         let mut new_value: i32 = 0;
         if value > 100 {
             new_value = 100;
@@ -208,15 +208,7 @@ impl Meter {
             }
         }
         if !broke {
-            out.push_str(
-                term.get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .get_fg()
-                    .to_string()
-                    .as_str(),
-            );
+            out.push_str(term.get_fg().to_string().as_str());
         }
 
         if self.saved.contains_key(&new_value) {

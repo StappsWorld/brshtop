@@ -23,6 +23,7 @@ use {
     once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
+        convert::TryFrom,
         io,
         mem::drop,
         ops::{Deref, DerefMut},
@@ -85,31 +86,22 @@ impl Term {
         &mut self,
         args: Vec<String>,
         boxes: Vec<Boxes>,
-        collector_p: &OnceCell<Mutex<Collector>>,
-        init_p: &OnceCell<Mutex<Init>>,
-        cpu_box_p: &OnceCell<Mutex<CpuBox>>,
-        draw_p: &OnceCell<Mutex<Draw>>,
+        collector: &mut Collector,
+        init: &mut Init,
+        cpu_box: &mut CpuBox,
+        draw: &mut Draw,
         force: bool,
-        key_p: &OnceCell<Mutex<Key>>,
-        menu: &mut MutexGuard<Menu>,
-        brshtop_box_p: &OnceCell<Mutex<BrshtopBox>>,
-        timer_p: &OnceCell<Mutex<Timer>>,
-        config_p: &OnceCell<Mutex<Config>>,
-        theme_p: &OnceCell<Mutex<Theme>>,
-        cpu_p: &OnceCell<Mutex<CpuCollector>>,
-        mem_box_p: &OnceCell<Mutex<MemBox>>,
-        net_box_p: &OnceCell<Mutex<NetBox>>,
-        proc_box_p: &OnceCell<Mutex<ProcBox>>,
+        key: &mut Key,
+        menu: &mut Menu,
+        brshtop_box: &mut BrshtopBox,
+        timer: &mut Timer,
+        config: &Config,
+        theme: &Theme,
+        cpu: &CpuCollector,
+        mem_box: &mut MemBox,
+        net_box: &mut NetBox,
+        proc_box: &mut ProcBox,
     ) {
-        let mut collector = collector_p.get().unwrap().lock().unwrap();
-        let mut init = init_p.get().unwrap().lock().unwrap();
-        let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-        let mut draw = draw_p.get().unwrap().lock().unwrap();
-        let mut key = key_p.get().unwrap().lock().unwrap();
-        let mut brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-        let mut timer = timer_p.get().unwrap().lock().unwrap();
-        let mut theme = theme_p.get().unwrap().lock().unwrap();
-
         if self.resized {
             self.winch.replace_self(EventEnum::Flag(true));
             return;
@@ -141,12 +133,12 @@ impl Term {
             collector.set_collect_interrupt(true);
             self.width = self._w;
             self.height = self._h;
-            draw.now(vec![self.clear.clone()], &mut key);
+            draw.now(vec![self.clear.clone()], key);
             draw.now(
                 vec![
                     create_box(
-                        (self._w as u32 / 2) - 25,
-                        (self._h as u32 / 2) - 2,
+                        u32::try_from((self._w as i32 / 2) - 25).unwrap_or(0),
+                        u32::try_from((self._h as i32 / 2) - 2).unwrap_or(0),
                         50,
                         3,
                         Some(String::from("resizing")),
@@ -156,7 +148,7 @@ impl Term {
                         true,
                         None,
                         self,
-                        &theme.to_owned(),
+                        theme,
                         None,
                         None,
                         None,
@@ -176,16 +168,16 @@ impl Term {
                         self.get_fg()
                     ),
                 ],
-                &mut key,
+                key,
             );
 
             while self._w < 80 || self._h < 24 {
-                draw.now(vec![self.clear.clone()], &mut key);
+                draw.now(vec![self.clear.clone()], key);
                 draw.now(
                     vec![
                         create_box(
-                            (self._w as u32 / 2) - 25,
-                            (self._h as u32 / 2) - 2,
+                            u32::try_from((self._w as i32 / 2) - 25).unwrap_or(0),
+                            u32::try_from((self._h as i32 / 2) - 2).unwrap_or(0),
                             50,
                             5,
                             Some(String::from("warning")),
@@ -195,7 +187,7 @@ impl Term {
                             true,
                             None,
                             self,
-                            &theme.to_owned(),
+                            theme,
                             None,
                             None,
                             None,
@@ -229,7 +221,7 @@ impl Term {
                         ),
                         format!(
                             "{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}",
-                            mv::to((self._h / 2) as u32, (self._w / 2) as u32 - 23),
+                            mv::to((self._h / 2) as u32, u32::try_from((self._w / 2) as i32 - 23).unwrap_or(0)),
                             Color::Default(),
                             Color::BlackBg(),
                             fx::ub,
@@ -237,7 +229,7 @@ impl Term {
                             self.get_fg()
                         ),
                     ],
-                    &mut key,
+                    key,
                 );
                 self.winch.replace_self(EventEnum::Wait);
                 self.winch.wait(0.3);
@@ -267,20 +259,18 @@ impl Term {
         }
 
         key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
-        drop(cpu_box);
-        let mut mutex_self: Mutex<Term> = Mutex::new(self.clone());
-        let mut passable_self: OnceCell<Mutex<Term>> = OnceCell::new();
-        passable_self.set(mutex_self);
+
         brshtop_box.calc_sizes(
             boxes.clone(),
-            &passable_self,
-            config_p,
-            cpu_p,
-            cpu_box_p,
-            mem_box_p,
-            net_box_p,
-            proc_box_p,
+            self,
+            config,
+            cpu,
+            cpu_box,
+            mem_box,
+            net_box,
+            proc_box,
         );
+
         if init.running {
             self.resized = false;
             return;
@@ -292,249 +282,21 @@ impl Term {
 
         brshtop_box.draw_bg(
             false,
-            draw_p,
+            draw,
             boxes.clone(),
             menu,
-            config_p,
-            cpu_box_p,
-            mem_box_p,
-            net_box_p,
-            proc_box_p,
-            key_p,
-            theme_p,
-            &passable_self,
+            config,
+            cpu_box,
+            mem_box,
+            net_box,
+            proc_box,
+            key,
+            theme,
+            self,
         );
         self.resized = false;
-        timer.finish(key_p, config_p);
+        timer.finish(key, config);
     }
-
-    pub fn refresh_dereferenced_menu(
-        &mut self,
-        args: Vec<String>,
-        boxes: Vec<Boxes>,
-        collector_p: &OnceCell<Mutex<Collector>>,
-        init_p: &OnceCell<Mutex<Init>>,
-        cpu_box_p: &OnceCell<Mutex<CpuBox>>,
-        draw_p: &OnceCell<Mutex<Draw>>,
-        force: bool,
-        key_p: &OnceCell<Mutex<Key>>,
-        menu: &mut Menu,
-        brshtop_box_p: &OnceCell<Mutex<BrshtopBox>>,
-        timer_p: &OnceCell<Mutex<Timer>>,
-        config_p: &OnceCell<Mutex<Config>>,
-        theme_p: &OnceCell<Mutex<Theme>>,
-        cpu_p: &OnceCell<Mutex<CpuCollector>>,
-        mem_box_p: &OnceCell<Mutex<MemBox>>,
-        net_box_p: &OnceCell<Mutex<NetBox>>,
-        proc_box_p: &OnceCell<Mutex<ProcBox>>,
-    ) {
-        let mut collector = collector_p.get().unwrap().lock().unwrap();
-        let mut init = init_p.get().unwrap().lock().unwrap();
-        let mut cpu_box = cpu_box_p.get().unwrap().lock().unwrap();
-        let mut draw = draw_p.get().unwrap().lock().unwrap();
-        let mut key = key_p.get().unwrap().lock().unwrap();
-        let mut brshtop_box = brshtop_box_p.get().unwrap().lock().unwrap();
-        let mut timer = timer_p.get().unwrap().lock().unwrap();
-        let mut theme = theme_p.get().unwrap().lock().unwrap();
-
-        if self.resized {
-            self.winch.replace_self(EventEnum::Flag(true));
-            return;
-        }
-
-        let term_size = terminal_size();
-        match term_size {
-            Some((Width(w), Height(h))) => {
-                self._w = w;
-                self._h = h;
-            }
-            None => error::throw_error("Unable to get size of terminal!"),
-        };
-
-        if (self._w == self.width && self._h == self.height) && !force {
-            return;
-        }
-        if force {
-            collector.set_collect_interrupt(true);
-        }
-
-        while (self._w != self.width && self._h != self.height) || (self._w < 80 || self._h < 24) {
-            if init.running {
-                init.resized = true;
-            }
-
-            cpu_box.set_clock_block(true);
-            self.resized = true;
-            collector.set_collect_interrupt(true);
-            self.width = self._w;
-            self.height = self._h;
-            draw.now(vec![self.clear.clone()], &mut key);
-            draw.now(
-                vec![
-                    create_box(
-                        (self._w as u32 / 2) - 25,
-                        (self._h as u32 / 2) - 2,
-                        50,
-                        3,
-                        Some(String::from("resizing")),
-                        None,
-                        Some(Color::Green()),
-                        Some(Color::White()),
-                        true,
-                        None,
-                        self,
-                        &theme.to_owned(),
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                    ),
-                    format!(
-                        "{}{}{}{}Width : {}   Height: {}{}{}{}",
-                        mv::right(120),
-                        Color::Default(),
-                        Color::BlackBg(),
-                        fx::bold,
-                        self.get_w(),
-                        self.get_h(),
-                        fx::ub,
-                        self.get_bg(),
-                        self.get_fg()
-                    ),
-                ],
-                &mut key,
-            );
-
-            while self._w < 80 || self._h < 24 {
-                draw.now(vec![self.clear.clone()], &mut key);
-                draw.now(
-                    vec![
-                        create_box(
-                            (self._w as u32 / 2) - 25,
-                            (self._h as u32 / 2) - 2,
-                            50,
-                            5,
-                            Some(String::from("warning")),
-                            None,
-                            Some(Color::Red()),
-                            Some(Color::White()),
-                            true,
-                            None,
-                            self,
-                            &theme.to_owned(),
-                            None,
-                            None,
-                            None,
-                            None,
-                            None,
-                        ),
-                        format!(
-                            "{}{}{}{}Width: {}{}   ",
-                            mv::right(12),
-                            Color::default(),
-                            Color::BlackBg(),
-                            fx::b,
-                            if self._w < 80 {
-                                Color::Red()
-                            } else {
-                                Color::Green()
-                            },
-                            self.get_w()
-                        ),
-                        format!(
-                            "{}Height: {}{}{}{}",
-                            Color::Default(),
-                            if self.get_h() < 24 {
-                                Color::Red()
-                            } else {
-                                Color::Green()
-                            },
-                            self.get_h(),
-                            self.get_bg(),
-                            self.get_fg()
-                        ),
-                        format!(
-                            "{}{}{}Width and Height needs to be at least 80 x 24 !{}{}{}",
-                            mv::to((self._h / 2) as u32, (self._w / 2) as u32 - 23),
-                            Color::Default(),
-                            Color::BlackBg(),
-                            fx::ub,
-                            self.get_bg(),
-                            self.get_fg()
-                        ),
-                    ],
-                    &mut key,
-                );
-                self.winch.replace_self(EventEnum::Wait);
-                self.winch.wait(0.3);
-                self.winch.replace_self(EventEnum::Flag(false));
-
-                let term_size_check = terminal_size();
-                match term_size_check {
-                    Some((Width(w), Height(h))) => {
-                        self._w = w;
-                        self._h = h;
-                    }
-                    None => error::throw_error("Unable to get size of terminal!"),
-                };
-            }
-            self.winch.replace_self(EventEnum::Wait);
-            self.winch.wait(0.3);
-            self.winch.replace_self(EventEnum::Flag(false));
-
-            let term_size_check = terminal_size();
-            match term_size_check {
-                Some((Width(w), Height(h))) => {
-                    self._w = w;
-                    self._h = h;
-                }
-                None => error::throw_error("Unable to get size of terminal!"),
-            };
-        }
-
-        key.mouse = HashMap::<String, Vec<Vec<i32>>>::new();
-        drop(cpu_box);
-        let mut mutex_self: Mutex<Term> = Mutex::new(self.clone());
-        let mut passable_self: OnceCell<Mutex<Term>> = OnceCell::new();
-        passable_self.set(mutex_self);
-        brshtop_box.calc_sizes(
-            boxes.clone(),
-            &passable_self,
-            config_p,
-            cpu_p,
-            cpu_box_p,
-            mem_box_p,
-            net_box_p,
-            proc_box_p,
-        );
-        if init.running {
-            self.resized = false;
-            return;
-        }
-
-        if menu.active {
-            menu.resized = true;
-        }
-
-        brshtop_box.draw_bg_dereferenced_menu(
-            false,
-            draw_p,
-            boxes.clone(),
-            menu,
-            config_p,
-            cpu_box_p,
-            mem_box_p,
-            net_box_p,
-            proc_box_p,
-            key_p,
-            theme_p,
-            &passable_self,
-        );
-        self.resized = false;
-        timer.finish(key_p, config_p);
-    }
-
 
     /// Toggle input echo
     pub fn echo(on: bool) {

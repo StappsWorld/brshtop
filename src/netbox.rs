@@ -29,11 +29,7 @@ pub struct NetBox {
     buffer: String,
 }
 impl NetBox {
-    pub fn new(
-        CONFIG: &OnceCell<Mutex<Config>>,
-        ARG_MODE: ViewMode,
-        brshtop_box: &OnceCell<Mutex<BrshtopBox>>,
-    ) -> Self {
+    pub fn new(CONFIG: &Config, ARG_MODE: ViewMode, brshtop_box: &mut BrshtopBox) -> Self {
         let mut net = NetBox {
             parent: BrshtopBox::new(CONFIG, ARG_MODE),
             sub: SubBox::new(),
@@ -46,12 +42,7 @@ impl NetBox {
             buffer: "net".to_owned(),
         };
 
-        brshtop_box
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .push_buffers(net.buffer.clone());
+        brshtop_box.push_buffers(net.buffer.clone());
 
         net.set_parent_name("net".to_owned());
         net.set_parent_height_p(30);
@@ -62,7 +53,7 @@ impl NetBox {
         net
     }
 
-    pub fn calc_size(&mut self, term: &OnceCell<Mutex<Term>>, b_cpu_h: i32, b_mem_h: i32) {
+    pub fn calc_size(&mut self, term: &Term, b_cpu_h: i32, b_mem_h: i32) {
         let mut width_p: u32 = 0;
 
         if self.get_parent().get_stat_mode() {
@@ -70,22 +61,13 @@ impl NetBox {
         } else {
             width_p = self.get_parent().get_width_p();
         }
-        self.set_parent_width(
-            ((term.get().unwrap().lock().unwrap().get_width() as u32) * width_p / 100) as u32,
-        );
+        self.set_parent_width(((term.get_width() as u32) * width_p / 100) as u32);
         self.set_parent_height(
-            u32::try_from(
-                term.get().unwrap().lock().unwrap().get_height() as i32 - b_cpu_h - b_mem_h,
-            )
-            .unwrap_or(0),
+            u32::try_from(term.get_height() as i32 - b_cpu_h - b_mem_h).unwrap_or(0),
         );
         self.set_parent_y(
-            u32::try_from(
-                (term.get().unwrap().lock().unwrap().get_height() as i32)
-                    - self.parent.get_height() as i32
-                    + 1,
-            )
-            .unwrap_or(0),
+            u32::try_from((term.get_height() as i32) - self.parent.get_height() as i32 + 1)
+                .unwrap_or(0),
         );
         self.set_sub_box_width(if self.parent.get_width() > 45 { 27 } else { 19 });
         self.set_sub_box_height(if self.parent.get_height() > 10 {
@@ -124,13 +106,10 @@ impl NetBox {
         self.set_redraw(true);
     }
 
-    pub fn draw_bg(&self, theme_p: &OnceCell<Mutex<Theme>>, term_p: &OnceCell<Mutex<Term>>) -> String {
+    pub fn draw_bg(&self, theme: &Theme, term: &Term) -> String {
         if self.parent.get_proc_mode() {
             return String::default();
         }
-
-        let mut theme = theme_p.get().unwrap().lock().unwrap();
-        let mut term = term_p.get().unwrap().lock().unwrap();
 
         format!(
             "{}{}",
@@ -164,8 +143,8 @@ impl NetBox {
                 None,
                 false,
                 None,
-                &term.to_owned(),
-                &theme.to_owned(),
+                term,
+                theme,
                 None,
                 None,
                 None,
@@ -177,13 +156,13 @@ impl NetBox {
 
     pub fn draw_fg(
         &mut self,
-        theme: &OnceCell<Mutex<Theme>>,
-        key: &OnceCell<Mutex<Key>>,
-        term: &OnceCell<Mutex<Term>>,
-        CONFIG: &OnceCell<Mutex<Config>>,
-        draw: &OnceCell<Mutex<Draw>>,
-        graphs: &OnceCell<Mutex<Graphs>>,
-        menu: &OnceCell<Mutex<Menu>>,
+        theme: &Theme,
+        key: &mut Key,
+        term: &Term,
+        CONFIG: &Config,
+        draw: &mut Draw,
+        graphs: &mut Graphs,
+        menu: &Menu,
         net: &mut NetCollector,
     ) {
         if self.get_parent().get_proc_mode() {
@@ -228,14 +207,7 @@ impl NetBox {
 
         if self.get_parent().get_resized() || self.get_redraw() {
             out_misc.push_str(self.draw_bg(theme, term).as_str());
-            if key
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .mouse
-                .contains_key(&"b".to_owned())
-            {
+            if key.mouse.contains_key(&"b".to_owned()) {
                 let mut b_vec_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                 for i in 0..4 {
@@ -245,12 +217,7 @@ impl NetBox {
                     b_vec_top.push(b_insert);
                 }
 
-                key.get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .mouse
-                    .insert("b".to_owned(), b_vec_top);
+                key.mouse.insert("b".to_owned(), b_vec_top);
 
                 let mut n_vec_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
@@ -261,12 +228,7 @@ impl NetBox {
                     n_vec_top.push(n_insert);
                 }
 
-                key.get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .mouse
-                    .insert("n".to_owned(), n_vec_top);
+                key.mouse.insert("n".to_owned(), n_vec_top);
 
                 let mut z_vec_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
@@ -277,97 +239,42 @@ impl NetBox {
                     z_vec_top.push(z_insert);
                 }
 
-                key.get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .mouse
-                    .insert("z".to_owned(), z_vec_top);
+                key.mouse.insert("z".to_owned(), z_vec_top);
             }
             out_misc.push_str(
                 format!(
                     "{}{}{}{}{}{}{}{}{}{}{}{}{}{} {} {}{}{}{}",
                     mv::to(y as u32 - 1, x as u32 + w - 25),
-                    theme.get().unwrap().lock().unwrap().colors.net_box,
+                    theme.colors.net_box,
                     symbol::h_line.repeat(10 - nic_name[..10].len()),
                     symbol::title_left,
                     if reset { fx::bold } else { "" },
-                    theme
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .colors
-                        .hi_fg
-                        .call("z".to_owned(), term),
-                    theme
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .colors
-                        .title
-                        .call("ero".to_owned(), term),
+                    theme.colors.hi_fg.call("z".to_owned(), term),
+                    theme.colors.title.call("ero".to_owned(), term),
                     fx::ub,
                     theme
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
                         .colors
                         .net_box
                         .call(symbol::title_right.to_owned(), term),
-                    term.get().unwrap().lock().unwrap().get_fg(),
-                    theme.get().unwrap().lock().unwrap().colors.net_box,
+                    term.get_fg(),
+                    theme.colors.net_box,
                     symbol::title_left,
                     fx::b,
-                    theme
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .colors
-                        .hi_fg
-                        .call("<b".to_owned(), term),
-                    theme
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .colors
-                        .title
-                        .call(nic_name[..10].to_owned(), term),
-                    theme
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .colors
-                        .hi_fg
-                        .call("n>".to_owned(), term),
+                    theme.colors.hi_fg.call("<b".to_owned(), term),
+                    theme.colors.title.call(nic_name[..10].to_owned(), term),
+                    theme.colors.hi_fg.call("n>".to_owned(), term),
                     fx::ub,
                     theme
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
                         .colors
                         .net_box
                         .call(symbol::title_right.to_owned(), term),
-                    term.get().unwrap().lock().unwrap().get_fg(),
+                    term.get_fg(),
                 )
                 .as_str(),
             );
 
             if (w as usize) - nic_name[..10].len() - 20 > 6 {
-                if !key
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .mouse
-                    .contains_key(&"a".to_owned())
-                {
+                if !key.mouse.contains_key(&"a".to_owned()) {
                     let mut inserter_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
                     for i in 0..4 {
                         let mut inserter: Vec<i32> = Vec::<i32>::new();
@@ -376,12 +283,7 @@ impl NetBox {
                         inserter.push(y as i32 - 1);
                         inserter_top.push(inserter);
                     }
-                    key.get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .mouse
-                        .insert("a".to_owned(), inserter_top);
+                    key.mouse.insert("a".to_owned(), inserter_top);
                 }
                 out_misc.push_str(
                     format!(
@@ -392,53 +294,24 @@ impl NetBox {
                                 .unwrap_or(0)
                         ),
                         theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
                             .colors
                             .net_box
                             .call(symbol::title_left.to_owned(), term),
                         if net.get_auto_min() { fx::b } else { "" },
-                        theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .colors
-                            .hi_fg
-                            .call("a".to_owned(), term),
-                        theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .colors
-                            .title
-                            .call("uto".to_owned(), term),
+                        theme.colors.hi_fg.call("a".to_owned(), term),
+                        theme.colors.title.call("uto".to_owned(), term),
                         fx::ub,
                         theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
                             .colors
                             .net_box
                             .call(symbol::title_right.to_owned(), term),
-                        term.get().unwrap().lock().unwrap().get_fg(),
+                        term.get_fg(),
                     )
                     .as_str(),
                 );
             }
             if w as i32 - nic_name[..10].len() as i32 - 20 > 6 {
-                if !key
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .mouse
-                    .contains_key(&"a".to_owned())
-                {
+                if !key.mouse.contains_key(&"a".to_owned()) {
                     let mut inserter_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..4 {
@@ -447,12 +320,7 @@ impl NetBox {
                         inserter.push(y as i32 - 1);
                         inserter_top.push(inserter);
                     }
-                    key.get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .mouse
-                        .insert("a".to_owned(), inserter_top);
+                    key.mouse.insert("a".to_owned(), inserter_top);
                 }
                 out_misc.push_str(
                     format!(
@@ -463,54 +331,25 @@ impl NetBox {
                                 .unwrap_or(0)
                         ),
                         theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
                             .colors
                             .net_box
                             .call(symbol::title_left.to_owned(), term),
                         if net.get_auto_min() { fx::b } else { "" },
-                        theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .colors
-                            .hi_fg
-                            .call("a".to_owned(), term),
-                        theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .colors
-                            .title
-                            .call("auto".to_owned(), term),
+                        theme.colors.hi_fg.call("a".to_owned(), term),
+                        theme.colors.title.call("auto".to_owned(), term),
                         fx::ub,
                         theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
                             .colors
                             .net_box
                             .call(symbol::title_right.to_owned(), term),
-                        term.get().unwrap().lock().unwrap().get_fg(),
+                        term.get_fg(),
                     )
                     .as_str(),
                 );
             }
 
             if w - nic_name[..10].len() as u32 - 20 > 13 {
-                if !key
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .mouse
-                    .contains_key(&"y".to_owned())
-                {
+                if !key.mouse.contains_key(&"y".to_owned()) {
                     let mut inserter_top: Vec<Vec<i32>> = Vec::<Vec<i32>>::new();
 
                     for i in 0..4 {
@@ -519,12 +358,7 @@ impl NetBox {
                         inserter.push(y as i32 - 1);
                         inserter_top.push(inserter);
                     }
-                    key.get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .mouse
-                        .insert("a".to_owned(), inserter_top);
+                    key.mouse.insert("a".to_owned(), inserter_top);
                 }
                 out_misc.push_str(
                     format!(
@@ -535,58 +369,25 @@ impl NetBox {
                                 .unwrap_or(0)
                         ),
                         theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
                             .colors
                             .net_box
                             .call(symbol::title_left.to_owned(), term),
-                        if CONFIG.get().unwrap().lock().unwrap().net_sync {
-                            fx::b
-                        } else {
-                            ""
-                        },
-                        theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .colors
-                            .title
-                            .call("s".to_owned(), term),
-                        theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .colors
-                            .hi_fg
-                            .call("y".to_owned(), term),
-                        theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .colors
-                            .title
-                            .call("nc".to_owned(), term),
+                        if CONFIG.net_sync { fx::b } else { "" },
+                        theme.colors.title.call("s".to_owned(), term),
+                        theme.colors.hi_fg.call("y".to_owned(), term),
+                        theme.colors.title.call("nc".to_owned(), term),
                         fx::ub,
                         theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
                             .colors
                             .net_box
                             .call(symbol::title_right.to_owned(), term),
-                        term.get().unwrap().lock().unwrap().get_fg(),
+                        term.get_fg(),
                     )
                     .as_str(),
                 );
             }
 
-            draw.get().unwrap().lock().unwrap().buffer(
+            draw.buffer(
                 "net_misc".to_owned(),
                 vec![out_misc.clone()],
                 false,
@@ -627,7 +428,7 @@ impl NetBox {
                 }
             } || self.get_parent().get_resized()
             {
-                graphs.get().unwrap().lock().unwrap().net.insert(
+                graphs.net.insert(
                     direction.clone(),
                     Graph::new_with_vec::<Color>(
                         w - bw - 3,
@@ -636,10 +437,6 @@ impl NetBox {
                             .unwrap()
                             .to_owned(),
                         theme
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
                             .gradient
                             .get(&direction.clone())
                             .unwrap()
@@ -652,7 +449,7 @@ impl NetBox {
                         },
                         term,
                         direction != "download".to_owned(),
-                        if CONFIG.get().unwrap().lock().unwrap().net_sync {
+                        if CONFIG.net_sync {
                             net.get_sync_top()
                         } else {
                             match stats.get(&"graph_top".to_owned()).unwrap() {
@@ -673,7 +470,7 @@ impl NetBox {
                             }
                         },
                         0,
-                        if CONFIG.get().unwrap().lock().unwrap().net_color_fixed {
+                        if CONFIG.net_color_fixed {
                             Some(net.get_net_min_index(direction.clone()).unwrap())
                         } else {
                             None
@@ -696,10 +493,6 @@ impl NetBox {
                         x as u32
                     ),
                     graphs
-                        .get()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
                         .net
                         .get_mut(&direction.to_owned())
                         .unwrap()
@@ -731,7 +524,7 @@ impl NetBox {
                 format!(
                     "{}{}{} {:<10.10}{}",
                     mv::to(by + cy, bx),
-                    theme.get().unwrap().lock().unwrap().colors.main_fg,
+                    theme.colors.main_fg,
                     self.symbols[&direction],
                     strings[&"byte_ps".to_owned()],
                     if bw < 20 {
@@ -792,8 +585,8 @@ impl NetBox {
             format!(
                 "{}{}{}{}",
                 mv::to(y, x),
-                theme.get().unwrap().lock().unwrap().colors.graph_text.call(
-                    if CONFIG.get().unwrap().lock().unwrap().net_sync {
+                theme.colors.graph_text.call(
+                    if CONFIG.net_sync {
                         net.get_sync_string()
                     } else {
                         net.get_strings_inner_inner_index(
@@ -805,8 +598,8 @@ impl NetBox {
                     term
                 ),
                 mv::to(u32::try_from(y as i32 + h as i32 - 1).unwrap_or(0), x),
-                theme.get().unwrap().lock().unwrap().colors.graph_text.call(
-                    if CONFIG.get().unwrap().lock().unwrap().net_sync {
+                theme.colors.graph_text.call(
+                    if CONFIG.net_sync {
                         net.get_sync_string()
                     } else {
                         net.get_strings_inner_inner_index(
@@ -821,18 +614,13 @@ impl NetBox {
             .as_str(),
         );
 
-        draw.get().unwrap().lock().unwrap().buffer(
+        draw.buffer(
             self.get_buffer(),
-            vec![format!(
-                "{}{}{}",
-                out_misc.clone(),
-                out,
-                term.get().unwrap().lock().unwrap().get_fg()
-            )],
+            vec![format!("{}{}{}", out_misc.clone(), out, term.get_fg())],
             false,
             false,
             100,
-            menu.get().unwrap().lock().unwrap().active,
+            menu.active,
             false,
             false,
             key,

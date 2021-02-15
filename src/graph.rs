@@ -55,7 +55,7 @@ impl Graph {
         height: i32,
         color: Option<ColorSwitch>,
         data: Vec<i32>,
-        term: &OnceCell<Mutex<Term>>,
+        term: &Term,
         invert: bool,
         max_value: i32,
         offset: i32,
@@ -173,7 +173,7 @@ impl Graph {
         height: u32,
         color: Vec<String>,
         data: Vec<i32>, // TODO: Data type
-        term: &OnceCell<Mutex<Term>>,
+        term: &Term,
         invert: bool,
         max_value: i32,
         offset: i32,
@@ -281,7 +281,7 @@ impl Graph {
         };
         self
     }
-    pub fn max_value(mut self, max_value: i32, term: &OnceCell<Mutex<Term>>) -> Self {
+    pub fn max_value(mut self, max_value: i32, term: &Term) -> Self {
         self.max_value = max_value;
         self._refresh_data(term);
         self
@@ -295,7 +295,7 @@ impl Graph {
         self
     }
 
-    fn _refresh_data(&mut self, term: &OnceCell<Mutex<Term>>) {
+    fn _refresh_data(&mut self, term: &Term) {
         let value_width = (self._data.len() as f32 / 2.).ceil() as i32;
 
         self._data = if self._data.is_empty() {
@@ -303,7 +303,15 @@ impl Graph {
         } else {
             self._data
                 .iter()
-                .map(|v| (v + self.offset) * (100 / (self.max_value + self.offset)))
+                .map(|v| {
+                    let mut divider = self.max_value + self.offset;
+                    divider = if divider > 0 {
+                        divider
+                    } else {
+                        1
+                    };
+                    (v + self.offset) * (100 / divider)
+                })
                 .skip(if value_width < self.width as i32 {
                     self._data.len() - self.width as usize * 2
                 } else {
@@ -329,7 +337,7 @@ impl Graph {
         self._create(true, term);
     }
 
-    fn _create(&mut self, new: bool, term: &OnceCell<Mutex<Term>>) {
+    fn _create(&mut self, new: bool, term: &Term) {
         let mut value = hashmap! {
             "left" => 0,
             "right" => 0,
@@ -452,11 +460,11 @@ impl Graph {
         }
 
         if !self.colors.is_empty() {
-            self.out.push_str(&term.get().unwrap().lock().unwrap().get_fg().to_string())
+            self.out.push_str(&term.get_fg().to_string().as_str())
         }
     }
 
-    pub fn call(&mut self, value: Option<i32>, term: &OnceCell<Mutex<Term>>) -> String {
+    pub fn call(&mut self, value: Option<i32>, term: &Term) -> String {
         if let Some(value) = value {
             self.current = !self.current;
 
@@ -506,7 +514,7 @@ impl Graph {
         self.out.clone()
     }
 
-    pub fn add(&mut self, value: Option<i32>, term: &OnceCell<Mutex<Term>>) -> String {
+    pub fn add(&mut self, value: Option<i32>, term: &Term) -> String {
         self.call(value, term)
     }
 }
