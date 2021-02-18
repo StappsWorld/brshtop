@@ -443,7 +443,7 @@ pub fn main() {
         }
     };
 
-    //println!("Made it through global variables");
+    errlog("Made it through global variables".to_owned());
 
     // Pre main ---------------------------------------------------------------------------------------------
     let mut term: Term = Term::new();
@@ -495,7 +495,7 @@ pub fn main() {
 
     let mut meters: Meters = Meters::default();
 
-    //println!("Made it through pre-main");
+    errlog("Made it through pre-main".to_owned());
 
     // Main -----------------------------------------------------------------------------------------------
 
@@ -515,6 +515,7 @@ pub fn main() {
     }
 
     // Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo
+    errlog("Switch to alternate screen, clear screen, hide cursor, enable mouse reporting and disable input echo".to_owned());
     draw.now(
         vec![
             term.get_alt_screen(),
@@ -549,6 +550,7 @@ pub fn main() {
     );
 
     // Start a thread checking for updates while running init
+    errlog("Start a thread checking for updates while running init".to_owned());
     if CONFIG.update_check {
         updatechecker.run();
     }
@@ -578,6 +580,8 @@ pub fn main() {
         );
     }
 
+    errlog("Load theme".to_owned());
+
     THEME = match Theme::from_str(CONFIG.color_theme.clone()) {
         Ok(t) => {
             init.success(&CONFIG, &mut draw, &term, &mut key);
@@ -591,6 +595,7 @@ pub fn main() {
     };
 
     // Setup boxes
+    errlog("Setting up boxes".to_owned());
     if CONFIG.show_init {
         draw.buffer(
             "+init!".to_owned(),
@@ -638,9 +643,12 @@ pub fn main() {
         );
         init.success(&CONFIG, &mut draw, &term, &mut key);
     }
+    errlog("Setup boxes successfully".to_owned());
 
     // Setup signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH
+    errlog("Setting up signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH".to_owned());
     if CONFIG.show_init {
+        errlog("Showing init".to_owned());
         draw.buffer(
             "+init!".to_owned(),
             vec![format!(
@@ -657,6 +665,7 @@ pub fn main() {
             false,
             &mut key,
         );
+        errlog("Finished showing init".to_owned());
     }
 
     let mut signals = match Signals::new(&[SIGTSTP, SIGCONT, SIGINT, SIGWINCH]) {
@@ -753,12 +762,24 @@ pub fn main() {
             }
         });
     }) {
-        _ => (),
+        Ok(_) => errlog("Created signal handler successfully!".to_owned()),
+        Err(_) => clean_quit(
+            None,
+            Some("Failed to setup signal handler".to_owned()),
+            &mut key,
+            &mut collector,
+            &mut draw,
+            &term,
+            &CONFIG,
+        ),
     };
+
+    errlog("Setup signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH succesfully".to_owned());
 
     init.success(&CONFIG, &mut draw, &term, &mut key);
 
     // Start a separate thread for reading keyboard input
+    errlog("Starting a separate thread for reading keyboard input".to_owned());
     if CONFIG.show_init {
         draw.buffer(
             "+init!".to_owned(),
@@ -781,8 +802,10 @@ pub fn main() {
     key.start(&mut draw, &menu);
 
     init.success(&CONFIG, &mut draw, &term, &mut key);
+    errlog("Started a separate thread for reading keyboard input successfully".to_owned());
 
     // Start a separate thread for data collection and drawing
+    errlog("Starting a separate thread for data collection and drawing".to_owned());
     if CONFIG.show_init {
         draw.buffer(
             "+init!".to_owned(),
@@ -826,8 +849,10 @@ pub fn main() {
         &mut proc_collector,
     );
     init.success(&CONFIG, &mut draw, &term, &mut key);
+    errlog("Started a separate thread for data collection and drawing successfully".to_owned());
 
     // Collect data and draw to buffer
+    errlog("Collecting data and draw to buffer".to_owned());
     if CONFIG.show_init {
         draw.buffer(
             "+init!".to_owned(),
@@ -848,8 +873,10 @@ pub fn main() {
     }
     collector.collect(collectors.clone(), false, false, false, false, false);
     init.success(&CONFIG, &mut draw, &term, &mut key);
+    errlog("Collected data and drew to buffer successfully".to_owned());
 
     // Draw to screen
+    errlog("Drawing to screen".to_owned());
     if CONFIG.show_init {
         draw.buffer(
             "+init!".to_owned(),
@@ -899,6 +926,8 @@ pub fn main() {
     if DEBUG {
         timeit.stop("Init".to_owned());
     }
+
+    errlog("Main finished successfully! Moving to main loop.".to_owned());
 
     // Main loop ------------------------------------------------------------------------------------->
 

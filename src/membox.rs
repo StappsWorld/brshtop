@@ -135,13 +135,16 @@ impl MemBox {
         );
 
         self.set_mem_meter(
-            (self.get_parent().get_width()
-                - if CONFIG.show_disks {
-                    self.get_disks_width()
-                } else {
-                    0
-                }
-                - if self.get_mem_size() > 2 { 9 } else { 20 }) as i32,
+            u32::try_from(
+                self.get_parent().get_width() as i32
+                    - if CONFIG.show_disks {
+                        self.get_disks_width() as i32
+                    } else {
+                        0
+                    }
+                    - if self.get_mem_size() > 2 { 9 } else { 20 },
+            )
+            .unwrap_or(0) as i32,
         );
 
         if self.get_mem_size() == 1 {
@@ -625,8 +628,7 @@ impl MemBox {
                                         },
                                         term,
                                     );
-                                meters
-                                    .set_mem_index(name.clone(), MeterUnion::Meter(m_callable));
+                                meters.set_mem_index(name.clone(), MeterUnion::Meter(m_callable));
                                 save
                             }
                             MeterUnion::Graph(g) => {
@@ -641,8 +643,7 @@ impl MemBox {
                                         },
                                         term,
                                     );
-                                meters
-                                    .set_mem_index(name.clone(), MeterUnion::Graph(g_callable));
+                                meters.set_mem_index(name.clone(), MeterUnion::Graph(g_callable));
                                 save
                             }
                         },
@@ -934,10 +935,7 @@ impl MemBox {
                 if collector.get_collect_interrupt() {
                     return;
                 }
-                if !meters
-                    .get_disks_used()
-                    .contains_key(&name)
-                {
+                if !meters.get_disks_used().contains_key(&name) {
                     continue;
                 }
                 if cy > h - 2 {

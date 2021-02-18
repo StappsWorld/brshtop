@@ -4,7 +4,7 @@ use crate::{clean_quit, CONFIG_DIR};
 
 pub fn errlog(message: String) {
     // TODO: I know there's a better way to do this
-    let error_file = "log.log";
+    let error_file = "brshtop.log";
     let error_dir = CONFIG_DIR.join(PathBuf::from(error_file));
     let dir = error_dir.to_str().unwrap();
 

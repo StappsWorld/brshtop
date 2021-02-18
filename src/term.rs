@@ -318,7 +318,7 @@ impl Term {
 
         match tcsetattr(fd, os::target::TCSANOW, &termios) {
             Ok(_) => (),
-            Err(e) => error::errlog(format!("Error setting Termios data... (error {})", e)),
+            Err(e) => error::errlog(format!("(error 1) Error setting Termios data... (error {})", e)),
         }
     }
 
@@ -327,7 +327,7 @@ impl Term {
         let mut out: String = match std::env::var("TERMINAL_TITLE") {
             Ok(o) => o,
             Err(e) => {
-                error::errlog(format!("Error setting Termios data... (error {})", e));
+                error::errlog(format!("(error 2) Error setting Termios data... (error {})", e));
                 return String::default();
             }
         };
