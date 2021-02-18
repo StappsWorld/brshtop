@@ -23,7 +23,6 @@ use {
         theme::{Color, Theme},
     },
     inflector::Inflector,
-    once_cell::sync::OnceCell,
     psutil::{
         Bytes,
         process::{

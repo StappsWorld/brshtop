@@ -16,7 +16,6 @@ use {
         term::Term,
         theme::{Color, Theme},
     },
-    once_cell::sync::OnceCell,
     std::{collections::HashMap, convert::TryFrom, sync::Mutex},
 };
 
@@ -186,7 +185,7 @@ impl NetBox {
         let by: u32 = self.get_sub().get_box_y() + 1;
         let bw: u32 = u32::try_from(self.get_sub().get_box_width() as i32 - 2).unwrap_or(0);
         let bh: u32 = u32::try_from(self.get_sub().get_box_height() as i32 - 2).unwrap_or(0);
-        let nic_name: String = net.nic.unwrap().name().to_owned();
+        let nic_name: String = net.nic.clone().unwrap().name().to_owned();
         let reset: bool = match net.get_stats_inner_inner_index(
             nic_name.clone(),
             "download".to_owned(),

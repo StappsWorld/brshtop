@@ -15,7 +15,6 @@ use {
         CONFIG_DIR, CORES, CORE_MAP, SYSTEM, THREADS,
     },
     hhmmss::Hhmmss,
-    once_cell::sync::OnceCell,
     psutil::sensors::*,
     std::time::SystemTime,
     std::{collections::HashMap, iter::Enumerate, path::*, sync::Mutex},

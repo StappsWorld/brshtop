@@ -1,10 +1,8 @@
 use {
     crate::{error::errlog, VERSION},
-    crossbeam::scope,
     error_chain::error_chain,
     reqwest,
-    std::{process::Command, str, thread},
-    which::which,
+    std::{process::Command, str, sync::{Arc, Mutex}},
 };
 
 error_chain! {
@@ -24,14 +22,11 @@ impl<'a> UpdateChecker {
         }
     }
 
-    pub fn run(&mut self) {
-        scope(|s| {
-            s.spawn(|_| self.checker());
-        });
-    }
-
     // TODO : Implement for Brshtop github
-    pub fn checker(&mut self) {
+    pub fn checker(_self : Arc<Mutex<UpdateChecker>>) {
+
+        let mut self_checker = _self.lock().unwrap();
+
         let source: String = match reqwest::blocking::get(
             "https://github.com/aristocratos/bpytop/raw/master/bpytop.py",
         ) {
@@ -61,7 +56,7 @@ impl<'a> UpdateChecker {
                 }
             };
             if mut_line.starts_with("VERSION: str = ") {
-                self.version = mut_line[(mut_line.find('=').unwrap()) + 1..]
+                self_checker.version = mut_line[(mut_line.find('=').unwrap()) + 1..]
                     .strip_prefix("\" \n")
                     .unwrap_or(&mut_line[(mut_line.find('=').unwrap()) + 1..])
                     .strip_suffix("\" \n")
@@ -71,14 +66,14 @@ impl<'a> UpdateChecker {
             }
         }
 
-        if self.version != VERSION.to_owned()
+        if self_checker.version != VERSION.to_owned()
             && match which::which("notify_send") {
                 Ok(p) => p.exists(),
                 Err(e) => false,
             }
         {
 
-            match Command::new("notify_send").args(&vec!["-u", "normal", "BpyTop Update!", format!("New version of BpyTop available!\nCurrent version: {}\nNew version: {}\nDownload at github.com/aristocratos/bpytop", VERSION.to_owned(), self.version).as_str(), "-i", "update-notifier", "-t", "10000"]).output() {
+            match Command::new("notify_send").args(&vec!["-u", "normal", "BpyTop Update!", format!("New version of BpyTop available!\nCurrent version: {}\nNew version: {}\nDownload at github.com/aristocratos/bpytop", VERSION.to_owned(), self_checker.version).as_str(), "-i", "update-notifier", "-t", "10000"]).output() {
                 Ok(_) => (),
                 Err(e) => errlog(format!("Unable to execute notify_send (error {})", e)),
             };

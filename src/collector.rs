@@ -23,8 +23,6 @@ use {
         timeit::TimeIt,
         CONFIG_DIR,
     },
-    crossbeam,
-    once_cell::sync::OnceCell,
     std::{
         path::*,
         sync::{Arc, Mutex},
@@ -119,64 +117,62 @@ impl Collector {
     }
 
     pub fn start(
-        &mut self,
-        CONFIG: &Config,
+        _self: Arc<Mutex<Collector>>,
         DEBUG: bool,
-        collectors: Vec<Collectors>,
-        brshtop_box: &mut BrshtopBox,
-        timeit: &mut TimeIt,
-        menu: &Menu,
-        draw: &mut Draw,
-        term: &Term,
-        cpu_box: &mut CpuBox,
-        key: &mut Key,
-        THEME: &Theme,
         ARG_MODE: ViewMode,
-        graphs: &mut Graphs,
-        meters: &mut Meters,
-        netbox: &mut NetBox,
-        procbox: &mut ProcBox,
-        membox: &mut MemBox,
-        cpu_collector: &mut CpuCollector,
-        mem_collector: &mut MemCollector,
-        net_collector: &mut NetCollector,
-        proc_collector: &mut ProcCollector,
+        collectors: Vec<Collectors>,
+        CONFIG: Arc<Mutex<Config>>,
+        brshtop_box: Arc<Mutex<BrshtopBox>>,
+        timeit: Arc<Mutex<TimeIt>>,
+        menu: Arc<Mutex<Menu>>,
+        draw: Arc<Mutex<Draw>>,
+        term: Arc<Mutex<Term>>,
+        cpu_box: Arc<Mutex<CpuBox>>,
+        key: Arc<Mutex<Key>>,
+        THEME: Arc<Mutex<Theme>>,
+        graphs: Arc<Mutex<Graphs>>,
+        meters: Arc<Mutex<Meters>>,
+        netbox: Arc<Mutex<NetBox>>,
+        procbox: Arc<Mutex<ProcBox>>,
+        membox: Arc<Mutex<MemBox>>,
+        cpu_collector: Arc<Mutex<CpuCollector>>,
+        mem_collector: Arc<Mutex<MemCollector>>,
+        net_collector: Arc<Mutex<NetCollector>>,
+        proc_collector: Arc<Mutex<ProcCollector>>,
     ) {
-        self.set_stopping(false);
-        match crossbeam::scope(|s| {
-            s.spawn(|_| {
-                let (flag_build, control_build) = make_pair();
-                self.flag = flag_build;
-                self.control = control_build;
-                self.runner(
-                    CONFIG,
-                    DEBUG,
-                    brshtop_box,
-                    timeit,
-                    menu,
-                    draw,
-                    term,
-                    cpu_box,
-                    key,
-                    THEME,
-                    ARG_MODE,
-                    graphs,
-                    meters,
-                    netbox,
-                    procbox,
-                    membox,
-                    cpu_collector,
-                    net_collector,
-                    proc_collector,
-                    mem_collector,
-                );
-            });
-        }) {
-            _ => (),
-        };
+        let mut initial_usage = _self.lock().unwrap();
+        initial_usage.set_stopping(false);
+        drop(initial_usage);
+        let mut self_copy = Arc::clone(&_self);
+        thread::spawn(move || {
+            Collector::runner(
+                self_copy,
+                CONFIG,
+                DEBUG,
+                ARG_MODE,
+                brshtop_box,
+                timeit,
+                menu,
+                draw,
+                term,
+                cpu_box,
+                key,
+                THEME,
+                graphs,
+                meters,
+                netbox,
+                procbox,
+                membox,
+                cpu_collector,
+                net_collector,
+                proc_collector,
+                mem_collector,
+            );
+        });
+        let mut after_usage = _self.lock().unwrap();
 
-        self.set_started(true);
-        self.set_default_collect_queue(collectors.clone());
+        after_usage.set_started(true);
+        after_usage.set_default_collect_queue(collectors.clone());
     }
 
     pub fn stop(&mut self) {
@@ -198,98 +194,150 @@ impl Collector {
     }
 
     pub fn runner(
-        &mut self,
-        CONFIG: &Config,
+        _self: Arc<Mutex<Collector>>,
+        CONFIG_mutex: Arc<Mutex<Config>>,
         DEBUG: bool,
-        brshtop_box: &mut BrshtopBox,
-        timeit: &mut TimeIt,
-        menu: &Menu,
-        draw: &mut Draw,
-        term: &Term,
-        cpu_box: &mut CpuBox,
-        key: &mut Key,
-        THEME: &Theme,
         ARG_MODE: ViewMode,
-        graphs: &mut Graphs,
-        meters: &mut Meters,
-        netbox: &mut NetBox,
-        procbox: &mut ProcBox,
-        membox: &mut MemBox,
-        cpu_collector: &mut CpuCollector,
-        net_collector: &mut NetCollector,
-        proc_collector: &mut ProcCollector,
-        mem_collector: &mut MemCollector,
+        brshtop_box_mutex: Arc<Mutex<BrshtopBox>>,
+        timeit_mutex: Arc<Mutex<TimeIt>>,
+        menu_mutex: Arc<Mutex<Menu>>,
+        draw_mutex: Arc<Mutex<Draw>>,
+        term_mutex: Arc<Mutex<Term>>,
+        cpu_box_mutex: Arc<Mutex<CpuBox>>,
+        key_mutex: Arc<Mutex<Key>>,
+        THEME_mutex: Arc<Mutex<Theme>>,
+        graphs_mutex: Arc<Mutex<Graphs>>,
+        meters_mutex: Arc<Mutex<Meters>>,
+        netbox_mutex: Arc<Mutex<NetBox>>,
+        procbox_mutex: Arc<Mutex<ProcBox>>,
+        membox_mutex: Arc<Mutex<MemBox>>,
+        cpu_collector_mutex: Arc<Mutex<CpuCollector>>,
+        net_collector_mutex: Arc<Mutex<NetCollector>>,
+        proc_collector_mutex: Arc<Mutex<ProcCollector>>,
+        mem_collector_mutex: Arc<Mutex<MemCollector>>,
     ) {
         let mut draw_buffers = Vec::<String>::new();
 
         let mut debugged = false;
+        let initial_check = _self.lock().unwrap();
+        let mut stopping = initial_check.get_stopping();
+        drop(initial_check);
 
-        while !self.get_stopping() {
+        while !stopping {
+            let mut CONFIG = CONFIG_mutex.lock().unwrap();
+            let mut brshtop_box = brshtop_box_mutex.lock().unwrap();
+            let mut timeit = timeit_mutex.lock().unwrap();
+            let mut menu = menu_mutex.lock().unwrap();
+            let mut draw = draw_mutex.lock().unwrap();
+            let mut term = term_mutex.lock().unwrap();
+            let mut cpu_box = cpu_box_mutex.lock().unwrap();
+            let mut key = key_mutex.lock().unwrap();
+            let mut THEME = THEME_mutex.lock().unwrap();
+            let mut graphs = graphs_mutex.lock().unwrap();
+            let mut meters = meters_mutex.lock().unwrap();
+            let mut netbox = netbox_mutex.lock().unwrap();
+            let mut procbox = procbox_mutex.lock().unwrap();
+            let mut membox = membox_mutex.lock().unwrap();
+            let mut cpu_collector = cpu_collector_mutex.lock().unwrap();
+            let mut net_collector = net_collector_mutex.lock().unwrap();
+            let mut proc_collector = proc_collector_mutex.lock().unwrap();
+            let mut mem_collector = mem_collector_mutex.lock().unwrap();
+            let mut self_collector = _self.lock().unwrap();
+
             if CONFIG.draw_clock != String::default() && CONFIG.update_ms != 1000 {
-                brshtop_box.draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
+                brshtop_box.draw_clock(
+                    false, &term, &CONFIG, &THEME, &menu, &cpu_box, &mut draw, &mut key,
+                );
             }
-            self.set_collect_run(EventEnum::Wait);
-            self.get_collect_run_reference().wait(0.1);
-            if !self.get_collect_run().is_set() {
+            self_collector.set_collect_run(EventEnum::Wait);
+            self_collector.get_collect_run_reference().wait(0.1);
+            if !self_collector.get_collect_run().is_set() {
                 continue;
             }
             draw_buffers = Vec::<String>::new();
-            self.set_collect_interrupt(false);
-            self.set_collect_run(EventEnum::Flag(false));
-            self.set_collect_idle(EventEnum::Flag(true));
-            self.set_collect_done(EventEnum::Flag(false));
+            self_collector.set_collect_interrupt(false);
+            self_collector.set_collect_run(EventEnum::Flag(false));
+            self_collector.set_collect_idle(EventEnum::Flag(true));
+            self_collector.set_collect_done(EventEnum::Flag(false));
 
             if DEBUG && !debugged {
                 timeit.start("Collect and draw".to_owned());
             }
 
-            while self.get_collect_queue().len() > 0 {
-                let collector = self.pop_collect_queue();
-                if !self.get_only_draw() {
+            while self_collector.get_collect_queue().len() > 0 {
+                let collector = self_collector.pop_collect_queue();
+                if !self_collector.get_only_draw() {
                     match collector {
                         Collectors::CpuCollector => {
-                            cpu_collector.collect(CONFIG, term, cpu_box, brshtop_box);
+                            cpu_collector.collect(&CONFIG, &term, &mut cpu_box, &mut brshtop_box);
                         }
                         Collectors::NetCollector => {
-                            net_collector.collect(CONFIG, netbox);
+                            net_collector.collect(&CONFIG, &mut netbox);
                         }
                         Collectors::ProcCollector => {
-                            proc_collector.collect(brshtop_box, CONFIG, procbox);
+                            proc_collector.collect(&brshtop_box, &CONFIG, &mut procbox);
                         }
                         Collectors::MemCollector => {
-                            mem_collector.collect(CONFIG, membox);
+                            mem_collector.collect(&CONFIG, &mut membox);
                         }
                     }
                 }
                 match collector {
                     Collectors::CpuCollector => {
                         cpu_collector.draw(
-                            cpu_box, CONFIG, key, THEME, term, draw, ARG_MODE, graphs, meters, menu,
+                            &mut cpu_box,
+                            &CONFIG,
+                            &mut key,
+                            &THEME,
+                            &mut term,
+                            &mut draw,
+                            ARG_MODE,
+                            &mut graphs,
+                            &mut meters,
+                            &mut menu,
                         );
                     }
                     Collectors::NetCollector => {
-                        net_collector.draw(netbox, THEME, key, term, CONFIG, draw, graphs, menu);
+                        net_collector.draw(
+                            &mut netbox,
+                            &THEME,
+                            &mut key,
+                            &term,
+                            &CONFIG,
+                            &mut draw,
+                            &mut graphs,
+                            &mut menu,
+                        );
                     }
                     Collectors::ProcCollector => {
-                        proc_collector.draw(procbox, CONFIG, key, THEME, graphs, term, draw, menu);
+                        proc_collector.draw(
+                            &mut procbox,
+                            &CONFIG,
+                            &mut key,
+                            &THEME,
+                            &mut graphs,
+                            &term,
+                            &mut draw,
+                            &mut menu,
+                        );
                     }
                     Collectors::MemCollector => {
                         mem_collector.draw(
-                            membox,
-                            term,
-                            brshtop_box,
-                            CONFIG,
-                            meters,
-                            THEME,
-                            key,
-                            self,
-                            draw,
-                            menu,
+                            &mut membox,
+                            &term,
+                            &mut brshtop_box,
+                            &CONFIG,
+                            &mut meters,
+                            &THEME,
+                            &mut key,
+                            &self_collector,
+                            &mut draw,
+                            &menu,
                         );
                     }
                 }
 
-                if self.get_use_draw_list() {
+                if self_collector.get_use_draw_list() {
                     draw_buffers.push(match collector {
                         Collectors::CpuCollector => cpu_collector.get_buffer().clone(),
                         Collectors::NetCollector => net_collector.get_buffer().clone(),
@@ -298,7 +346,7 @@ impl Collector {
                     });
                 }
 
-                if self.get_collect_interrupt() {
+                if self_collector.get_collect_interrupt() {
                     break;
                 }
             }
@@ -308,20 +356,26 @@ impl Collector {
                 debugged = true;
             }
 
-            if self.get_draw_now() && !menu.active && !self.get_collect_interrupt() {
-                if self.get_use_draw_list() {
-                    draw.out(draw_buffers.clone(), false, key);
+            if self_collector.get_draw_now()
+                && !menu.active
+                && !self_collector.get_collect_interrupt()
+            {
+                if self_collector.get_use_draw_list() {
+                    draw.out(draw_buffers.clone(), false, &mut key);
                 } else {
-                    draw.out(Vec::<String>::new(), false, key);
+                    draw.out(Vec::<String>::new(), false, &mut key);
                 }
             }
 
             if CONFIG.draw_clock != String::default() && CONFIG.update_ms == 1000 {
-                brshtop_box.draw_clock(false, term, CONFIG, THEME, menu, cpu_box, draw, key);
+                brshtop_box.draw_clock(
+                    false, &term, &CONFIG, &THEME, &menu, &cpu_box, &mut draw, &mut key,
+                );
             }
 
-            self.set_collect_idle(EventEnum::Flag(true));
-            self.set_collect_done(EventEnum::Flag(true));
+            self_collector.set_collect_idle(EventEnum::Flag(true));
+            self_collector.set_collect_done(EventEnum::Flag(true));
+            stopping = self_collector.get_stopping();
         }
     }
 

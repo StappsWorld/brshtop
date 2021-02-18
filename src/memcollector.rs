@@ -18,7 +18,6 @@ use {
     },
     futures::{future, stream::StreamExt},
     heim::disk::{io_counters, IoCounters},
-    once_cell::sync::OnceCell,
     psutil::{
         disk::{DiskUsage, FileSystem},
         memory::{

@@ -15,11 +15,10 @@ use {
     },
     futures::{future, stream::StreamExt},
     heim::net::{io_counters, nic, IoCounters, Nic},
-    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         fmt,
-        sync::Mutex,
+        sync::Arc,
         time::{Duration, SystemTime},
     },
 };
@@ -51,14 +50,15 @@ impl fmt::Display for NetCollectorStat {
     }
 }
 
-pub struct NetCollector<'a> {
+#[derive(Clone)]
+pub struct NetCollector {
     parent: Collector,
     buffer: String,
-    pub up_stat: HashMap<String, Nic>,
-    pub nics: Vec<&'a Nic>,
+    pub up_stat: HashMap<String, Arc<Nic>>,
+    pub nics: Vec<Arc<Nic>>,
     nic_i: i32,
-    pub nic: Option<&'a Nic>,
-    pub new_nic: Option<&'a Nic>,
+    pub nic: Option<Arc<Nic>>,
+    pub new_nic: Option<Arc<Nic>>,
     nic_error: bool,
     reset: bool,
     graph_raise: HashMap<String, i32>,
@@ -72,13 +72,13 @@ pub struct NetCollector<'a> {
     sync_top: i32,
     sync_string: String,
 }
-impl<'a> NetCollector<'a> {
+impl NetCollector {
     pub fn new(netbox: &NetBox, CONFIG: &Config) -> Self {
         NetCollector {
             parent: Collector::new(),
             buffer: netbox.get_buffer(),
-            up_stat: HashMap::<String, Nic>::new(),
-            nics: Vec::<&'a Nic>::new(),
+            up_stat: HashMap::<String, Arc<Nic>>::new(),
+            nics: Vec::<Arc<Nic>>::new(),
             nic_i: 0,
             nic: None,
             new_nic: None,
@@ -132,10 +132,10 @@ impl<'a> NetCollector<'a> {
         }
 
         let up_stat_stream = nic();
-        let mut up_stat: HashMap<String, &'a Nic> = HashMap::<String, &'a Nic>::new();
+        let mut up_stat: HashMap<String, Arc<Nic>> = HashMap::<String, Arc<Nic>>::new();
         up_stat_stream.for_each(|o| match o {
             Ok(val) => {
-                self.up_stat.insert(val.name().to_owned(), val);
+                self.up_stat.insert(val.name().to_owned(), Arc::new(val));
                 future::ready(())
             }
             Err(e) => {
@@ -162,14 +162,10 @@ impl<'a> NetCollector<'a> {
         if self.nics.len() == 0 {
             self.nics = vec![];
         }
-        self.nic = Some(self.nics[self.nic_i as usize]);
+        self.nic = Some(self.nics[self.nic_i as usize].clone());
     }
 
-    pub fn switch(
-        &mut self,
-        key: String,
-        collector: &mut Collector,
-    ) {
+    pub fn switch(&mut self, key: String, collector: &mut Collector) {
         if self.nics.len() < 2 {
             return;
         }
@@ -179,7 +175,7 @@ impl<'a> NetCollector<'a> {
         } else if self.nic_i < 0 {
             self.nic_i = self.nics.len() as i32 - 1;
         }
-        self.new_nic = Some(self.nics[self.nic_i as usize]);
+        self.new_nic = Some(self.nics[self.nic_i as usize].clone());
         self.switched = true;
 
         collector.collect(
@@ -192,18 +188,14 @@ impl<'a> NetCollector<'a> {
         );
     }
 
-    pub fn collect(
-        &mut self,
-        CONFIG: &Config,
-        netbox: &mut NetBox,
-    ) {
+    pub fn collect(&mut self, CONFIG: &Config, netbox: &mut NetBox) {
         let mut speed: i32 = 0;
         let mut stat: HashMap<String, NetCollectorStat> =
             HashMap::<String, NetCollectorStat>::new();
         let up_stat_stream = nic();
         up_stat_stream.for_each(|o| match o {
             Ok(val) => {
-                self.up_stat.insert(val.name().to_owned(), val);
+                self.up_stat.insert(val.name().to_owned(), Arc::new(val));
                 future::ready(())
             }
             Err(e) => {
@@ -216,17 +208,17 @@ impl<'a> NetCollector<'a> {
         });
 
         if self.switched {
-            self.nic = self.new_nic;
+            self.nic = self.new_nic.clone();
             self.switched = false;
         }
 
         if self.nic.is_none()
             || !self
                 .up_stat
-                .contains_key(&self.nic.unwrap().name().to_owned())
+                .contains_key(&self.nic.clone().unwrap().name().to_owned())
             || !self
                 .up_stat
-                .get(&self.nic.unwrap().name().to_owned())
+                .get(&self.nic.clone().unwrap().name().to_owned())
                 .unwrap()
                 .is_up()
         {
@@ -252,21 +244,21 @@ impl<'a> NetCollector<'a> {
             }
         });
 
-        let mut io_all: &IoCounters = match io_all_hash.get(&self.nic.unwrap().name().to_owned()) {
+        let mut io_all: &IoCounters = match io_all_hash.get(&self.nic.clone().unwrap().name().to_owned()) {
             Some(i) => i,
             None => return,
         };
 
         if !self
             .stats
-            .contains_key(&self.nic.unwrap().name().to_owned())
+            .contains_key(&self.nic.clone().unwrap().name().to_owned())
         {
             self.stats.insert(
-                self.nic.unwrap().name().to_owned(),
+                self.nic.clone().unwrap().name().to_owned(),
                 HashMap::<String, HashMap<String, NetCollectorStat>>::new(),
             );
             self.strings.insert(
-                self.nic.unwrap().name().to_owned(),
+                self.nic.clone().unwrap().name().to_owned(),
                 vec![
                     ("download", HashMap::<String, String>::new()),
                     ("upload", HashMap::<String, String>::new()),
@@ -284,7 +276,7 @@ impl<'a> NetCollector<'a> {
             .collect::<HashMap<String, u64>>()
             {
                 self.stats
-                    .get_mut(&self.nic.unwrap().name().to_owned())
+                    .get_mut(&self.nic.clone().unwrap().name().to_owned())
                     .unwrap()
                     .insert(
                         direction,
@@ -308,7 +300,7 @@ impl<'a> NetCollector<'a> {
                     .map(|s| s.to_owned().to_owned())
                     .collect::<Vec<String>>()
                 {
-                    match self.strings.get_mut(&self.nic.unwrap().name().to_owned()) {
+                    match self.strings.get_mut(&self.nic.clone().unwrap().name().to_owned()) {
                         Some(h) => {
                             h.insert(v, HashMap::<String, String>::new());
                             ()
@@ -319,7 +311,7 @@ impl<'a> NetCollector<'a> {
             }
         }
 
-        match self.stats.get_mut(&self.nic.unwrap().name().to_owned()) {
+        match self.stats.get_mut(&self.nic.clone().unwrap().name().to_owned()) {
             Some(h) => {
                 match h.get_mut(&"download".to_owned()) {
                     Some(hash) => {
@@ -349,7 +341,7 @@ impl<'a> NetCollector<'a> {
                     stat = h.get(&direction).unwrap().clone();
                     let mut strings: HashMap<String, NetCollectorStat> = self
                         .strings
-                        .get(&self.nic.unwrap().name().to_owned())
+                        .get(&self.nic.clone().unwrap().name().to_owned())
                         .unwrap()
                         .get(&direction)
                         .unwrap()
@@ -592,7 +584,7 @@ impl<'a> NetCollector<'a> {
                     stat.insert("speed".to_owned(), NetCollectorStat::Vec(speed_vec.clone()));
 
                     self.strings
-                        .get_mut(&self.nic.unwrap().name().to_owned())
+                        .get_mut(&self.nic.clone().unwrap().name().to_owned())
                         .unwrap()
                         .insert(
                             direction.clone(),
@@ -618,7 +610,7 @@ impl<'a> NetCollector<'a> {
                 if CONFIG.net_sync {
                     let download_top = self
                         .stats
-                        .get(&self.nic.unwrap().name().to_owned())
+                        .get(&self.nic.clone().unwrap().name().to_owned())
                         .unwrap()
                         .get(&"download".to_owned())
                         .unwrap()
@@ -626,7 +618,7 @@ impl<'a> NetCollector<'a> {
                         .unwrap();
                     let upload_top = self
                         .stats
-                        .get(&self.nic.unwrap().name().to_owned())
+                        .get(&self.nic.clone().unwrap().name().to_owned())
                         .unwrap()
                         .get(&"upload".to_owned())
                         .unwrap()
@@ -658,7 +650,7 @@ impl<'a> NetCollector<'a> {
             }
             None => errlog(format!(
                 "Unable to access nic in self.stats (nic : {})",
-                self.nic.unwrap().name()
+                self.nic.clone().unwrap().name()
             )),
         }
     }
@@ -675,16 +667,7 @@ impl<'a> NetCollector<'a> {
         graphs: &mut Graphs,
         menu: &Menu,
     ) {
-        netbox.draw_fg(
-            theme,
-            key,
-            term,
-            CONFIG,
-            draw,
-            graphs,
-            menu,
-            self,
-        )
+        netbox.draw_fg(theme, key, term, CONFIG, draw, graphs, menu, self)
     }
 
     pub fn get_parent(&self) -> Collector {
@@ -978,30 +961,5 @@ impl<'a> NetCollector<'a> {
 
     pub fn set_sync_string(&mut self, sync_string: String) {
         self.sync_string = sync_string.clone();
-    }
-}
-impl<'a> Clone for NetCollector<'a> {
-    fn clone(&self) -> Self {
-        NetCollector {
-            parent: self.get_parent(),
-            buffer: self.get_buffer(),
-            up_stat: HashMap::<String, Nic>::new(),
-            nics: self.nics.clone(),
-            nic_i: self.nic_i.clone(),
-            nic: self.nic.clone(),
-            new_nic: self.new_nic.clone(),
-            nic_error: self.nic_error.clone(),
-            reset: self.get_reset(),
-            graph_raise: self.get_graph_raise(),
-            graph_lower: self.get_graph_lower(),
-            stats: self.get_stats(),
-            strings: self.get_strings(),
-            switched: self.get_switched(),
-            timestamp: self.get_timestamp(),
-            net_min: self.get_net_min(),
-            auto_min: self.get_auto_min(),
-            sync_top: self.get_sync_top(),
-            sync_string: self.get_sync_string(),
-        }
     }
 }

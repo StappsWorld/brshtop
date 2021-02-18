@@ -16,7 +16,6 @@ use {
         theme::Color,
         CONFIG_DIR, VERSION,
     },
-    once_cell::sync::OnceCell,
     rand::Rng,
     std::{sync::Mutex, thread, time},
 };

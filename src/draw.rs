@@ -3,7 +3,6 @@ use {
         event::{Event, EventEnum},
         key::Key,
     },
-    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         io::{self, Write},

@@ -60,12 +60,12 @@ use {
     },
     clap::{App, Arg},
     consts::*,
-    cpuid, crossbeam,
+    cpuid,
     error::{errlog, throw_error},
     expanduser::expanduser,
     lazy_static::lazy_static,
+    log::{debug, LevelFilter},
     math::round,
-    once_cell::sync::OnceCell,
     psutil::process::Signal,
     signal_hook::{consts::signal::*, iterator::Signals},
     std::{
@@ -78,7 +78,7 @@ use {
         ops::{Deref, DerefMut},
         path::{Path, PathBuf},
         process,
-        sync::Mutex,
+        sync::{Arc, Mutex, MutexGuard},
         thread,
         time::{Duration, SystemTime, UNIX_EPOCH},
     },
@@ -213,6 +213,24 @@ lazy_static! {
 pub fn main() {
     let errors = Vec::<String>::new();
 
+    // Setting up error logging
+
+    let error_file = "brshtop.log";
+    let error_dir = CONFIG_DIR.join(PathBuf::from(error_file));
+    let dir = error_dir.to_str().unwrap();
+
+    match simple_logging::log_to_file(dir, LevelFilter::Debug) {
+        Err(e) => throw_error(
+            format!(
+                "ERROR!\nNo permission to write to \"{}\" directory with error {}!",
+                CONFIG_DIR.to_str().unwrap(),
+                e
+            )
+            .as_str(),
+        ),
+        _ => (),
+    };
+
     //Getting system information from env:consts:OS
 
     if SYSTEM.to_string() == "Other".to_owned() {
@@ -266,7 +284,7 @@ pub fn main() {
         )
         .get_matches();
 
-    let mut ARG_MODE: ViewMode = ViewMode {
+    let mut ARG_MODE_raw: ViewMode = ViewMode {
         t: ViewModeEnum::None,
     };
     let arg_full = matches.value_of("Full Mode");
@@ -276,18 +294,21 @@ pub fn main() {
     let arg_debug = matches.value_of("Debug");
 
     if arg_full.is_some() {
-        ARG_MODE = ViewMode {
+        ARG_MODE_raw = ViewMode {
             t: ViewModeEnum::Full,
         };
     } else if arg_proc.is_some() {
-        ARG_MODE = ViewMode {
+        ARG_MODE_raw = ViewMode {
             t: ViewModeEnum::Proc,
         }
     } else if arg_stat.is_some() {
-        ARG_MODE = ViewMode {
+        ARG_MODE_raw = ViewMode {
             t: ViewModeEnum::Stat,
         };
     }
+    let mut ARG_MODE_parent: Arc<Mutex<ViewMode>> = Arc::new(Mutex::new(ARG_MODE_raw));
+    let mut ARG_MODE_mutex: Arc<Mutex<ViewMode>> = Arc::clone(&ARG_MODE_parent);
+    let mut ARG_MODE: MutexGuard<ViewMode> = ARG_MODE_mutex.lock().unwrap();
 
     let DEBUG = arg_debug.is_some();
 
@@ -394,13 +415,16 @@ pub fn main() {
             .collect::<Vec<String>>(),
     );
 
-    let mut CONFIG: Config = match Config::new(CONFIG_FILE.clone()) {
+    let mut CONFIG_raw: Config = match Config::new(CONFIG_FILE.clone()) {
         Ok(c) => c,
         Err(e) => {
             throw_error(e);
             Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
         }
     };
+    let mut CONFIG_parent: Arc<Mutex<Config>> = Arc::new(Mutex::new(CONFIG_raw));
+    let mut CONFIG_mutex: Arc<Mutex<Config>> = Arc::clone(&CONFIG_parent);
+    let mut CONFIG: MutexGuard<Config> = CONFIG_mutex.lock().unwrap();
 
     errlog(format!(
         "New instance of brshtop version {} started with pid {}",
@@ -421,7 +445,7 @@ pub fn main() {
     let mut b = brshtop::Brshtop::new();
     b._init();
 
-    let mut THEME: Theme = match Theme::from_file(THEME_DIR.to_owned().as_path()) {
+    let mut THEME_raw: Theme = match Theme::from_file(THEME_DIR.to_owned().as_path()) {
         Ok(r) => match r {
             Ok(t) => t,
             Err(e) => {
@@ -442,45 +466,105 @@ pub fn main() {
             Theme::default()
         }
     };
+    let mut THEME_parent: Arc<Mutex<Theme>> = Arc::new(Mutex::new(THEME_raw));
+    let mut THEME_mutex: Arc<Mutex<Theme>> = Arc::clone(&THEME_parent);
+    let mut THEME: MutexGuard<Theme> = THEME_mutex.lock().unwrap();
 
     errlog("Made it through global variables".to_owned());
 
     // Pre main ---------------------------------------------------------------------------------------------
-    let mut term: Term = Term::new();
+    let mut term_raw: Term = Term::new();
+    let mut term_parent: Arc<Mutex<Term>> = Arc::new(Mutex::new(term_raw));
+    let mut term_mutex: Arc<Mutex<Term>> = Arc::clone(&term_parent);
+    let mut term: MutexGuard<Term> = term_mutex.lock().unwrap();
 
-    let mut key: Key = Key::new();
+    let mut key_raw: Key = Key::new();
+    let mut key_parent: Arc<Mutex<Key>> = Arc::new(Mutex::new(key_raw));
+    let mut key_mutex: Arc<Mutex<Key>> = Arc::clone(&key_parent);
+    let mut key: MutexGuard<Key> = key_mutex.lock().unwrap();
 
-    let mut draw: Draw = Draw::new();
+    let mut draw_raw: Draw = Draw::new();
+    let mut draw_parent: Arc<Mutex<Draw>> = Arc::new(Mutex::new(draw_raw));
+    let mut draw_mutex: Arc<Mutex<Draw>> = Arc::clone(&draw_parent);
+    let mut draw: MutexGuard<Draw> = draw_mutex.lock().unwrap();
 
-    let mut brshtop_box: BrshtopBox = BrshtopBox::new(&CONFIG, ARG_MODE);
+    let mut brshtop_box_raw: BrshtopBox = BrshtopBox::new(&CONFIG, ARG_MODE.to_owned());
+    let mut brshtop_box_parent: Arc<Mutex<BrshtopBox>> = Arc::new(Mutex::new(brshtop_box_raw));
+    let mut brshtop_box_mutex: Arc<Mutex<BrshtopBox>> = Arc::clone(&brshtop_box_parent);
+    let mut brshtop_box: MutexGuard<BrshtopBox> = brshtop_box_mutex.lock().unwrap();
 
-    let mut cpu_box: CpuBox = CpuBox::new(&mut brshtop_box, &CONFIG, ARG_MODE);
+    let mut cpu_box_raw: CpuBox = CpuBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
+    let mut cpu_box_parent: Arc<Mutex<CpuBox>> = Arc::new(Mutex::new(cpu_box_raw));
+    let mut cpu_box_mutex: Arc<Mutex<CpuBox>> = Arc::clone(&cpu_box_parent);
+    let mut cpu_box: MutexGuard<CpuBox> = cpu_box_mutex.lock().unwrap();
 
-    let mut mem_box: MemBox = MemBox::new(&mut brshtop_box, &CONFIG, ARG_MODE);
+    let mut mem_box_raw: MemBox = MemBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
+    let mut mem_box_parent: Arc<Mutex<MemBox>> = Arc::new(Mutex::new(mem_box_raw));
+    let mut mem_box_mutex: Arc<Mutex<MemBox>> = Arc::clone(&mem_box_parent);
+    let mut mem_box: MutexGuard<MemBox> = mem_box_mutex.lock().unwrap();
 
-    let mut net_box: NetBox = NetBox::new(&CONFIG, ARG_MODE, &mut brshtop_box);
+    let mut net_box_raw: NetBox = NetBox::new(&CONFIG, ARG_MODE.to_owned(), &mut brshtop_box);
+    let mut net_box_parent: Arc<Mutex<NetBox>> = Arc::new(Mutex::new(net_box_raw));
+    let mut net_box_mutex: Arc<Mutex<NetBox>> = Arc::clone(&net_box_parent);
+    let mut net_box: MutexGuard<NetBox> = net_box_mutex.lock().unwrap();
 
-    let mut proc_box: ProcBox = ProcBox::new(&mut brshtop_box, &CONFIG, ARG_MODE);
+    let mut proc_box_raw: ProcBox = ProcBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
+    let mut proc_box_parent: Arc<Mutex<ProcBox>> = Arc::new(Mutex::new(proc_box_raw));
+    let mut proc_box_mutex: Arc<Mutex<ProcBox>> = Arc::clone(&proc_box_parent);
+    let mut proc_box: MutexGuard<ProcBox> = proc_box_mutex.lock().unwrap();
 
-    let mut collector: Collector = Collector::new();
+    let mut collector_raw: Collector = Collector::new();
+    let mut collector_parent: Arc<Mutex<Collector>> = Arc::new(Mutex::new(collector_raw));
+    let mut collector_mutex: Arc<Mutex<Collector>> = Arc::clone(&collector_parent);
+    let mut collector: MutexGuard<Collector> = collector_mutex.lock().unwrap();
 
-    let mut cpu_collector: CpuCollector = CpuCollector::new();
+    let mut cpu_collector_raw: CpuCollector = CpuCollector::new();
+    let mut cpu_collector_parent: Arc<Mutex<CpuCollector>> =
+        Arc::new(Mutex::new(cpu_collector_raw));
+    let mut cpu_collector_mutex: Arc<Mutex<CpuCollector>> = Arc::clone(&cpu_collector_parent);
+    let mut cpu_collector: MutexGuard<CpuCollector> = cpu_collector_mutex.lock().unwrap();
 
-    let mut mem_collector: MemCollector = MemCollector::new(&mem_box);
+    let mut mem_collector_raw: MemCollector = MemCollector::new(&mem_box);
+    let mut mem_collector_parent: Arc<Mutex<MemCollector>> =
+        Arc::new(Mutex::new(mem_collector_raw));
+    let mut mem_collector_mutex: Arc<Mutex<MemCollector>> = Arc::clone(&mem_collector_parent);
+    let mut mem_collector: MutexGuard<MemCollector> = mem_collector_mutex.lock().unwrap();
 
-    let mut net_collector: NetCollector = NetCollector::new(&net_box, &CONFIG);
+    let mut net_collector_raw: NetCollector = NetCollector::new(&net_box, &CONFIG);
+    let mut net_collector_parent: Arc<Mutex<NetCollector>> =
+        Arc::new(Mutex::new(net_collector_raw));
+    let mut net_collector_mutex: Arc<Mutex<NetCollector>> = Arc::clone(&net_collector_parent);
+    let mut net_collector: MutexGuard<NetCollector> = net_collector_mutex.lock().unwrap();
 
-    let mut proc_collector: ProcCollector = ProcCollector::new(&proc_box);
+    let mut proc_collector_raw: ProcCollector = ProcCollector::new(&proc_box);
+    let mut proc_collector_parent: Arc<Mutex<ProcCollector>> =
+        Arc::new(Mutex::new(proc_collector_raw));
+    let mut proc_collector_mutex: Arc<Mutex<ProcCollector>> = Arc::clone(&proc_collector_parent);
+    let mut proc_collector: MutexGuard<ProcCollector> = proc_collector_mutex.lock().unwrap();
 
-    let mut menu: Menu = Menu::new(MENUS, MENU_COLORS);
+    let mut menu_raw: Menu = Menu::new(MENUS, MENU_COLORS);
+    let mut menu_parent: Arc<Mutex<Menu>> = Arc::new(Mutex::new(menu_raw));
+    let mut menu_mutex: Arc<Mutex<Menu>> = Arc::clone(&menu_parent);
+    let mut menu: MutexGuard<Menu> = menu_mutex.lock().unwrap();
 
-    let mut timer: Timer = Timer::new();
+    let mut timer_raw: Timer = Timer::new();
+    let mut timer_parent: Arc<Mutex<Timer>> = Arc::new(Mutex::new(timer_raw));
+    let mut timer_mutex: Arc<Mutex<Timer>> = Arc::clone(&timer_parent);
+    let mut timer: MutexGuard<Timer> = timer_mutex.lock().unwrap();
 
-    let mut timeit: TimeIt = TimeIt::new();
+    let mut timeit_raw: TimeIt = TimeIt::new();
+    let mut timeit_parent: Arc<Mutex<TimeIt>> = Arc::new(Mutex::new(timeit_raw));
+    let mut timeit_mutex: Arc<Mutex<TimeIt>> = Arc::clone(&timeit_parent);
+    let mut timeit: MutexGuard<TimeIt> = timeit_mutex.lock().unwrap();
 
-    let mut init: Init = Init::new();
+    let mut init_raw: Init = Init::new();
+    let mut init_parent: Arc<Mutex<Init>> = Arc::new(Mutex::new(init_raw));
+    let mut init_mutex: Arc<Mutex<Init>> = Arc::clone(&init_parent);
+    let mut init: MutexGuard<Init> = init_mutex.lock().unwrap();
 
-    let mut updatechecker: UpdateChecker = UpdateChecker::new();
+    let mut updatechecker_raw: UpdateChecker = UpdateChecker::new();
+    let mut updatechecker_parent: Arc<Mutex<UpdateChecker>> =
+        Arc::new(Mutex::new(updatechecker_raw));
 
     let mut collectors: Vec<Collectors> = vec![
         Collectors::MemCollector,
@@ -491,9 +575,15 @@ pub fn main() {
 
     let mut boxes: Vec<Boxes> = vec![Boxes::CpuBox, Boxes::MemBox, Boxes::NetBox, Boxes::ProcBox];
 
-    let mut graphs: Graphs = Graphs::default();
+    let mut graphs_raw: Graphs = Graphs::default();
+    let mut graphs_parent: Arc<Mutex<Graphs>> = Arc::new(Mutex::new(graphs_raw));
+    let mut graphs_mutex: Arc<Mutex<Graphs>> = Arc::clone(&graphs_parent);
+    let mut graphs: MutexGuard<Graphs> = graphs_mutex.lock().unwrap();
 
-    let mut meters: Meters = Meters::default();
+    let mut meters_raw: Meters = Meters::default();
+    let mut meters_parent: Arc<Mutex<Meters>> = Arc::new(Mutex::new(meters_raw));
+    let mut meters_mutex: Arc<Mutex<Meters>> = Arc::clone(&meters_parent);
+    let mut meters: MutexGuard<Meters> = meters_mutex.lock().unwrap();
 
     errlog("Made it through pre-main".to_owned());
 
@@ -552,7 +642,7 @@ pub fn main() {
     // Start a thread checking for updates while running init
     errlog("Start a thread checking for updates while running init".to_owned());
     if CONFIG.update_check {
-        updatechecker.run();
+        UpdateChecker::checker(Arc::clone(&updatechecker_parent));
     }
 
     // Draw banner and init status
@@ -582,7 +672,7 @@ pub fn main() {
 
     errlog("Load theme".to_owned());
 
-    THEME = match Theme::from_str(CONFIG.color_theme.clone()) {
+    THEME.replace_self(match Theme::from_str(CONFIG.color_theme.clone()) {
         Ok(t) => {
             init.success(&CONFIG, &mut draw, &term, &mut key);
             t
@@ -592,7 +682,7 @@ pub fn main() {
             Init::fail(e, &CONFIG, &mut draw, &mut collector, &mut key, &term);
             Theme::default()
         }
-    };
+    });
 
     // Setup boxes
     errlog("Setting up boxes".to_owned());
@@ -684,95 +774,148 @@ pub fn main() {
         }
     };
 
-    match crossbeam::scope(|s| {
-        s.spawn(|_| {
-            for sig in signals.forever() {
-                match sig {
-                    SIGTSTP => match now_sleeping(&mut key, &mut collector, &mut draw, &mut term) {
+    let mut ARG_MODE_signal = Arc::clone(&ARG_MODE_parent);
+    let mut CONFIG_signal = Arc::clone(&CONFIG_parent);
+    let mut THEME_signal = Arc::clone(&THEME_parent);
+    let mut term_signal = Arc::clone(&term_parent);
+    let mut key_signal = Arc::clone(&key_parent);
+    let mut draw_signal = Arc::clone(&draw_parent);
+    let mut brshtop_box_signal = Arc::clone(&brshtop_box_parent);
+    let mut cpu_box_signal = Arc::clone(&cpu_box_parent);
+    let mut mem_box_signal = Arc::clone(&mem_box_parent);
+    let mut net_box_signal = Arc::clone(&net_box_parent);
+    let mut proc_box_signal = Arc::clone(&proc_box_parent);
+    let mut collector_signal = Arc::clone(&collector_parent);
+    let mut cpu_collector_signal = Arc::clone(&cpu_collector_parent);
+    let mut mem_collector_signal = Arc::clone(&mem_collector_parent);
+    let mut net_collector_signal = Arc::clone(&net_collector_parent);
+    let mut proc_collector_signal = Arc::clone(&proc_collector_parent);
+    let mut menu_signal = Arc::clone(&menu_parent);
+    let mut timer_signal = Arc::clone(&timer_parent);
+    let mut init_signal = Arc::clone(&init_parent);
+    let mut graphs_signal = Arc::clone(&graphs_parent);
+    let mut meters_signal = Arc::clone(&meters_parent);
+    let mut timeit_signal = Arc::clone(&timeit_parent);
+    let mut boxes_signal = boxes.clone();
+    let mut collectors_signal = collectors.clone();
+    let mut DEBUG_signal = DEBUG.clone();
+
+    thread::spawn(move || {
+        for sig in signals.forever() {
+            match sig {
+                SIGTSTP => {
+                    match now_sleeping(
+                        key_signal.clone(),
+                        collector_signal.clone(),
+                        draw_signal.clone(),
+                        term_signal.clone(),
+                    ) {
                         Some(_) => (),
-                        None => clean_quit(
+                        None => clean_quit_mutex(
                             None,
                             Some("Failed to pause program".to_owned()),
-                            &mut key,
-                            &mut collector,
-                            &mut draw,
-                            &term,
-                            &CONFIG,
+                            key_signal.clone(),
+                            collector_signal.clone(),
+                            draw_signal.clone(),
+                            term_signal.clone(),
+                            CONFIG_signal.clone(),
                         ),
-                    },
-                    SIGCONT => now_awake(
-                        &mut draw,
-                        &mut term,
-                        &mut key,
-                        &mut brshtop_box,
-                        &mut collector,
-                        boxes.clone(),
-                        &mut init,
-                        &mut cpu_box,
-                        &mut menu,
-                        &mut timer,
-                        &CONFIG,
-                        &THEME,
-                        DEBUG,
-                        collectors.clone(),
-                        &mut timeit,
-                        ARG_MODE,
-                        &mut graphs,
-                        &mut meters,
-                        &mut net_box,
-                        &mut proc_box,
-                        &mut mem_box,
-                        &mut cpu_collector,
-                        &mut mem_collector,
-                        &mut net_collector,
-                        &mut proc_collector,
-                    ),
-                    SIGINT => clean_quit(
-                        None,
-                        None,
-                        &mut key,
-                        &mut collector,
-                        &mut draw,
-                        &term,
-                        &CONFIG,
-                    ),
-                    SIGWINCH => {
-                        term.refresh(
-                            vec![],
-                            boxes.clone(),
-                            &mut collector,
-                            &mut init,
-                            &mut cpu_box,
-                            &mut draw,
-                            true,
-                            &mut key,
-                            &mut menu,
-                            &mut brshtop_box,
-                            &mut timer,
-                            &CONFIG,
-                            &THEME,
-                            &cpu_collector,
-                            &mut mem_box,
-                            &mut net_box,
-                            &mut proc_box,
-                        );
                     }
-                    _ => unreachable!(),
                 }
+                SIGCONT => {
+                    let ARG_MODE_cont = ARG_MODE_signal.lock().unwrap();
+                    now_awake(
+                        boxes_signal.clone(),
+                        collectors_signal.clone(),
+                        DEBUG_signal,
+                        ARG_MODE_cont.to_owned(),
+                        draw_signal.clone(),
+                        term_signal.clone(),
+                        key_signal.clone(),
+                        brshtop_box_signal.clone(),
+                        collector_signal.clone(),
+                        init_signal.clone(),
+                        cpu_box_signal.clone(),
+                        menu_signal.clone(),
+                        timer_signal.clone(),
+                        CONFIG_signal.clone(),
+                        THEME_signal.clone(),
+                        timeit_signal.clone(),
+                        graphs_signal.clone(),
+                        meters_signal.clone(),
+                        net_box_signal.clone(),
+                        proc_box_signal.clone(),
+                        mem_box_signal.clone(),
+                        cpu_collector_signal.clone(),
+                        mem_collector_signal.clone(),
+                        net_collector_signal.clone(),
+                        proc_collector_signal.clone(),
+                    );
+                }
+                SIGINT => clean_quit_mutex(
+                    None,
+                    None,
+                    key_signal.clone(),
+                    collector_signal.clone(),
+                    draw_signal.clone(),
+                    term_signal.clone(),
+                    CONFIG_signal.clone(),
+                ),
+                SIGWINCH => {
+                    let mut term_signal_clone = term_signal.clone();
+                    let mut collector_signal_clone = collector_signal.clone();
+                    let mut init_signal_clone = init_signal.clone();
+                    let mut cpu_box_signal_clone = cpu_box_signal.clone();
+                    let mut draw_signal_clone = draw_signal.clone();
+                    let mut key_signal_clone = key_signal.clone();
+                    let mut menu_signal_clone = menu_signal.clone();
+                    let mut brshtop_box_signal_clone = brshtop_box_signal.clone();
+                    let mut timer_signal_clone = timer_signal.clone();
+                    let mut CONFIG_signal_clone = CONFIG_signal.clone();
+                    let mut THEME_signal_clone = THEME_signal.clone();
+                    let mut cpu_collector_signal_clone = cpu_collector_signal.clone();
+                    let mut mem_box_signal_clone = mem_box_signal.clone();
+                    let mut net_box_signal_clone = net_box_signal.clone();
+                    let mut proc_box_signal_clone = proc_box_signal.clone();
+                    let mut term_winch = term_signal_clone.lock().unwrap();
+                    let mut collector_winch = collector_signal_clone.lock().unwrap();
+                    let mut init_winch = init_signal_clone.lock().unwrap();
+                    let mut cpu_box_winch = cpu_box_signal_clone.lock().unwrap();
+                    let mut draw_winch = draw_signal_clone.lock().unwrap();
+                    let mut key_winch = key_signal_clone.lock().unwrap();
+                    let mut menu_winch = menu_signal_clone.lock().unwrap();
+                    let mut brshtop_box_winch = brshtop_box_signal_clone.lock().unwrap();
+                    let mut timer_winch = timer_signal_clone.lock().unwrap();
+                    let mut CONFIG_winch = CONFIG_signal_clone.lock().unwrap();
+                    let mut THEME_winch = THEME_signal_clone.lock().unwrap();
+                    let mut cpu_collector_winch = cpu_collector_signal_clone.lock().unwrap();
+                    let mut mem_box_winch = mem_box_signal_clone.lock().unwrap();
+                    let mut net_box_winch = net_box_signal_clone.lock().unwrap();
+                    let mut proc_box_winch = proc_box_signal_clone.lock().unwrap();
+                    term_winch.refresh(
+                        vec![],
+                        boxes_signal.clone(),
+                        &mut collector_winch,
+                        &mut init_winch,
+                        &mut cpu_box_winch,
+                        &mut draw_winch,
+                        true,
+                        &mut key_winch,
+                        &mut menu_winch,
+                        &mut brshtop_box_winch,
+                        &mut timer_winch,
+                        &mut CONFIG_winch,
+                        &mut THEME_winch,
+                        &mut cpu_collector_winch,
+                        &mut mem_box_winch,
+                        &mut net_box_winch,
+                        &mut proc_box_winch,
+                    );
+                }
+                _ => unreachable!(),
             }
-        });
-    }) {
-        Ok(_) => errlog("Created signal handler successfully!".to_owned()),
-        Err(_) => clean_quit(
-            None,
-            Some("Failed to setup signal handler".to_owned()),
-            &mut key,
-            &mut collector,
-            &mut draw,
-            &term,
-            &CONFIG,
-        ),
-    };
+        }
+    });
 
     errlog("Setup signal handlers for SIGSTP, SIGCONT, SIGINT and SIGWINCH succesfully".to_owned());
 
@@ -799,7 +942,17 @@ pub fn main() {
         );
     }
 
-    key.start(&mut draw, &menu);
+    drop(key);
+    drop(draw);
+    drop(menu);
+    Key::start(
+        Arc::clone(&key_parent),
+        Arc::clone(&draw_parent),
+        Arc::clone(&menu_parent),
+    );
+    key = key_mutex.lock().unwrap();
+    draw = draw_mutex.lock().unwrap();
+    menu = menu_mutex.lock().unwrap();
 
     init.success(&CONFIG, &mut draw, &term, &mut key);
     errlog("Started a separate thread for reading keyboard input successfully".to_owned());
@@ -825,29 +978,32 @@ pub fn main() {
         );
     }
 
-    collector.start(
-        &CONFIG,
+    drop(collector);
+    Collector::start(
+        Arc::clone(&collector_parent),
         DEBUG,
+        ARG_MODE.to_owned(),
         collectors.clone(),
-        &mut brshtop_box,
-        &mut timeit,
-        &menu,
-        &mut draw,
-        &term,
-        &mut cpu_box,
-        &mut key,
-        &THEME,
-        ARG_MODE,
-        &mut graphs,
-        &mut meters,
-        &mut net_box,
-        &mut proc_box,
-        &mut mem_box,
-        &mut cpu_collector,
-        &mut mem_collector,
-        &mut net_collector,
-        &mut proc_collector,
+        Arc::clone(&CONFIG_parent),
+        Arc::clone(&brshtop_box_parent),
+        Arc::clone(&timeit_parent),
+        Arc::clone(&menu_parent),
+        Arc::clone(&draw_parent),
+        Arc::clone(&term_parent),
+        Arc::clone(&cpu_box_parent),
+        Arc::clone(&key_parent),
+        Arc::clone(&THEME_parent),
+        Arc::clone(&graphs_parent),
+        Arc::clone(&meters_parent),
+        Arc::clone(&net_box_parent),
+        Arc::clone(&proc_box_parent),
+        Arc::clone(&mem_box_parent),
+        Arc::clone(&cpu_collector_parent),
+        Arc::clone(&mem_collector_parent),
+        Arc::clone(&net_collector_parent),
+        Arc::clone(&proc_collector_parent),
     );
+    collector = collector_mutex.lock().unwrap();
     init.success(&CONFIG, &mut draw, &term, &mut key);
     errlog("Started a separate thread for data collection and drawing successfully".to_owned());
 
@@ -932,103 +1088,129 @@ pub fn main() {
     // Main loop ------------------------------------------------------------------------------------->
 
     run(
-        &mut term,
-        &mut key,
-        &mut timer,
-        &mut collector,
         boxes.clone(),
-        &mut init,
-        &mut cpu_box,
-        &mut draw,
-        &mut menu,
-        &mut brshtop_box,
-        &mut CONFIG,
-        &mut THEME,
-        &mut ARG_MODE,
-        &mut proc_box,
-        &mut proc_collector,
-        &mut net_collector,
-        &mut cpu_collector,
-        &mut net_box,
-        &updatechecker,
         collectors.clone(),
-        &mut graphs,
-        &mut mem_box,
+        Arc::clone(&term_parent),
+        Arc::clone(&key_parent),
+        Arc::clone(&timer_parent),
+        Arc::clone(&collector_parent),
+        Arc::clone(&init_parent),
+        Arc::clone(&cpu_box_parent),
+        Arc::clone(&draw_parent),
+        Arc::clone(&menu_parent),
+        Arc::clone(&brshtop_box_parent),
+        Arc::clone(&CONFIG_parent),
+        Arc::clone(&THEME_parent),
+        Arc::clone(&ARG_MODE_parent),
+        Arc::clone(&proc_box_parent),
+        Arc::clone(&proc_collector_parent),
+        Arc::clone(&net_collector_parent),
+        Arc::clone(&cpu_collector_parent),
+        Arc::clone(&net_box_parent),
+        Arc::clone(&updatechecker_parent),
+        Arc::clone(&graphs_parent),
+        Arc::clone(&mem_box_parent),
     );
 }
 
 pub fn run(
-    term: &mut Term,
-    key: &mut Key,
-    timer: &mut Timer,
-    collector: &mut Collector,
     boxes: Vec<Boxes>,
-    init: &mut Init,
-    cpu_box: &mut CpuBox,
-    draw: &mut Draw,
-    menu: &mut Menu,
-    brshtop_box: &mut BrshtopBox,
-    CONFIG: &mut Config,
-    THEME: &mut Theme,
-    ARG_MODE: &mut ViewMode,
-    procbox: &mut ProcBox,
-    proccollector: &mut ProcCollector,
-    netcollector: &mut NetCollector,
-    cpucollector: &mut CpuCollector,
-    netbox: &mut NetBox,
-    update_checker: &UpdateChecker,
     collectors: Vec<Collectors>,
-    graphs: &mut Graphs,
-    mem_box: &mut MemBox,
+    term_mutex: Arc<Mutex<Term>>,
+    key_mutex: Arc<Mutex<Key>>,
+    timer_mutex: Arc<Mutex<Timer>>,
+    collector_mutex: Arc<Mutex<Collector>>,
+    init_mutex: Arc<Mutex<Init>>,
+    cpu_box_mutex: Arc<Mutex<CpuBox>>,
+    draw_mutex: Arc<Mutex<Draw>>,
+    menu_mutex: Arc<Mutex<Menu>>,
+    brshtop_box_mutex: Arc<Mutex<BrshtopBox>>,
+    CONFIG_mutex: Arc<Mutex<Config>>,
+    THEME_mutex: Arc<Mutex<Theme>>,
+    ARG_MODE_mutex: Arc<Mutex<ViewMode>>,
+    procbox_mutex: Arc<Mutex<ProcBox>>,
+    proccollector_mutex: Arc<Mutex<ProcCollector>>,
+    netcollector_mutex: Arc<Mutex<NetCollector>>,
+    cpucollector_mutex: Arc<Mutex<CpuCollector>>,
+    netbox_mutex: Arc<Mutex<NetBox>>,
+    update_checker_mutex: Arc<Mutex<UpdateChecker>>,
+    graphs_mutex: Arc<Mutex<Graphs>>,
+    mem_box_mutex: Arc<Mutex<MemBox>>,
 ) {
     loop {
+        let mut term = term_mutex.lock().unwrap();
+        let mut key = key_mutex.lock().unwrap();
+        let mut timer = timer_mutex.lock().unwrap();
+        let mut collector = collector_mutex.lock().unwrap();
+        let mut init = init_mutex.lock().unwrap();
+        let mut cpu_box = cpu_box_mutex.lock().unwrap();
+        let mut draw = draw_mutex.lock().unwrap();
+        let mut menu = menu_mutex.lock().unwrap();
+        let mut brshtop_box = brshtop_box_mutex.lock().unwrap();
+        let mut CONFIG = CONFIG_mutex.lock().unwrap();
+        let mut THEME = THEME_mutex.lock().unwrap();
+        let mut ARG_MODE = ARG_MODE_mutex.lock().unwrap();
+        let mut procbox = procbox_mutex.lock().unwrap();
+        let mut proccollector = proccollector_mutex.lock().unwrap();
+        let mut netcollector = netcollector_mutex.lock().unwrap();
+        let mut cpucollector = cpucollector_mutex.lock().unwrap();
+        let mut netbox = netbox_mutex.lock().unwrap();
+        let mut update_checker = update_checker_mutex.lock().unwrap();
+        let mut graphs = graphs_mutex.lock().unwrap();
+        let mut mem_box = mem_box_mutex.lock().unwrap();
+
         term.refresh(
             vec![],
             boxes.clone(),
-            collector,
-            init,
-            cpu_box,
-            draw,
+            &mut collector,
+            &mut init,
+            &mut cpu_box,
+            &mut draw,
             false,
-            key,
-            menu,
-            brshtop_box,
-            timer,
-            CONFIG,
-            THEME,
-            cpucollector,
-            mem_box,
-            netbox,
-            procbox,
+            &mut key,
+            &mut menu,
+            &mut brshtop_box,
+            &mut timer,
+            &CONFIG,
+            &THEME,
+            &cpucollector,
+            &mut mem_box,
+            &mut netbox,
+            &mut procbox,
         );
 
         timer.stamp();
 
-        while timer.not_zero(CONFIG) {
-            if key.input_wait(timer.left(CONFIG).as_secs_f64(), false, draw, term) {
-                process_keys(
-                    ARG_MODE,
-                    key,
-                    procbox,
-                    collector,
-                    proccollector,
-                    CONFIG,
-                    draw,
-                    term,
-                    brshtop_box,
-                    cpu_box,
-                    menu,
-                    THEME,
-                    netcollector,
-                    init,
-                    cpucollector,
+        while timer.not_zero(&CONFIG) {
+            if key.input_wait(
+                timer.left(&CONFIG).as_secs_f64(),
+                false,
+                &mut draw,
+                &mut term,
+            ) {
+                process_keys_mutex_guard(
                     boxes.clone(),
-                    netbox,
-                    update_checker,
                     collectors.clone(),
-                    timer,
-                    graphs,
-                    mem_box,
+                    &mut ARG_MODE,
+                    &mut key,
+                    &mut procbox,
+                    &mut collector,
+                    &mut proccollector,
+                    &mut CONFIG,
+                    &mut draw,
+                    &mut term,
+                    &mut brshtop_box,
+                    &mut cpu_box,
+                    &mut menu,
+                    &mut THEME,
+                    &mut netcollector,
+                    &mut init,
+                    &mut cpucollector,
+                    &mut netbox,
+                    &mut update_checker,
+                    &mut timer,
+                    &mut graphs,
+                    &mut mem_box,
                 );
             }
         }
@@ -1242,6 +1424,118 @@ pub fn min_max(value: i32, min_value: i32, max_value: i32) -> i32 {
     }
 }
 
+pub fn clean_quit_mutex(
+    errcode: Option<i32>,
+    errmsg: Option<String>,
+    key_mutex: Arc<Mutex<Key>>,
+    collector_mutex: Arc<Mutex<Collector>>,
+    draw_mutex: Arc<Mutex<Draw>>,
+    term_mutex: Arc<Mutex<Term>>,
+    CONFIG_mutex: Arc<Mutex<Config>>,
+) {
+    let mut key = key_mutex.lock().unwrap();
+    let mut collector = collector_mutex.lock().unwrap();
+    let mut draw = draw_mutex.lock().unwrap();
+    let mut term = term_mutex.lock().unwrap();
+    let mut CONFIG = CONFIG_mutex.lock().unwrap();
+
+    key.stop();
+    collector.stop();
+    if errcode == None {
+        CONFIG.save_config();
+    }
+    draw.now(
+        vec![
+            term.get_clear(),
+            term.get_normal_screen(),
+            term.get_show_cursor(),
+            term.get_mouse_off(),
+            term.get_mouse_direct_off(),
+            Term::title(String::default()),
+        ],
+        &mut key,
+    );
+    Term::echo(true);
+    let now = SystemTime::now();
+    match errcode {
+        Some(0) => errlog(format!(
+            "Exiting, Runtime {} \n",
+            now.duration_since(SELF_START.to_owned())
+                .unwrap()
+                .as_secs_f64()
+        )),
+        Some(n) => {
+            errlog(format!(
+                "Exiting with errorcode {}, Runtime {} \n",
+                n,
+                now.duration_since(SELF_START.to_owned())
+                    .unwrap()
+                    .as_secs_f64()
+            ));
+            print!(
+                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                errcode.unwrap(),
+                CONFIG_DIR.to_string_lossy()
+            );
+        }
+        None => (),
+    };
+    std::process::exit(errcode.unwrap_or(0));
+}
+
+pub fn clean_quit_mutex_guard(
+    errcode: Option<i32>,
+    errmsg: Option<String>,
+    key: &mut MutexGuard<Key>,
+    collector: &mut MutexGuard<Collector>,
+    draw: &mut MutexGuard<Draw>,
+    term: &mut MutexGuard<Term>,
+    CONFIG: &mut MutexGuard<Config>,
+) {
+    key.stop();
+    collector.stop();
+    if errcode == None {
+        CONFIG.save_config();
+    }
+    draw.now(
+        vec![
+            term.get_clear(),
+            term.get_normal_screen(),
+            term.get_show_cursor(),
+            term.get_mouse_off(),
+            term.get_mouse_direct_off(),
+            Term::title(String::default()),
+        ],
+        key,
+    );
+    Term::echo(true);
+    let now = SystemTime::now();
+    match errcode {
+        Some(0) => errlog(format!(
+            "Exiting, Runtime {} \n",
+            now.duration_since(SELF_START.to_owned())
+                .unwrap()
+                .as_secs_f64()
+        )),
+        Some(n) => {
+            errlog(format!(
+                "Exiting with errorcode {}, Runtime {} \n",
+                n,
+                now.duration_since(SELF_START.to_owned())
+                    .unwrap()
+                    .as_secs_f64()
+            ));
+            print!(
+                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                errcode.unwrap(),
+                CONFIG_DIR.to_string_lossy()
+            );
+        }
+        None => (),
+    };
+    std::process::exit(errcode.unwrap_or(0));
+}
+
 pub fn clean_quit(
     errcode: Option<i32>,
     errmsg: Option<String>,
@@ -1452,29 +1746,545 @@ pub fn units_to_bytes(value: String) -> u64 {
     out
 }
 
-pub fn process_keys<'a>(
-    ARG_MODE: &mut ViewMode,
-    key_class: &mut Key,
-    procbox: &mut ProcBox,
-    collector: &mut Collector,
-    proccollector: &mut ProcCollector,
-    CONFIG: &mut Config,
-    draw: &mut Draw,
-    term: &mut Term,
-    brshtop_box: &mut BrshtopBox,
-    cpu_box: &mut CpuBox,
-    menu: &mut Menu,
-    THEME: &mut Theme,
-    netcollector: &mut NetCollector,
-    init: &mut Init,
-    cpucollector: &mut CpuCollector,
+pub fn process_keys_mutex(
     boxes: Vec<Boxes>,
-    netbox: &mut NetBox,
-    update_checker: &UpdateChecker,
     collectors: Vec<Collectors>,
-    timer: &mut Timer,
-    graphs: &mut Graphs,
-    mem_box: &mut MemBox,
+    ARG_MODE_mutex: Arc<Mutex<ViewMode>>,
+    key_class_mutex: Arc<Mutex<Key>>,
+    procbox_mutex: Arc<Mutex<ProcBox>>,
+    collector_mutex: Arc<Mutex<Collector>>,
+    proccollector_mutex: Arc<Mutex<ProcCollector>>,
+    CONFIG_mutex: Arc<Mutex<Config>>,
+    draw_mutex: Arc<Mutex<Draw>>,
+    term_mutex: Arc<Mutex<Term>>,
+    brshtop_box_mutex: Arc<Mutex<BrshtopBox>>,
+    cpu_box_mutex: Arc<Mutex<CpuBox>>,
+    menu_mutex: Arc<Mutex<Menu>>,
+    THEME_mutex: Arc<Mutex<Theme>>,
+    netcollector_mutex: Arc<Mutex<NetCollector>>,
+    init_mutex: Arc<Mutex<Init>>,
+    cpucollector_mutex: Arc<Mutex<CpuCollector>>,
+    netbox_mutex: Arc<Mutex<NetBox>>,
+    update_checker_mutex: Arc<Mutex<UpdateChecker>>,
+    timer_mutex: Arc<Mutex<Timer>>,
+    graphs_mutex: Arc<Mutex<Graphs>>,
+    mem_box_mutex: Arc<Mutex<MemBox>>,
+) {
+    let mut ARG_MODE = ARG_MODE_mutex.lock().unwrap();
+    let mut key_class = key_class_mutex.lock().unwrap();
+    let mut procbox = procbox_mutex.lock().unwrap();
+    let mut collector = collector_mutex.lock().unwrap();
+    let mut proccollector = proccollector_mutex.lock().unwrap();
+    let mut CONFIG = CONFIG_mutex.lock().unwrap();
+    let mut draw = draw_mutex.lock().unwrap();
+    let mut term = term_mutex.lock().unwrap();
+    let mut brshtop_box = brshtop_box_mutex.lock().unwrap();
+    let mut cpu_box = cpu_box_mutex.lock().unwrap();
+    let mut menu = menu_mutex.lock().unwrap();
+    let mut THEME = THEME_mutex.lock().unwrap();
+    let mut netcollector = netcollector_mutex.lock().unwrap();
+    let mut init = init_mutex.lock().unwrap();
+    let mut cpucollector = cpucollector_mutex.lock().unwrap();
+    let mut netbox = netbox_mutex.lock().unwrap();
+    let mut update_checker = update_checker_mutex.lock().unwrap();
+    let mut timer = timer_mutex.lock().unwrap();
+    let mut graphs = graphs_mutex.lock().unwrap();
+    let mut mem_box = mem_box_mutex.lock().unwrap();
+
+    let mut mouse_pos: (i32, i32) = (0, 0);
+    let mut filtered: bool = false;
+    while key_class.has_key() {
+        let mut key = match key_class.get() {
+            Some(k) => k.clone(),
+            None => return,
+        };
+        if vec!["mouse_scroll_up", "mouse_scroll_down", "mouse_click"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            mouse_pos = key_class.get_mouse();
+            if mouse_pos.0 >= procbox.get_parent().get_x() as i32
+                && procbox.get_current_y() as i32 + 1 <= mouse_pos.1
+                && mouse_pos.1 < procbox.get_current_y() as i32 + procbox.get_current_h() as i32 - 1
+            {
+                ()
+            } else if key == "mouse_click".to_owned() {
+                key = "mouse_unselect".to_owned()
+            } else {
+                key = "_null".to_owned()
+            }
+        }
+        if procbox.get_filtering() {
+            if vec!["enter", "mouse_click", "mouse_unselect"]
+                .iter()
+                .map(|s| s.to_owned().to_owned())
+                .collect::<Vec<String>>()
+                .contains(&key)
+            {
+                procbox.set_filtering(false);
+                collector.collect(
+                    vec![Collectors::ProcCollector],
+                    true,
+                    false,
+                    false,
+                    true,
+                    true,
+                );
+                continue;
+            } else if vec!["escape", "delete"]
+                .iter()
+                .map(|s| s.to_owned().to_owned())
+                .collect::<Vec<String>>()
+                .contains(&key)
+            {
+                proccollector.search_filter = String::default();
+                procbox.set_filtering(false);
+            } else if key.len() == 1 {
+                proccollector.search_filter.push_str(key.as_str());
+            } else if key == "backspace".to_owned() && proccollector.search_filter.len() > 0 {
+                proccollector.search_filter =
+                    proccollector.search_filter[..proccollector.search_filter.len() - 2].to_owned();
+            } else {
+                continue;
+            }
+            collector.collect(
+                vec![Collectors::ProcCollector],
+                true,
+                false,
+                true,
+                true,
+                false,
+            );
+            if filtered {
+                collector.set_collect_done(EventEnum::Wait);
+                collector.get_collect_done_reference().wait(0.1);
+                collector.set_collect_done(EventEnum::Flag(false));
+            }
+            filtered = true;
+            continue;
+        }
+
+        if key == "_null".to_owned() {
+            continue;
+        } else if key == "q".to_owned() {
+            clean_quit_mutex_guard(
+                None,
+                None,
+                &mut key_class,
+                &mut collector,
+                &mut draw,
+                &mut term,
+                &mut CONFIG,
+            );
+        } else if key == "+" && CONFIG.update_ms + 100 <= 86399900 {
+            CONFIG.update_ms += 100;
+            brshtop_box.draw_update_ms(
+                false,
+                &mut CONFIG,
+                &mut cpu_box,
+                &mut key_class,
+                &mut draw,
+                &menu,
+                &THEME,
+                &term,
+            );
+        } else if key == "-".to_owned() && CONFIG.update_ms - 100 >= 100 {
+            CONFIG.update_ms -= 100;
+            brshtop_box.draw_update_ms(
+                false,
+                &mut CONFIG,
+                &mut cpu_box,
+                &mut key_class,
+                &mut draw,
+                &menu,
+                &THEME,
+                &term,
+            );
+        } else if vec!["b", "n"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            netcollector.switch(key, &mut collector);
+        } else if vec!["M", "escape"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            menu.main(
+                &mut draw,
+                &mut term,
+                &update_checker,
+                &mut THEME,
+                &mut key_class,
+                &mut timer,
+                &mut collector,
+                collectors.clone(),
+                &mut CONFIG,
+                &mut ARG_MODE,
+                &mut netcollector,
+                &mut brshtop_box,
+                &mut init,
+                &mut cpu_box,
+                &mut cpucollector,
+                boxes.clone(),
+                &mut netbox,
+                &mut proccollector,
+                &mut mem_box,
+                &mut procbox,
+            );
+        } else if vec!["o", "f2"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            menu.options(
+                &mut ARG_MODE,
+                &mut THEME,
+                &mut draw,
+                &mut term,
+                &mut CONFIG,
+                &mut key_class,
+                &mut timer,
+                &mut netcollector,
+                &mut brshtop_box,
+                boxes.clone(),
+                &mut collector,
+                &mut init,
+                &mut cpu_box,
+                &mut cpucollector,
+                &mut netbox,
+                &mut proccollector,
+                collectors.clone(),
+                &mut procbox,
+                &mut mem_box,
+            );
+        } else if vec!["h", "f1"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            menu.help(
+                &THEME,
+                &mut draw,
+                &term,
+                &mut key_class,
+                &mut collector,
+                collectors.clone(),
+                &CONFIG,
+                &mut timer,
+            );
+        } else if key == "z".to_owned() {
+            let inserter = netcollector.get_reset();
+            netcollector.set_reset(!inserter);
+            collector.collect(
+                vec![Collectors::NetCollector],
+                true,
+                false,
+                false,
+                true,
+                false,
+            );
+        } else if key == "y".to_owned() {
+            let switch = CONFIG.net_sync.clone();
+            CONFIG.net_sync = !switch;
+            collector.collect(
+                vec![Collectors::NetCollector],
+                true,
+                false,
+                false,
+                true,
+                false,
+            );
+        } else if key == "a".to_owned() {
+            let inserter = netcollector.get_auto_min();
+            netcollector.set_auto_min(!inserter);
+            netcollector.set_net_min(
+                vec![("download", -1), ("upload", -1)]
+                    .iter()
+                    .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
+                    .collect::<HashMap<String, i32>>(),
+            );
+            collector.collect(
+                vec![Collectors::NetCollector],
+                true,
+                false,
+                false,
+                true,
+                false,
+            );
+        } else if vec!["left", "right"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key)
+        {
+            // TODO : Fix this...
+            //proccollector.sorting(key);
+        } else if key == " ".to_owned() && CONFIG.proc_tree && procbox.get_selected() > 0 {
+            if proccollector
+                .collapsed
+                .contains_key(&procbox.get_selected_pid())
+            {
+                let inserter = proccollector
+                    .collapsed
+                    .get(&procbox.get_selected_pid().clone())
+                    .unwrap()
+                    .to_owned();
+                proccollector
+                    .collapsed
+                    .insert(procbox.get_selected_pid().clone(), !inserter);
+            }
+            collector.collect(
+                vec![Collectors::ProcCollector],
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "e".to_owned() {
+            let switch = CONFIG.proc_tree;
+            CONFIG.proc_tree = !switch;
+            collector.collect(
+                vec![Collectors::ProcCollector],
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "r".to_owned() {
+            let switch = CONFIG.proc_reversed;
+            CONFIG.proc_reversed = !switch;
+            collector.collect(
+                vec![Collectors::ProcCollector],
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "c".to_owned() {
+            let switch = CONFIG.proc_per_core;
+            CONFIG.proc_per_core = !switch;
+            collector.collect(
+                vec![Collectors::ProcCollector],
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "g".to_owned() {
+            let switch = CONFIG.mem_graphs;
+            CONFIG.mem_graphs = !switch;
+            collector.collect(
+                vec![Collectors::MemCollector],
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "s".to_owned() {
+            collector.set_collect_idle(EventEnum::Wait);
+            collector.get_collect_idle_reference().wait(1.0);
+            let switch = CONFIG.swap_disk;
+            CONFIG.swap_disk = !switch;
+            collector.collect(
+                vec![Collectors::MemCollector],
+                true,
+                true,
+                false,
+                true,
+                false,
+            );
+        } else if key == "f".to_owned() {
+            procbox.set_filtering(true);
+            if proccollector.search_filter.len() == 0 {
+                procbox.set_start(0);
+            }
+            collector.collect(
+                vec![Collectors::ProcCollector],
+                true,
+                false,
+                false,
+                true,
+                true,
+            );
+        } else if key == "m".to_owned() {
+            if ARG_MODE.t != ViewModeEnum::None {
+                ARG_MODE.replace_self(ViewModeEnum::None);
+            } else if CONFIG
+                .view_modes
+                .iter()
+                .position(|v| *v == CONFIG.view_mode)
+                .unwrap()
+                + 1
+                > CONFIG.view_modes.len() - 1
+            {
+                CONFIG.view_mode = CONFIG.view_modes[0];
+            } else {
+                CONFIG.view_mode = CONFIG.view_modes[CONFIG
+                    .view_modes
+                    .iter()
+                    .position(|v| *v == CONFIG.view_mode)
+                    .unwrap()
+                    + 1];
+            }
+            brshtop_box.set_proc_mode(CONFIG.view_mode.t == ViewModeEnum::Proc);
+            brshtop_box.set_stat_mode(CONFIG.view_mode.t == ViewModeEnum::Stat);
+            draw.clear(vec![], true);
+            term.refresh(
+                vec![],
+                boxes.clone(),
+                &mut collector,
+                &mut init,
+                &mut cpu_box,
+                &mut draw,
+                true,
+                &mut key_class,
+                &mut menu,
+                &mut brshtop_box,
+                &mut timer,
+                &mut CONFIG,
+                &mut THEME,
+                &mut cpucollector,
+                &mut mem_box,
+                &mut netbox,
+                &mut procbox,
+            );
+        } else if vec!["t", "k", "i"]
+            .iter()
+            .map(|s| s.to_owned().to_owned())
+            .collect::<Vec<String>>()
+            .contains(&key.to_ascii_lowercase())
+        {
+            let pid: u32 = if procbox.get_selected() > 0 {
+                procbox.get_selected_pid()
+            } else {
+                proccollector.detailed_pid.unwrap()
+            };
+            let lower = key.to_ascii_lowercase();
+            if psutil::process::pid_exists(pid) {
+                let sig = if lower == "t".to_owned() {
+                    Signal::SIGTERM
+                } else if lower == "k".to_owned() {
+                    Signal::SIGKILL
+                } else {
+                    Signal::SIGINT
+                };
+                match psutil::process::Process::new(pid).unwrap().send_signal(sig) {
+                    Ok(_) => (),
+                    Err(e) => errlog(format!(
+                        "Execption when sending signal {} to pid {}",
+                        sig, pid
+                    )),
+                };
+            }
+        } else if key == "delete".to_owned() && proccollector.search_filter.len() > 0 {
+            proccollector.search_filter = String::default();
+            collector.collect(
+                vec![Collectors::ProcCollector],
+                true,
+                false,
+                true,
+                true,
+                false,
+            );
+        } else if key == "enter".to_owned() {
+            if procbox.get_selected() > 0
+                && proccollector.detailed_pid.unwrap_or(0) != procbox.get_selected_pid()
+                && psutil::process::pid_exists(procbox.get_selected_pid())
+            {
+                proccollector.detailed = true;
+                let inserter = procbox.get_selected();
+                procbox.set_last_selection(inserter);
+                procbox.set_selected(0);
+                proccollector.detailed_pid = Some(procbox.get_selected_pid());
+                procbox.set_parent_resized(true);
+            } else if proccollector.detailed {
+                let inserter = procbox.get_last_selection();
+                procbox.set_selected(inserter);
+                procbox.set_last_selection(0);
+                proccollector.detailed = false;
+                proccollector.detailed_pid = None;
+                procbox.set_parent_resized(true);
+            } else {
+                continue;
+            }
+            proccollector.details = HashMap::<String, ProcCollectorDetails>::new();
+            proccollector.details_cpu = vec![];
+            proccollector.details_mem = vec![];
+            graphs.detailed_cpu.NotImplemented = true;
+            graphs.detailed_mem.NotImplemented = true;
+            collector.collect(
+                vec![Collectors::ProcCollector],
+                true,
+                false,
+                true,
+                true,
+                false,
+            );
+        } else if vec![
+            "up",
+            "down",
+            "mouse_scroll_up",
+            "mouse_scroll_down",
+            "page_up",
+            "page_down",
+            "home",
+            "end",
+            "mouse_click",
+            "mouse_unselect",
+        ]
+        .iter()
+        .map(|s| s.to_owned().to_owned())
+        .collect::<Vec<String>>()
+        .contains(&key)
+        {
+            procbox.selector(
+                key.clone(),
+                mouse_pos,
+                &mut proccollector,
+                &mut key_class,
+                &mut collector,
+                &mut CONFIG,
+            );
+        }
+    }
+}
+
+pub fn process_keys_mutex_guard(
+    boxes: Vec<Boxes>,
+    collectors: Vec<Collectors>,
+    ARG_MODE: &mut MutexGuard<ViewMode>,
+    key_class: &mut MutexGuard<Key>,
+    procbox: &mut MutexGuard<ProcBox>,
+    collector: &mut MutexGuard<Collector>,
+    proccollector: &mut MutexGuard<ProcCollector>,
+    CONFIG: &mut MutexGuard<Config>,
+    draw: &mut MutexGuard<Draw>,
+    term: &mut MutexGuard<Term>,
+    brshtop_box: &mut MutexGuard<BrshtopBox>,
+    cpu_box: &mut MutexGuard<CpuBox>,
+    menu: &mut MutexGuard<Menu>,
+    THEME: &mut MutexGuard<Theme>,
+    netcollector: &mut MutexGuard<NetCollector>,
+    init: &mut MutexGuard<Init>,
+    cpucollector: &mut MutexGuard<CpuCollector>,
+    netbox: &mut MutexGuard<NetBox>,
+    update_checker: &mut MutexGuard<UpdateChecker>,
+    timer: &mut MutexGuard<Timer>,
+    graphs: &mut MutexGuard<Graphs>,
+    mem_box: &mut MutexGuard<MemBox>,
 ) {
     let mut mouse_pos: (i32, i32) = (0, 0);
     let mut filtered: bool = false;
@@ -1554,7 +2364,7 @@ pub fn process_keys<'a>(
         if key == "_null".to_owned() {
             continue;
         } else if key == "q".to_owned() {
-            clean_quit(None, None, key_class, collector, draw, term, CONFIG);
+            clean_quit_mutex_guard(None, None, key_class, collector, draw, term, CONFIG);
         } else if key == "+" && CONFIG.update_ms + 100 <= 86399900 {
             CONFIG.update_ms += 100;
             brshtop_box.draw_update_ms(false, CONFIG, cpu_box, key_class, draw, menu, THEME, term);
@@ -1973,11 +2783,16 @@ fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader
 
 /// Reset terminal settings and stop background input read before putting to sleep
 pub fn now_sleeping(
-    key: &mut Key,
-    collector: &mut Collector,
-    draw: &mut Draw,
-    term: &mut Term,
+    key_mutex: Arc<Mutex<Key>>,
+    collector_mutex: Arc<Mutex<Collector>>,
+    draw_mutex: Arc<Mutex<Draw>>,
+    term_mutex: Arc<Mutex<Term>>,
 ) -> Option<()> {
+    let mut key = key_mutex.lock().unwrap();
+    let mut collector = collector_mutex.lock().unwrap();
+    let mut draw = draw_mutex.lock().unwrap();
+    let mut term = term_mutex.lock().unwrap();
+
     key.stop();
     collector.stop();
     draw.now(
@@ -1988,7 +2803,7 @@ pub fn now_sleeping(
             term.get_mouse_off(),
             Term::title("".to_owned()),
         ],
-        key,
+        &mut key,
     );
     Term::echo(true);
     match psutil::process::Process::new(process::id())
@@ -2002,32 +2817,48 @@ pub fn now_sleeping(
 
 /// Set terminal settings and restart background input read
 pub fn now_awake(
-    draw: &mut Draw,
-    term: &mut Term,
-    key: &mut Key,
-    brshtop_box: &mut BrshtopBox,
-    collector: &mut Collector,
     boxes: Vec<Boxes>,
-    init: &mut Init,
-    cpu_box: &mut CpuBox,
-    menu: &mut Menu,
-    timer: &mut Timer,
-    CONFIG: &Config,
-    THEME: &Theme,
-    DEBUG: bool,
     collectors: Vec<Collectors>,
-    timeit: &mut TimeIt,
+    DEBUG: bool,
     ARG_MODE: ViewMode,
-    graphs: &mut Graphs,
-    meters: &mut Meters,
-    netbox: &mut NetBox,
-    procbox: &mut ProcBox,
-    membox: &mut MemBox,
-    cpu_collector: &mut CpuCollector,
-    mem_collector: &mut MemCollector,
-    net_collector: &mut NetCollector,
-    proc_collector: &mut ProcCollector,
+    draw_mutex: Arc<Mutex<Draw>>,
+    term_mutex: Arc<Mutex<Term>>,
+    key_mutex: Arc<Mutex<Key>>,
+    brshtop_box_mutex: Arc<Mutex<BrshtopBox>>,
+    collector_mutex: Arc<Mutex<Collector>>,
+    init_mutex: Arc<Mutex<Init>>,
+    cpu_box_mutex: Arc<Mutex<CpuBox>>,
+    menu_mutex: Arc<Mutex<Menu>>,
+    timer_mutex: Arc<Mutex<Timer>>,
+    CONFIG_mutex: Arc<Mutex<Config>>,
+    THEME_mutex: Arc<Mutex<Theme>>,
+    timeit_mutex: Arc<Mutex<TimeIt>>,
+    graphs_mutex: Arc<Mutex<Graphs>>,
+    meters_mutex: Arc<Mutex<Meters>>,
+    netbox_mutex: Arc<Mutex<NetBox>>,
+    procbox_mutex: Arc<Mutex<ProcBox>>,
+    membox_mutex: Arc<Mutex<MemBox>>,
+    cpu_collector_mutex: Arc<Mutex<CpuCollector>>,
+    mem_collector_mutex: Arc<Mutex<MemCollector>>,
+    net_collector_mutex: Arc<Mutex<NetCollector>>,
+    proc_collector_mutex: Arc<Mutex<ProcCollector>>,
 ) {
+    let mut draw = draw_mutex.lock().unwrap();
+    let mut term = term_mutex.lock().unwrap();
+    let mut key = key_mutex.lock().unwrap();
+    let mut brshtop_box = brshtop_box_mutex.lock().unwrap();
+    let mut collector = collector_mutex.lock().unwrap();
+    let mut init = init_mutex.lock().unwrap();
+    let mut cpu_box = cpu_box_mutex.lock().unwrap();
+    let mut menu = menu_mutex.lock().unwrap();
+    let mut timer = timer_mutex.lock().unwrap();
+    let mut CONFIG = CONFIG_mutex.lock().unwrap();
+    let mut THEME = THEME_mutex.lock().unwrap();
+    let mut netbox = netbox_mutex.lock().unwrap();
+    let mut procbox = procbox_mutex.lock().unwrap();
+    let mut membox = membox_mutex.lock().unwrap();
+    let mut cpu_collector = cpu_collector_mutex.lock().unwrap();
+
     draw.now(
         vec![
             term.get_alt_screen(),
@@ -2036,76 +2867,89 @@ pub fn now_awake(
             term.get_mouse_on(),
             Term::title("BRShtop".to_owned()),
         ],
-        key,
+        &mut key,
     );
     Term::echo(false);
-    key.start(draw, menu);
+
+    drop(key);
+    drop(draw);
+    drop(menu);
+    Key::start(
+        Arc::clone(&key_mutex),
+        Arc::clone(&draw_mutex),
+        Arc::clone(&menu_mutex),
+    );
+    key = key_mutex.lock().unwrap();
+    draw = draw_mutex.lock().unwrap();
+    menu = menu_mutex.lock().unwrap();
+
     term.refresh(
         vec![],
         boxes.clone(),
-        collector,
-        init,
-        cpu_box,
-        draw,
+        &mut collector,
+        &mut init,
+        &mut cpu_box,
+        &mut draw,
         false,
-        key,
-        menu,
-        brshtop_box,
-        timer,
-        CONFIG,
-        THEME,
-        cpu_collector,
-        membox,
-        netbox,
-        procbox,
+        &mut key,
+        &mut menu,
+        &mut brshtop_box,
+        &mut timer,
+        &mut CONFIG,
+        &mut THEME,
+        &mut cpu_collector,
+        &mut membox,
+        &mut netbox,
+        &mut procbox,
     );
 
     brshtop_box.calc_sizes(
         boxes.clone(),
-        term,
-        CONFIG,
-        cpu_collector,
-        cpu_box,
-        membox,
-        netbox,
-        procbox,
+        &mut term,
+        &mut CONFIG,
+        &mut cpu_collector,
+        &mut cpu_box,
+        &mut membox,
+        &mut netbox,
+        &mut procbox,
     );
     brshtop_box.draw_bg(
         true,
-        draw,
+        &mut draw,
         boxes.clone(),
-        menu,
-        CONFIG,
-        cpu_box,
-        membox,
-        netbox,
-        procbox,
-        key,
-        THEME,
-        term,
+        &mut menu,
+        &mut CONFIG,
+        &mut cpu_box,
+        &mut membox,
+        &mut netbox,
+        &mut procbox,
+        &mut key,
+        &mut THEME,
+        &mut term,
     );
 
-    collector.start(
-        CONFIG,
+    Collector::start(
+        Arc::clone(&collector_mutex),
         DEBUG,
-        collectors,
-        brshtop_box,
-        timeit,
-        menu,
-        draw,
-        term,
-        cpu_box,
-        key,
-        THEME,
-        ARG_MODE,
-        graphs,
-        meters,
-        netbox,
-        procbox,
-        membox,
-        cpu_collector,
-        mem_collector,
-        net_collector,
-        proc_collector,
-    )
+        ARG_MODE.to_owned(),
+        collectors.clone(),
+        Arc::clone(&CONFIG_mutex),
+        Arc::clone(&brshtop_box_mutex),
+        Arc::clone(&timeit_mutex),
+        Arc::clone(&menu_mutex),
+        Arc::clone(&draw_mutex),
+        Arc::clone(&term_mutex),
+        Arc::clone(&cpu_box_mutex),
+        Arc::clone(&key_mutex),
+        Arc::clone(&THEME_mutex),
+        Arc::clone(&graphs_mutex),
+        Arc::clone(&meters_mutex),
+        Arc::clone(&netbox_mutex),
+        Arc::clone(&procbox_mutex),
+        Arc::clone(&membox_mutex),
+        Arc::clone(&cpu_collector_mutex),
+        Arc::clone(&mem_collector_mutex),
+        Arc::clone(&net_collector_mutex),
+        Arc::clone(&proc_collector_mutex),
+    );
 }

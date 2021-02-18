@@ -18,7 +18,6 @@ use {
     },
     inflector::Inflector,
     math::round::ceil,
-    once_cell::sync::OnceCell,
     std::{collections::HashMap, convert::TryFrom, sync::Mutex},
 };
 

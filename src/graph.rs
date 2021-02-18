@@ -2,7 +2,6 @@ use {
     crate::{mv, symbol, term::Term, theme::Color},
     maplit::hashmap,
     math::round::ceil,
-    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         default::Default,

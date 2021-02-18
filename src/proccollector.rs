@@ -16,7 +16,6 @@ use {
     },
     core::time::Duration,
     math::round::ceil,
-    once_cell::sync::OnceCell,
     psutil::{
         process::{os::unix::ProcessExt, *},
         Bytes, Count, Pid,

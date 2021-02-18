@@ -19,7 +19,6 @@ use {
     },
     battery::Manager,
     chrono::{offset::Local, DateTime},
-    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         convert::TryFrom,

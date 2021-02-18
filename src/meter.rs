@@ -5,7 +5,6 @@ use {
         term::Term,
         theme::{Color, Theme},
     },
-    once_cell::sync::OnceCell,
     std::{collections::HashMap, fmt, sync::Mutex},
 };
 

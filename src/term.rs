@@ -20,7 +20,6 @@ use {
         theme::{Color, Theme},
         timer::Timer,
     },
-    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         convert::TryFrom,

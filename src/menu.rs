@@ -30,7 +30,6 @@ use {
         THEME_DIR, THREADS, VERSION,
     },
     math::round::ceil,
-    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
         iter::FromIterator,

@@ -3,7 +3,6 @@ use {
     from_map::{FromMap, FromMapDefault},
     gradient::Gradient,
     lazy_static::lazy_static,
-    once_cell::sync::OnceCell,
     regex::Regex,
     std::{
         collections::HashMap,

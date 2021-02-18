@@ -1,6 +1,5 @@
 use {
     crate::{config::Config, key::Key},
-    once_cell::sync::OnceCell,
     std::{
         sync::Mutex,
         time::{Duration, SystemTime},

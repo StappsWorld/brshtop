@@ -8,17 +8,14 @@ use {
         raw::Raw,
         term::Term,
     },
-    crossbeam,
     nix::sys::{
-        select::{select, FdSet},
+        select::select,
         time::{TimeVal, TimeValLike},
     },
-    once_cell::sync::OnceCell,
     std::{
         collections::HashMap,
-        io::{self, stdin, Read, Stdin},
-        path::Path,
-        sync::{Mutex, MutexGuard},
+        io::Read,
+        sync::{Arc, Mutex},
         thread,
         time::Duration,
     },
@@ -107,13 +104,18 @@ impl Key {
         }
     }
 
-    pub fn start(&mut self, draw: &mut Draw, menu: &Menu) {
-        self.stopping = false;
-        crossbeam::thread::scope(|s| {
-            s.spawn(|_| self.get_key(draw, menu));
-        })
-        .unwrap();
-        self.started = true;
+    pub fn start(_self : Arc<Mutex<Key>>, draw: Arc<Mutex<Draw>>, menu: Arc<Mutex<Menu>>) {
+        let mut initial_changes = _self.lock().unwrap();
+        initial_changes.stopping = false;
+        drop(initial_changes);
+
+        let mut self_clone = _self.clone();
+        thread::spawn(move || {
+            Key::get_key(self_clone, draw, menu);
+        });
+
+        let mut after_changes = _self.lock().unwrap();
+        after_changes.started = true;
     }
 
     pub fn stop(&mut self) {
@@ -204,11 +206,22 @@ impl Key {
     }
 
     /// Get a key or escape sequence from stdin, convert to readable format and save to keys list. Meant to be run in it's own thread
-    pub fn get_key(&mut self, draw: &mut Draw, menu: &Menu) {
+    pub fn get_key(_self : Arc<Mutex<Key>>, draw_mutex: Arc<Mutex<Draw>>, menu_mutex: Arc<Mutex<Menu>>) {
+
+
         let mut input_key: String = String::default();
         let mut clean_key: String = String::default();
 
-        while !self.stopping {
+        let mut initial_self = _self.lock().unwrap();
+        let mut stopping = initial_self.stopping.clone();
+        drop(initial_self);
+
+        while !stopping {
+
+            let mut self_key = _self.lock().unwrap();
+            let mut draw = draw_mutex.lock().unwrap();
+            let mut menu = menu_mutex.lock().unwrap();
+
             let mut raw = Raw::new();
             raw.enter();
 
@@ -225,7 +238,7 @@ impl Key {
                         match raw.stream.read_to_string(&mut input_key) {
                             Ok(_) => {
                                 if input_key == String::from("\x1b") {
-                                    self.idle.replace_self(EventEnum::Flag(false));
+                                    self_key.idle.replace_self(EventEnum::Flag(false));
                                     draw.idle.replace_self(EventEnum::Wait);
                                     draw.idle.wait(1.0);
 
@@ -241,7 +254,7 @@ impl Key {
                                         Err(_) => (),
                                     }
                                     nonblocking.exit();
-                                    self.idle.replace_self(EventEnum::Flag(true));
+                                    self_key.idle.replace_self(EventEnum::Flag(true));
                                 }
 
                                 if input_key == String::from("\x1b") {
@@ -253,7 +266,7 @@ impl Key {
                                 {
                                     let mut input_vec =
                                         input_key.as_str().split(';').collect::<Vec<&str>>();
-                                    self.mouse_pos = (
+                                    self_key.mouse_pos = (
                                         input_vec[1].parse::<i32>().unwrap(),
                                         input_vec[2]
                                             .to_owned()
@@ -264,8 +277,8 @@ impl Key {
                                     );
 
                                     if input_key.starts_with("\x1b[<35;") {
-                                        self.mouse_move.replace_self(EventEnum::Flag(true));
-                                        self.new.replace_self(EventEnum::Flag(true));
+                                        self_key.mouse_move.replace_self(EventEnum::Flag(true));
+                                        self_key.new.replace_self(EventEnum::Flag(true));
                                     } else if input_key.starts_with("\x1b[<64;") {
                                         clean_key = "mouse_scroll_up".to_owned();
                                     } else if input_key.starts_with("\x1b[<65;") {
@@ -277,9 +290,9 @@ impl Key {
                                             clean_key = "mouse_click".to_owned();
                                         } else {
                                             let mut broke: bool = false;
-                                            for (key_name, positions) in self.mouse.clone() {
+                                            for (key_name, positions) in self_key.mouse.clone() {
                                                 let check_inside: Vec<i32> =
-                                                    vec![self.mouse_pos.0, self.mouse_pos.1];
+                                                    vec![self_key.mouse_pos.0, self_key.mouse_pos.1];
                                                 if positions.contains(&check_inside) {
                                                     clean_key = key_name;
                                                     broke = true;
@@ -295,7 +308,7 @@ impl Key {
                                     clean_key = "\\".to_owned();
                                 } else {
                                     let mut broke: bool = false;
-                                    for code in self.escape.keys() {
+                                    for code in self_key.escape.keys() {
                                         if input_key.strip_prefix("\x1b").unwrap().starts_with(
                                             match code {
                                                 KeyUnion::String(s) => s.to_owned(),
@@ -309,7 +322,7 @@ impl Key {
                                             .as_str(),
                                         ) {
                                             clean_key =
-                                                self.escape.get(&code.clone()).unwrap().clone();
+                                                self_key.escape.get(&code.clone()).unwrap().clone();
                                             broke = true;
                                             break;
                                         }
@@ -322,12 +335,12 @@ impl Key {
                                 }
 
                                 if clean_key != String::default() {
-                                    self.list.push(clean_key);
-                                    if self.list.len() > 10 {
-                                        self.list.remove(0);
+                                    self_key.list.push(clean_key);
+                                    if self_key.list.len() > 10 {
+                                        self_key.list.remove(0);
                                     }
                                     clean_key = String::default();
-                                    self.new.replace_self(EventEnum::Flag(true));
+                                    self_key.new.replace_self(EventEnum::Flag(true));
                                 }
                                 input_key = String::default();
                             }
@@ -338,7 +351,7 @@ impl Key {
                         };
                     }
                 }
-                Err(_) => self.stop(),
+                Err(_) => self_key.stop(),
             };
 
             raw.exit();
