@@ -64,9 +64,9 @@ impl Color {
         if let Some(captures) = SIX_DIGIT_HEX.captures(&s) {
             let hex = captures.get(1).unwrap().as_str(); // Unwrap is safe, only one possible capture if we got any
 
-            r = u8::from_str_radix(&hex.get(0..2).unwrap(), 16).unwrap(); // These unwraps are unreachable because of the regex
-            g = u8::from_str_radix(&hex.get(2..4).unwrap(), 16).unwrap(); // These unwraps are unreachable because of the regex
-            b = u8::from_str_radix(&hex.get(4..6).unwrap(), 16).unwrap(); // These unwraps are unreachable because of the regex
+            r = u8::from_str_radix(&hex.get(0..2).unwrap(), 16).unwrap_or(0); // These unwraps are unreachable because of the regex
+            g = u8::from_str_radix(&hex.get(2..4).unwrap(), 16).unwrap_or(0); // These unwraps are unreachable because of the regex
+            b = u8::from_str_radix(&hex.get(4..6).unwrap(), 16).unwrap_or(0); // These unwraps are unreachable because of the regex
         } else if let Some(captures) = TWO_DIGIT_HEX.captures(&s) {
             let hex = captures.get(1).unwrap().as_str(); // Unwrap is safe, only one possible capture if we got any
 
@@ -83,9 +83,13 @@ impl Color {
             r = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap_or(0); // These unwraps are unreachable because of the regex
             g = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap_or(0); // These unwraps are unreachable because of the regex
             b = u8::from_str_radix(&parts.next().unwrap(), 10).unwrap_or(0); // These unwraps are unreachable because of the regex
-        } else {
-            errlog(format!("Unable to parse color from {:?}", s));
+        } else if s.to_string() == String::default() {
             return Ok(Color::Null());
+        } 
+        else {
+            panic!();
+            errlog(format!("Unable to parse color from {:?}", s));
+            return Err(format!("Unable to parse color from {:?}", s));
         }
 
         Ok(Self {
@@ -126,12 +130,12 @@ impl Color {
         }
     }
 
-    pub fn call(&self, adder: String, term: &Term) -> Color {
+    pub fn call(&self, adder: String, term: &Term) -> String {
         if adder.len() < 1 {
-            return Color::default();
+            return String::default();
         }
 
-        Color::from(format!(
+        format!(
             "{}{}{}",
             self.escape(),
             adder,
@@ -139,7 +143,7 @@ impl Color {
                 LayerDepth::Fg => term.get_fg(),
                 LayerDepth::Bg => term.get_bg(),
             }
-        ))
+        )
     }
 }
 impl std::default::Default for Color {
@@ -160,7 +164,13 @@ impl std::fmt::UpperHex for Color {
 impl From<String> for Color {
     // This is unsafe lol
     fn from(s: String) -> Self {
-        Self::new(s).unwrap()
+        match Self::new(s) {
+            Ok(c) => c,
+            Err(e) => {
+                errlog(e);
+                Color::Default()
+            }
+        }
     }
 }
 impl From<&Color> for Color {
@@ -363,6 +373,54 @@ impl Colors {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Result<Self, String>, io::Error> {
         Ok(Self::new(File::open(path)?))
     }
+
+    pub fn default() -> Colors {
+        Colors {
+            main_bg: Color::from("".to_owned()),
+            main_fg: Color::from("#cc".to_owned()),
+            title: Color::from("#ee".to_owned()),
+            hi_fg: Color::from("#969696".to_owned()),
+            selected_bg: Color::from("#7e2626".to_owned()),
+            selected_fg: Color::from("#ee".to_owned()),
+            inactive_fg: Color::from("#40".to_owned()),
+            proc_misc: Color::from("#60".to_owned()),
+            cpu_box: Color::from("#40".to_owned()),
+            mem_box: Color::from("#0de756".to_owned()),
+            net_box: Color::from("#3d7b46".to_owned()),
+            proc_box: Color::from("#8a882e".to_owned()),
+            div_line: Color::from("#423ba5".to_owned()),
+            temp_start: Color::from("#923535".to_owned()),
+            temp_mid: Color::from("#30".to_owned()),
+            temp_end: Color::from("#4897d4".to_owned()),
+            cpu_start: Color::from("#5474e8".to_owned()),
+            cpu_mid: Color::from("#ff40b6".to_owned()),
+            cpu_end: Color::from("#50f095".to_owned()),
+            free_start: Color::from("#f2e266".to_owned()),
+            free_mid: Color::from("#fa1e1e".to_owned()),
+            free_end: Color::from("#223014".to_owned()),
+            cached_start: Color::from("#b5e685".to_owned()),
+            cached_mid: Color::from("#dcff85".to_owned()),
+            cached_end: Color::from("#0b1a29".to_owned()),
+            available_start: Color::from("#74e6fc".to_owned()),
+            available_mid: Color::from("#26c5ff".to_owned()),
+            available_end: Color::from("#292107".to_owned()),
+            used_start: Color::from("#ffd77a".to_owned()),
+            used_mid: Color::from("#ffb814".to_owned()),
+            used_end: Color::from("#3b1f1c".to_owned()),
+            download_start: Color::from("#d9626d".to_owned()),
+            download_mid: Color::from("#ff4769".to_owned()),
+            download_end: Color::from("#231a63".to_owned()),
+            upload_start: Color::from("#4f43a3".to_owned()),
+            upload_mid: Color::from("#b0a9de".to_owned()),
+            upload_end: Color::from("#510554".to_owned()),
+            graph_text: Color::from("#7d4180".to_owned()),
+            meter_bg: Color::from("#dcafde".to_owned()),
+            process_start: Color::from("#80d0a3".to_owned()),
+            process_mid: Color::from("#dcd179".to_owned()),
+            process_end: Color::from("#d45454".to_owned()),
+        }
+    }
+
 }
 
 #[derive(Clone, Default)]
@@ -377,7 +435,10 @@ impl Theme {
     pub fn from_str<S: ToString>(s: S) -> Result<Self, String> {
         let colors_mut: Colors = match Colors::from_str(s) {
             Ok(c) => c,
-            _ => return Err(String::from("Error in Color parsing")),
+            _ => {
+                errlog(String::from("Error in Color parsing"));
+                Colors::default()
+            },
         };
 
         let mut cached_mut: HashMap<String, HashMap<String, String>> =
@@ -410,10 +471,11 @@ impl Theme {
     where
         R: Read,
     {
-        let colors_mut: Colors = match Colors::new(reader) {
-            Ok(c) => c,
-            _ => return Err(String::from("Error in Color parsing")),
-        };
+        // let colors_mut: Colors = match Colors::new(reader) {
+        //     Ok(c) => c,
+        //     Err(e) => return Err(e),
+        // };
+        let colors_mut : Colors = Colors::new(reader).unwrap();
 
         let mut cached_mut: HashMap<String, HashMap<String, String>> =
             HashMap::<String, HashMap<String, String>>::new();

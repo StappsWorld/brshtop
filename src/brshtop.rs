@@ -16,7 +16,7 @@ impl Brshtop {
     fn _load_themes(&mut self) -> Vec<crate::error::Error> {
         let mut errors = vec![];
         let mut files = vec![];
-        for path in crate::THEME_DIRS.iter() {
+        for path in crate::THEME_DIRS.to_owned().iter() {
             match std::fs::metadata(path) {
                 Err(e) => errors.push(e.into()),
                 Ok(meta) if meta.is_dir() => {

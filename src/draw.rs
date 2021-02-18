@@ -55,6 +55,23 @@ impl Draw {
         self.idle.replace_self(EventEnum::Flag(true));
     }
 
+    pub fn now_without_key(&mut self, args: Vec<String>) {
+        self.idle.replace_self(EventEnum::Wait);
+
+        //self.idle.wait(-1.0);
+
+        self.idle.replace_self(EventEnum::Flag(false));
+
+
+        print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+        for s in args.clone() {
+            print!("{}", s);
+            io::stdout().flush().unwrap();
+        }
+
+        self.idle.replace_self(EventEnum::Flag(true));
+    }
+
     /// Defaults append: bool = False, now: bool = False, z: int = 100, only_save: bool = False, no_save: bool = False, once: bool = False
     pub fn buffer(
         &mut self,

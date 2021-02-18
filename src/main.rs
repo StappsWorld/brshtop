@@ -445,7 +445,7 @@ pub fn main() {
     let mut b = brshtop::Brshtop::new();
     b._init();
 
-    let mut THEME_raw: Theme = match Theme::from_file(THEME_DIR.to_owned().as_path()) {
+    let mut THEME_raw: Theme = match Theme::from_file(CONFIG.color_theme.clone()) {
         Ok(r) => match r {
             Ok(t) => t,
             Err(e) => {
@@ -1433,10 +1433,96 @@ pub fn clean_quit_mutex(
     term_mutex: Arc<Mutex<Term>>,
     CONFIG_mutex: Arc<Mutex<Config>>,
 ) {
+    let mut term = match term_mutex.try_lock() {
+        Ok(t) => t,
+        Err(_) => {
+            let mut draw = match draw_mutex.try_lock() {
+                Ok(d) => d,
+                Err(_) => {
+                    let mut usable_draw = Draw::new();
+                    let term = Term::new();
+                    usable_draw.now_without_key(vec![
+                        term.get_clear(),
+                        term.get_normal_screen(),
+                        term.get_show_cursor(),
+                        term.get_mouse_off(),
+                        term.get_mouse_direct_off(),
+                        Term::title(String::default()),
+                    ]);
+                    Term::echo(true);
+                    let now = SystemTime::now();
+                    match errcode {
+                        Some(0) => errlog(format!(
+                            "Exiting, Runtime {} \n",
+                            now.duration_since(SELF_START.to_owned())
+                                .unwrap()
+                                .as_secs_f64()
+                        )),
+                        Some(n) => {
+                            errlog(format!(
+                                "Exiting with errorcode {}, Runtime {} \n",
+                                n,
+                                now.duration_since(SELF_START.to_owned())
+                                    .unwrap()
+                                    .as_secs_f64()
+                            ));
+                            print!(
+                                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                                errcode.unwrap(),
+                                CONFIG_DIR.to_string_lossy()
+                            );
+                        }
+                        None => (),
+                    };
+                    std::process::exit(errcode.unwrap_or(0));
+                }
+            };
+            unreachable!()
+        }
+    };
+    let mut draw = match draw_mutex.try_lock() {
+        Ok(d) => d,
+        Err(_) => {
+            let mut usable_draw = Draw::new();
+            usable_draw.now_without_key(vec![
+                term.get_clear(),
+                term.get_normal_screen(),
+                term.get_show_cursor(),
+                term.get_mouse_off(),
+                term.get_mouse_direct_off(),
+                Term::title(String::default()),
+            ]);
+            Term::echo(true);
+            let now = SystemTime::now();
+            match errcode {
+                Some(0) => errlog(format!(
+                    "Exiting, Runtime {} \n",
+                    now.duration_since(SELF_START.to_owned())
+                        .unwrap()
+                        .as_secs_f64()
+                )),
+                Some(n) => {
+                    errlog(format!(
+                        "Exiting with errorcode {}, Runtime {} \n",
+                        n,
+                        now.duration_since(SELF_START.to_owned())
+                            .unwrap()
+                            .as_secs_f64()
+                    ));
+                    print!(
+                        "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                        errcode.unwrap(),
+                        CONFIG_DIR.to_string_lossy()
+                    );
+                }
+                None => (),
+            };
+            std::process::exit(errcode.unwrap_or(0));
+        }
+    };
+
     let mut key = key_mutex.lock().unwrap();
     let mut collector = collector_mutex.lock().unwrap();
-    let mut draw = draw_mutex.lock().unwrap();
-    let mut term = term_mutex.lock().unwrap();
     let mut CONFIG = CONFIG_mutex.lock().unwrap();
 
     key.stop();

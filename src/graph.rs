@@ -101,7 +101,7 @@ impl Graph {
                 ColorSwitch::Color(c) => (0..height).map(|_| c).collect(),
                 ColorSwitch::VecString(v) => v
                     .iter()
-                    .map(|s| Color::new(s.to_owned()).unwrap_or(Color::default()))
+                    .map(|s| Color::new(s.to_owned()).unwrap_or(Color::Default()))
                     .collect(),
                 ColorSwitch::VecColor(c) => c.clone(),
             },

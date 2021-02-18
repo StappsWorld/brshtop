@@ -3,10 +3,10 @@ use string_template::Template;
 
 // TODO: Add the rest :/
 pub const THEME_DIRS: [&'static str; 4] = [
-    "./bpytop-themes",
-    "/usr/local/share/bpytop/themes",
-    "/usr/share/bpytop/themes",
-    "/snap/bpytop/current/usr/share/bpytop/themes",
+    "./brshtop-themes",
+    "/usr/local/share/brshtop/themes",
+    "/usr/share/brshtop/themes",
+    "/snap/brshtop/current/usr/share/brshtop/themes",
 ];
 
 lazy_static! {
