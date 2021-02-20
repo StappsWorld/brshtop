@@ -134,7 +134,12 @@ impl CpuBox {
 
         self.set_sub_box_height(
             ceil(
-                (THREADS.to_owned() / self.get_sub().get_box_columns() as u64) as f64,
+                (THREADS.to_owned()
+                    / if self.get_sub().get_box_columns() == 0 {
+                        1
+                    } else {
+                        self.get_sub().get_box_columns()
+                    } as u64) as f64,
                 0,
             ) as u32
                 + 4,
