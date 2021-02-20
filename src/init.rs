@@ -160,6 +160,7 @@ impl Init {
         let insert_width = term.get_width();
         let insert_height = term.get_height();
 
+        errlog(format!("terminal has a width of {} and a height of {}", insert_width, insert_height));
         self.initbg_up = Graph::new(
             insert_width as i32,
             insert_height as i32 / 2,

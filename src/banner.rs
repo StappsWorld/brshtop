@@ -24,8 +24,8 @@ impl BannerMeta {
         let mut out = vec![];
 
         for (line_num, (col1, col2, line_unowned)) in BANNER_SRC.iter().enumerate() {
-            let line : String = line_unowned.to_owned().to_owned();
-            let mut length_of_current_line : usize = 0;
+            let line: String = line_unowned.to_owned().to_owned();
+            let mut length_of_current_line: usize = 0;
             for _ in line.chars() {
                 length_of_current_line += 1;
             }
@@ -39,7 +39,7 @@ impl BannerMeta {
             for (char_num, c) in line.chars().enumerate() {
                 let mut to_push: String = c.into();
                 if c == '█' && c_color != line_color {
-                    c_color = if 5 < char_num && char_num < 25 {
+                    c_color = if 5 < char_num && char_num < 23 {
                         line_color2
                     } else {
                         line_color
@@ -97,12 +97,6 @@ pub fn draw_banner(
     if center {
         col = u32::try_from((term.get_width() as i32 / 2) - (BANNER_META.length as i32 / 2))
             .unwrap_or(0);
-        errlog(format!(
-            "Col is {}, width is {} and banner length is {}",
-            col,
-            term.get_width(),
-            BANNER_META.length
-        ));
     }
 
     for (n, o) in BANNER_META.out.iter().enumerate() {

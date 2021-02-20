@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 mod banner;
 mod brshtop;
 mod brshtop_box;
@@ -34,13 +36,12 @@ mod updatechecker;
 
 use {
     crate::{
-        brshtop_box::{Boxes, BrshtopBox, SubBoxes},
+        brshtop_box::{Boxes, BrshtopBox},
         collector::{Collector, Collectors},
-        config::{Config, SortingOption, ViewMode, ViewModeEnum},
+        config::{Config, ViewMode, ViewModeEnum},
         cpubox::CpuBox,
         cpucollector::CpuCollector,
         draw::Draw,
-        event::EventEnum,
         fx::Fx,
         graph::Graphs,
         init::Init,
@@ -64,23 +65,21 @@ use {
     error::{errlog, throw_error},
     expanduser::expanduser,
     lazy_static::lazy_static,
-    log::{debug, LevelFilter},
-    math::round,
+    log::LevelFilter,
     psutil::process::Signal,
     signal_hook::{consts::signal::*, iterator::Signals},
     std::{
         collections::HashMap,
         env, fs,
-        fs::{metadata, File},
+        fs::File,
         io,
         io::{prelude::*, BufReader},
         mem::drop,
-        ops::{Deref, DerefMut},
         path::{Path, PathBuf},
         process,
         sync::{Arc, Mutex, MutexGuard},
         thread,
-        time::{Duration, SystemTime, UNIX_EPOCH},
+        time::SystemTime,
     },
     terminal_size::{terminal_size, Height, Width},
     theme::{Color, Theme},
@@ -211,8 +210,6 @@ lazy_static! {
 }
 
 pub fn main() {
-    let errors = Vec::<String>::new();
-
     // Setting up error logging
 
     let error_file = "brshtop.log";
@@ -305,10 +302,13 @@ pub fn main() {
         ARG_MODE_raw = ViewMode {
             t: ViewModeEnum::Stat,
         };
+    } else if arg_version.is_some() {
+        println!("brshtop version: {}\n", VERSION.to_owned());
+        emergency_quit(None, None);
     }
-    let mut ARG_MODE_parent: Arc<Mutex<ViewMode>> = Arc::new(Mutex::new(ARG_MODE_raw));
-    let mut ARG_MODE_mutex: Arc<Mutex<ViewMode>> = Arc::clone(&ARG_MODE_parent);
-    let mut ARG_MODE: MutexGuard<ViewMode> = ARG_MODE_mutex.lock().unwrap();
+    let ARG_MODE_parent: Arc<Mutex<ViewMode>> = Arc::new(Mutex::new(ARG_MODE_raw));
+    let ARG_MODE_mutex: Arc<Mutex<ViewMode>> = Arc::clone(&ARG_MODE_parent);
+    let ARG_MODE: MutexGuard<ViewMode> = ARG_MODE_mutex.lock().unwrap();
 
     let DEBUG = arg_debug.is_some();
 
@@ -338,8 +338,6 @@ pub fn main() {
     }
 
     let CONFIG_FILE = CONFIG_DIR.join("bpytop.conf");
-
-    let THREAD_ERROR = 0;
 
     let mut MENUS = HashMap::new();
 
@@ -415,16 +413,16 @@ pub fn main() {
             .collect::<Vec<String>>(),
     );
 
-    let mut CONFIG_raw: Config = match Config::new(CONFIG_FILE.clone()) {
+    let CONFIG_raw: Config = match Config::new(CONFIG_FILE.clone()) {
         Ok(c) => c,
         Err(e) => {
             throw_error(e);
             Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
         }
     };
-    let mut CONFIG_parent: Arc<Mutex<Config>> = Arc::new(Mutex::new(CONFIG_raw));
-    let mut CONFIG_mutex: Arc<Mutex<Config>> = Arc::clone(&CONFIG_parent);
-    let mut CONFIG: MutexGuard<Config> = CONFIG_mutex.lock().unwrap();
+    let CONFIG_parent: Arc<Mutex<Config>> = Arc::new(Mutex::new(CONFIG_raw));
+    let CONFIG_mutex: Arc<Mutex<Config>> = Arc::clone(&CONFIG_parent);
+    let CONFIG: MutexGuard<Config> = CONFIG_mutex.lock().unwrap();
 
     errlog(format!(
         "New instance of brshtop version {} started with pid {}",
@@ -445,7 +443,7 @@ pub fn main() {
     let mut b = brshtop::Brshtop::new();
     b._init();
 
-    let mut THEME_raw: Theme = match Theme::from_file(CONFIG.color_theme.clone()) {
+    let THEME_raw: Theme = match Theme::from_file(CONFIG.color_theme.clone()) {
         Ok(r) => match r {
             Ok(t) => t,
             Err(e) => {
@@ -466,124 +464,115 @@ pub fn main() {
             Theme::default()
         }
     };
-    let mut THEME_parent: Arc<Mutex<Theme>> = Arc::new(Mutex::new(THEME_raw));
-    let mut THEME_mutex: Arc<Mutex<Theme>> = Arc::clone(&THEME_parent);
+    let THEME_parent: Arc<Mutex<Theme>> = Arc::new(Mutex::new(THEME_raw));
+    let THEME_mutex: Arc<Mutex<Theme>> = Arc::clone(&THEME_parent);
     let mut THEME: MutexGuard<Theme> = THEME_mutex.lock().unwrap();
 
     errlog("Made it through global variables".to_owned());
 
     // Pre main ---------------------------------------------------------------------------------------------
-    let mut term_raw: Term = Term::new();
-    let mut term_parent: Arc<Mutex<Term>> = Arc::new(Mutex::new(term_raw));
-    let mut term_mutex: Arc<Mutex<Term>> = Arc::clone(&term_parent);
+    let term_raw: Term = Term::new();
+    let term_parent: Arc<Mutex<Term>> = Arc::new(Mutex::new(term_raw));
+    let term_mutex: Arc<Mutex<Term>> = Arc::clone(&term_parent);
     let mut term: MutexGuard<Term> = term_mutex.lock().unwrap();
 
-    let mut key_raw: Key = Key::new();
-    let mut key_parent: Arc<Mutex<Key>> = Arc::new(Mutex::new(key_raw));
-    let mut key_mutex: Arc<Mutex<Key>> = Arc::clone(&key_parent);
+    let key_raw: Key = Key::new();
+    let key_parent: Arc<Mutex<Key>> = Arc::new(Mutex::new(key_raw));
+    let key_mutex: Arc<Mutex<Key>> = Arc::clone(&key_parent);
     let mut key: MutexGuard<Key> = key_mutex.lock().unwrap();
 
-    let mut draw_raw: Draw = Draw::new();
-    let mut draw_parent: Arc<Mutex<Draw>> = Arc::new(Mutex::new(draw_raw));
-    let mut draw_mutex: Arc<Mutex<Draw>> = Arc::clone(&draw_parent);
+    let draw_raw: Draw = Draw::new();
+    let draw_parent: Arc<Mutex<Draw>> = Arc::new(Mutex::new(draw_raw));
+    let draw_mutex: Arc<Mutex<Draw>> = Arc::clone(&draw_parent);
     let mut draw: MutexGuard<Draw> = draw_mutex.lock().unwrap();
 
-    let mut brshtop_box_raw: BrshtopBox = BrshtopBox::new(&CONFIG, ARG_MODE.to_owned());
-    let mut brshtop_box_parent: Arc<Mutex<BrshtopBox>> = Arc::new(Mutex::new(brshtop_box_raw));
-    let mut brshtop_box_mutex: Arc<Mutex<BrshtopBox>> = Arc::clone(&brshtop_box_parent);
+    let brshtop_box_raw: BrshtopBox = BrshtopBox::new(&CONFIG, ARG_MODE.to_owned());
+    let brshtop_box_parent: Arc<Mutex<BrshtopBox>> = Arc::new(Mutex::new(brshtop_box_raw));
+    let brshtop_box_mutex: Arc<Mutex<BrshtopBox>> = Arc::clone(&brshtop_box_parent);
     let mut brshtop_box: MutexGuard<BrshtopBox> = brshtop_box_mutex.lock().unwrap();
 
-    let mut cpu_box_raw: CpuBox = CpuBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
-    let mut cpu_box_parent: Arc<Mutex<CpuBox>> = Arc::new(Mutex::new(cpu_box_raw));
-    let mut cpu_box_mutex: Arc<Mutex<CpuBox>> = Arc::clone(&cpu_box_parent);
+    let cpu_box_raw: CpuBox = CpuBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
+    let cpu_box_parent: Arc<Mutex<CpuBox>> = Arc::new(Mutex::new(cpu_box_raw));
+    let cpu_box_mutex: Arc<Mutex<CpuBox>> = Arc::clone(&cpu_box_parent);
     let mut cpu_box: MutexGuard<CpuBox> = cpu_box_mutex.lock().unwrap();
 
-    let mut mem_box_raw: MemBox = MemBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
-    let mut mem_box_parent: Arc<Mutex<MemBox>> = Arc::new(Mutex::new(mem_box_raw));
-    let mut mem_box_mutex: Arc<Mutex<MemBox>> = Arc::clone(&mem_box_parent);
+    let mem_box_raw: MemBox = MemBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
+    let mem_box_parent: Arc<Mutex<MemBox>> = Arc::new(Mutex::new(mem_box_raw));
+    let mem_box_mutex: Arc<Mutex<MemBox>> = Arc::clone(&mem_box_parent);
     let mut mem_box: MutexGuard<MemBox> = mem_box_mutex.lock().unwrap();
 
-    let mut net_box_raw: NetBox = NetBox::new(&CONFIG, ARG_MODE.to_owned(), &mut brshtop_box);
-    let mut net_box_parent: Arc<Mutex<NetBox>> = Arc::new(Mutex::new(net_box_raw));
-    let mut net_box_mutex: Arc<Mutex<NetBox>> = Arc::clone(&net_box_parent);
+    let net_box_raw: NetBox = NetBox::new(&CONFIG, ARG_MODE.to_owned(), &mut brshtop_box);
+    let net_box_parent: Arc<Mutex<NetBox>> = Arc::new(Mutex::new(net_box_raw));
+    let net_box_mutex: Arc<Mutex<NetBox>> = Arc::clone(&net_box_parent);
     let mut net_box: MutexGuard<NetBox> = net_box_mutex.lock().unwrap();
 
-    let mut proc_box_raw: ProcBox = ProcBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
-    let mut proc_box_parent: Arc<Mutex<ProcBox>> = Arc::new(Mutex::new(proc_box_raw));
-    let mut proc_box_mutex: Arc<Mutex<ProcBox>> = Arc::clone(&proc_box_parent);
+    let proc_box_raw: ProcBox = ProcBox::new(&mut brshtop_box, &CONFIG, ARG_MODE.to_owned());
+    let proc_box_parent: Arc<Mutex<ProcBox>> = Arc::new(Mutex::new(proc_box_raw));
+    let proc_box_mutex: Arc<Mutex<ProcBox>> = Arc::clone(&proc_box_parent);
     let mut proc_box: MutexGuard<ProcBox> = proc_box_mutex.lock().unwrap();
 
-    let mut collector_raw: Collector = Collector::new();
-    let mut collector_parent: Arc<Mutex<Collector>> = Arc::new(Mutex::new(collector_raw));
-    let mut collector_mutex: Arc<Mutex<Collector>> = Arc::clone(&collector_parent);
+    let collector_raw: Collector = Collector::new();
+    let collector_parent: Arc<Mutex<Collector>> = Arc::new(Mutex::new(collector_raw));
+    let collector_mutex: Arc<Mutex<Collector>> = Arc::clone(&collector_parent);
     let mut collector: MutexGuard<Collector> = collector_mutex.lock().unwrap();
 
-    let mut cpu_collector_raw: CpuCollector = CpuCollector::new();
-    let mut cpu_collector_parent: Arc<Mutex<CpuCollector>> =
-        Arc::new(Mutex::new(cpu_collector_raw));
-    let mut cpu_collector_mutex: Arc<Mutex<CpuCollector>> = Arc::clone(&cpu_collector_parent);
+    let cpu_collector_raw: CpuCollector = CpuCollector::new();
+    let cpu_collector_parent: Arc<Mutex<CpuCollector>> = Arc::new(Mutex::new(cpu_collector_raw));
+    let cpu_collector_mutex: Arc<Mutex<CpuCollector>> = Arc::clone(&cpu_collector_parent);
     let mut cpu_collector: MutexGuard<CpuCollector> = cpu_collector_mutex.lock().unwrap();
 
-    let mut mem_collector_raw: MemCollector = MemCollector::new(&mem_box);
-    let mut mem_collector_parent: Arc<Mutex<MemCollector>> =
-        Arc::new(Mutex::new(mem_collector_raw));
-    let mut mem_collector_mutex: Arc<Mutex<MemCollector>> = Arc::clone(&mem_collector_parent);
-    let mut mem_collector: MutexGuard<MemCollector> = mem_collector_mutex.lock().unwrap();
+    let mem_collector_raw: MemCollector = MemCollector::new(&mem_box);
+    let mem_collector_parent: Arc<Mutex<MemCollector>> = Arc::new(Mutex::new(mem_collector_raw));
 
-    let mut net_collector_raw: NetCollector = NetCollector::new(&net_box, &CONFIG);
-    let mut net_collector_parent: Arc<Mutex<NetCollector>> =
-        Arc::new(Mutex::new(net_collector_raw));
-    let mut net_collector_mutex: Arc<Mutex<NetCollector>> = Arc::clone(&net_collector_parent);
-    let mut net_collector: MutexGuard<NetCollector> = net_collector_mutex.lock().unwrap();
+    let net_collector_raw: NetCollector = NetCollector::new(&net_box, &CONFIG);
+    let net_collector_parent: Arc<Mutex<NetCollector>> = Arc::new(Mutex::new(net_collector_raw));
+    let net_collector_mutex: Arc<Mutex<NetCollector>> = Arc::clone(&net_collector_parent);
+    let net_collector: MutexGuard<NetCollector> = net_collector_mutex.lock().unwrap();
 
-    let mut proc_collector_raw: ProcCollector = ProcCollector::new(&proc_box);
-    let mut proc_collector_parent: Arc<Mutex<ProcCollector>> =
-        Arc::new(Mutex::new(proc_collector_raw));
-    let mut proc_collector_mutex: Arc<Mutex<ProcCollector>> = Arc::clone(&proc_collector_parent);
-    let mut proc_collector: MutexGuard<ProcCollector> = proc_collector_mutex.lock().unwrap();
+    let proc_collector_raw: ProcCollector = ProcCollector::new(&proc_box);
+    let proc_collector_parent: Arc<Mutex<ProcCollector>> = Arc::new(Mutex::new(proc_collector_raw));
+    let proc_collector_mutex: Arc<Mutex<ProcCollector>> = Arc::clone(&proc_collector_parent);
+    let proc_collector: MutexGuard<ProcCollector> = proc_collector_mutex.lock().unwrap();
 
-    let mut menu_raw: Menu = Menu::new(MENUS, MENU_COLORS);
-    let mut menu_parent: Arc<Mutex<Menu>> = Arc::new(Mutex::new(menu_raw));
-    let mut menu_mutex: Arc<Mutex<Menu>> = Arc::clone(&menu_parent);
+    let menu_raw: Menu = Menu::new(MENUS, MENU_COLORS);
+    let menu_parent: Arc<Mutex<Menu>> = Arc::new(Mutex::new(menu_raw));
+    let menu_mutex: Arc<Mutex<Menu>> = Arc::clone(&menu_parent);
     let mut menu: MutexGuard<Menu> = menu_mutex.lock().unwrap();
 
-    let mut timer_raw: Timer = Timer::new();
-    let mut timer_parent: Arc<Mutex<Timer>> = Arc::new(Mutex::new(timer_raw));
-    let mut timer_mutex: Arc<Mutex<Timer>> = Arc::clone(&timer_parent);
+    let timer_raw: Timer = Timer::new();
+    let timer_parent: Arc<Mutex<Timer>> = Arc::new(Mutex::new(timer_raw));
+    let timer_mutex: Arc<Mutex<Timer>> = Arc::clone(&timer_parent);
     let mut timer: MutexGuard<Timer> = timer_mutex.lock().unwrap();
 
-    let mut timeit_raw: TimeIt = TimeIt::new();
-    let mut timeit_parent: Arc<Mutex<TimeIt>> = Arc::new(Mutex::new(timeit_raw));
-    let mut timeit_mutex: Arc<Mutex<TimeIt>> = Arc::clone(&timeit_parent);
+    let timeit_raw: TimeIt = TimeIt::new();
+    let timeit_parent: Arc<Mutex<TimeIt>> = Arc::new(Mutex::new(timeit_raw));
+    let timeit_mutex: Arc<Mutex<TimeIt>> = Arc::clone(&timeit_parent);
     let mut timeit: MutexGuard<TimeIt> = timeit_mutex.lock().unwrap();
 
-    let mut init_raw: Init = Init::new();
-    let mut init_parent: Arc<Mutex<Init>> = Arc::new(Mutex::new(init_raw));
-    let mut init_mutex: Arc<Mutex<Init>> = Arc::clone(&init_parent);
+    let init_raw: Init = Init::new();
+    let init_parent: Arc<Mutex<Init>> = Arc::new(Mutex::new(init_raw));
+    let init_mutex: Arc<Mutex<Init>> = Arc::clone(&init_parent);
     let mut init: MutexGuard<Init> = init_mutex.lock().unwrap();
 
-    let mut updatechecker_raw: UpdateChecker = UpdateChecker::new();
-    let mut updatechecker_parent: Arc<Mutex<UpdateChecker>> =
-        Arc::new(Mutex::new(updatechecker_raw));
+    let updatechecker_raw: UpdateChecker = UpdateChecker::new();
+    let updatechecker_parent: Arc<Mutex<UpdateChecker>> = Arc::new(Mutex::new(updatechecker_raw));
 
-    let mut collectors: Vec<Collectors> = vec![
+    let collectors: Vec<Collectors> = vec![
         Collectors::MemCollector,
         Collectors::NetCollector,
         Collectors::ProcCollector,
         Collectors::CpuCollector,
     ];
 
-    let mut boxes: Vec<Boxes> = vec![Boxes::CpuBox, Boxes::MemBox, Boxes::NetBox, Boxes::ProcBox];
+    let boxes: Vec<Boxes> = vec![Boxes::CpuBox, Boxes::MemBox, Boxes::NetBox, Boxes::ProcBox];
 
-    let mut graphs_raw: Graphs = Graphs::default();
-    let mut graphs_parent: Arc<Mutex<Graphs>> = Arc::new(Mutex::new(graphs_raw));
-    let mut graphs_mutex: Arc<Mutex<Graphs>> = Arc::clone(&graphs_parent);
-    let mut graphs: MutexGuard<Graphs> = graphs_mutex.lock().unwrap();
+    let graphs_raw: Graphs = Graphs::default();
+    let graphs_parent: Arc<Mutex<Graphs>> = Arc::new(Mutex::new(graphs_raw));
+    let graphs_mutex: Arc<Mutex<Graphs>> = Arc::clone(&graphs_parent);
+    let graphs: MutexGuard<Graphs> = graphs_mutex.lock().unwrap();
 
-    let mut meters_raw: Meters = Meters::default();
-    let mut meters_parent: Arc<Mutex<Meters>> = Arc::new(Mutex::new(meters_raw));
-    let mut meters_mutex: Arc<Mutex<Meters>> = Arc::clone(&meters_parent);
-    let mut meters: MutexGuard<Meters> = meters_mutex.lock().unwrap();
+    let meters_raw: Meters = Meters::default();
+    let meters_parent: Arc<Mutex<Meters>> = Arc::new(Mutex::new(meters_raw));
 
     errlog("Made it through pre-main".to_owned());
 
@@ -790,31 +779,31 @@ pub fn main() {
         }
     };
 
-    let mut ARG_MODE_signal = Arc::clone(&ARG_MODE_parent);
-    let mut CONFIG_signal = Arc::clone(&CONFIG_parent);
-    let mut THEME_signal = Arc::clone(&THEME_parent);
-    let mut term_signal = Arc::clone(&term_parent);
-    let mut key_signal = Arc::clone(&key_parent);
-    let mut draw_signal = Arc::clone(&draw_parent);
-    let mut brshtop_box_signal = Arc::clone(&brshtop_box_parent);
-    let mut cpu_box_signal = Arc::clone(&cpu_box_parent);
-    let mut mem_box_signal = Arc::clone(&mem_box_parent);
-    let mut net_box_signal = Arc::clone(&net_box_parent);
-    let mut proc_box_signal = Arc::clone(&proc_box_parent);
-    let mut collector_signal = Arc::clone(&collector_parent);
-    let mut cpu_collector_signal = Arc::clone(&cpu_collector_parent);
-    let mut mem_collector_signal = Arc::clone(&mem_collector_parent);
-    let mut net_collector_signal = Arc::clone(&net_collector_parent);
-    let mut proc_collector_signal = Arc::clone(&proc_collector_parent);
-    let mut menu_signal = Arc::clone(&menu_parent);
-    let mut timer_signal = Arc::clone(&timer_parent);
-    let mut init_signal = Arc::clone(&init_parent);
-    let mut graphs_signal = Arc::clone(&graphs_parent);
-    let mut meters_signal = Arc::clone(&meters_parent);
-    let mut timeit_signal = Arc::clone(&timeit_parent);
-    let mut boxes_signal = boxes.clone();
-    let mut collectors_signal = collectors.clone();
-    let mut DEBUG_signal = DEBUG.clone();
+    let ARG_MODE_signal = Arc::clone(&ARG_MODE_parent);
+    let CONFIG_signal = Arc::clone(&CONFIG_parent);
+    let THEME_signal = Arc::clone(&THEME_parent);
+    let term_signal = Arc::clone(&term_parent);
+    let key_signal = Arc::clone(&key_parent);
+    let draw_signal = Arc::clone(&draw_parent);
+    let brshtop_box_signal = Arc::clone(&brshtop_box_parent);
+    let cpu_box_signal = Arc::clone(&cpu_box_parent);
+    let mem_box_signal = Arc::clone(&mem_box_parent);
+    let net_box_signal = Arc::clone(&net_box_parent);
+    let proc_box_signal = Arc::clone(&proc_box_parent);
+    let collector_signal = Arc::clone(&collector_parent);
+    let cpu_collector_signal = Arc::clone(&cpu_collector_parent);
+    let mem_collector_signal = Arc::clone(&mem_collector_parent);
+    let net_collector_signal = Arc::clone(&net_collector_parent);
+    let proc_collector_signal = Arc::clone(&proc_collector_parent);
+    let menu_signal = Arc::clone(&menu_parent);
+    let timer_signal = Arc::clone(&timer_parent);
+    let init_signal = Arc::clone(&init_parent);
+    let graphs_signal = Arc::clone(&graphs_parent);
+    let meters_signal = Arc::clone(&meters_parent);
+    let timeit_signal = Arc::clone(&timeit_parent);
+    let boxes_signal = boxes.clone();
+    let collectors_signal = collectors.clone();
+    let DEBUG_signal = DEBUG.clone();
 
     thread::spawn(move || {
         for sig in signals_unimportant.forever() {
@@ -869,21 +858,21 @@ pub fn main() {
                     );
                 }
                 SIGWINCH => {
-                    let mut term_signal_clone = term_signal.clone();
-                    let mut collector_signal_clone = collector_signal.clone();
-                    let mut init_signal_clone = init_signal.clone();
-                    let mut cpu_box_signal_clone = cpu_box_signal.clone();
-                    let mut draw_signal_clone = draw_signal.clone();
-                    let mut key_signal_clone = key_signal.clone();
-                    let mut menu_signal_clone = menu_signal.clone();
-                    let mut brshtop_box_signal_clone = brshtop_box_signal.clone();
-                    let mut timer_signal_clone = timer_signal.clone();
-                    let mut CONFIG_signal_clone = CONFIG_signal.clone();
-                    let mut THEME_signal_clone = THEME_signal.clone();
-                    let mut cpu_collector_signal_clone = cpu_collector_signal.clone();
-                    let mut mem_box_signal_clone = mem_box_signal.clone();
-                    let mut net_box_signal_clone = net_box_signal.clone();
-                    let mut proc_box_signal_clone = proc_box_signal.clone();
+                    let term_signal_clone = term_signal.clone();
+                    let collector_signal_clone = collector_signal.clone();
+                    let init_signal_clone = init_signal.clone();
+                    let cpu_box_signal_clone = cpu_box_signal.clone();
+                    let draw_signal_clone = draw_signal.clone();
+                    let key_signal_clone = key_signal.clone();
+                    let menu_signal_clone = menu_signal.clone();
+                    let brshtop_box_signal_clone = brshtop_box_signal.clone();
+                    let timer_signal_clone = timer_signal.clone();
+                    let CONFIG_signal_clone = CONFIG_signal.clone();
+                    let THEME_signal_clone = THEME_signal.clone();
+                    let cpu_collector_signal_clone = cpu_collector_signal.clone();
+                    let mem_box_signal_clone = mem_box_signal.clone();
+                    let net_box_signal_clone = net_box_signal.clone();
+                    let proc_box_signal_clone = proc_box_signal.clone();
                     let mut term_winch = term_signal_clone.lock().unwrap();
                     let mut collector_winch = collector_signal_clone.lock().unwrap();
                     let mut init_winch = init_signal_clone.lock().unwrap();
@@ -924,11 +913,11 @@ pub fn main() {
         }
     });
 
-    let mut key_signal_important = Arc::clone(&key_parent);
-    let mut collector_signal_important = Arc::clone(&collector_parent);
-    let mut draw_signal_important = Arc::clone(&draw_parent);
-    let mut term_signal_important = Arc::clone(&term_parent);
-    let mut CONFIG_signal_important = Arc::clone(&CONFIG_parent);
+    let key_signal_important = Arc::clone(&key_parent);
+    let collector_signal_important = Arc::clone(&collector_parent);
+    let draw_signal_important = Arc::clone(&draw_parent);
+    let term_signal_important = Arc::clone(&term_parent);
+    let CONFIG_signal_important = Arc::clone(&CONFIG_parent);
 
     thread::spawn(move || {
         for sig in signals_important.forever() {
@@ -1185,7 +1174,7 @@ pub fn run(
     graphs_mutex: Arc<Mutex<Graphs>>,
     mem_box_mutex: Arc<Mutex<MemBox>>,
 ) {
-    let mut count : u64 = 0;
+    //let mut count: u64 = 0;
     loop {
         let mut term = match term_mutex.try_lock() {
             Ok(m) => m,
@@ -1267,9 +1256,9 @@ pub fn run(
             Ok(m) => m,
             _ => continue,
         };
-        errlog("Locked all modules in main loop successfully...".to_owned());
-        count += 1;
-        errlog(format!("Successfully locked {} times!", count));
+        //errlog("Locked all modules in main loop successfully...".to_owned());
+        //count += 1;
+        //errlog(format!("Successfully locked {} times!", count));
 
         term.refresh(
             vec![],
@@ -1352,11 +1341,11 @@ pub fn create_box(
     proc_box: Option<&ProcBox>,
 ) -> String {
     let mut out: String = format!("{}{}", term.get_fg(), term.get_bg());
-    let mut lc: Color = match line_color {
+    let lc: Color = match line_color {
         Some(c) => c,
         None => THEME.colors.div_line,
     };
-    let mut tc: Color = match title_color {
+    let tc: Color = match title_color {
         Some(c) => c,
         None => THEME.colors.title,
     };
@@ -1465,23 +1454,20 @@ pub fn create_box(
     );
 
     // * Draw titles if enabled
-    match title.clone() {
-        Some(st) => out.push_str(
-            format!(
-                "{}{}{}{}{}{}{}{}",
-                mv::to(wy, wx + 2),
-                symbol::title_left,
-                tc,
-                fx::b,
-                st.clone(),
-                fx::ub,
-                lc,
-                symbol::title_right
-            )
-            .as_str(),
-        ),
-        None => (),
-    };
+    out.push_str(
+        format!(
+            "{}{}{}{}{}{}{}{}",
+            mv::to(wy, wx + 2),
+            symbol::title_left,
+            tc,
+            fx::b,
+            wt.clone(),
+            fx::ub,
+            lc,
+            symbol::title_right
+        )
+        .as_str(),
+    );
 
     match title2 {
         Some(s) => {
@@ -1516,13 +1502,13 @@ pub fn readfile(file: File) -> Option<String> {
 
                 match buf_reader.read_to_string(&mut out) {
                     Ok(_) => Some(out),
-                    Err(e) => None,
+                    Err(_) => None,
                 }
             } else {
                 None
             }
         }
-        Err(e) => None,
+        Err(_) => None,
     }
 }
 
@@ -1545,7 +1531,7 @@ pub fn clean_quit_mutex(
     term_mutex: Arc<Mutex<Term>>,
     CONFIG_mutex: Arc<Mutex<Config>>,
 ) {
-    let mut term = match term_mutex.try_lock() {
+    let term = match term_mutex.try_lock() {
         Ok(t) => t,
         Err(_) => {
             emergency_quit(errcode, errmsg);
@@ -1557,7 +1543,7 @@ pub fn clean_quit_mutex(
         Err(_) => {
             emergency_quit(errcode, errmsg);
             unreachable!()
-        },
+        }
     };
     let mut key = key_mutex.lock().unwrap();
     let mut collector = collector_mutex.lock().unwrap();
@@ -1596,14 +1582,20 @@ pub fn clean_quit_mutex(
                     .unwrap()
                     .as_secs_f64()
             ));
-            print!(
-                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
-                errcode.unwrap(),
-                CONFIG_DIR.to_string_lossy()
-            );
+            if errmsg.is_none() {
+                print!(
+                    "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                    errcode.unwrap(),
+                    CONFIG_DIR.to_string_lossy()
+                );
+            }
         }
         None => (),
     };
+    match errmsg {
+        Some(s) => println!("{}", s),
+        None => (),
+    }
     std::process::exit(errcode.unwrap_or(0));
 }
 
@@ -1649,14 +1641,19 @@ pub fn clean_quit_mutex_guard(
                     .unwrap()
                     .as_secs_f64()
             ));
-            print!(
-                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
-                errcode.unwrap(),
-                CONFIG_DIR.to_string_lossy()
-            );
+            if errmsg.is_none() {
+                print!(
+                    "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                    errcode.unwrap(),
+                    CONFIG_DIR.to_string_lossy()
+                );
+            }
         }
         None => (),
     };
+    if errmsg.is_some() {
+        println!("{}", errmsg.unwrap());
+    }
     std::process::exit(errcode.unwrap_or(0));
 }
 
@@ -1702,33 +1699,34 @@ pub fn clean_quit(
                     .unwrap()
                     .as_secs_f64()
             ));
-            print!(
-                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
-                errcode.unwrap(),
-                CONFIG_DIR.to_string_lossy()
-            );
+            if errmsg.is_none() {
+                print!(
+                    "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                    errcode.unwrap(),
+                    CONFIG_DIR.to_string_lossy()
+                );
+            }
         }
         None => (),
     };
+    match errmsg {
+        Some(s) => println!("{}", s),
+        None => (),
+    }
     std::process::exit(errcode.unwrap_or(0));
 }
 
-pub fn emergency_quit(
-    errcode: Option<i32>,
-    errmsg: Option<String>,
-) {
+pub fn emergency_quit(errcode: Option<i32>, errmsg: Option<String>) {
     let mut draw = Draw::new();
-    let mut term = Term::new();
-    draw.now_without_key(
-        vec![
-            term.get_clear(),
-            term.get_normal_screen(),
-            term.get_show_cursor(),
-            term.get_mouse_off(),
-            term.get_mouse_direct_off(),
-            Term::title(String::default()),
-        ]
-    );
+    let term = Term::new();
+    draw.now_without_key(vec![
+        term.get_clear(),
+        term.get_normal_screen(),
+        term.get_show_cursor(),
+        term.get_mouse_off(),
+        term.get_mouse_direct_off(),
+        Term::title(String::default()),
+    ]);
     Term::echo(true);
     let now = SystemTime::now();
     match errcode {
@@ -1746,17 +1744,22 @@ pub fn emergency_quit(
                     .unwrap()
                     .as_secs_f64()
             ));
-            print!(
-                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
-                errcode.unwrap(),
-                CONFIG_DIR.to_string_lossy()
-            );
+            if errmsg.is_none() {
+                print!(
+                    "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                    errcode.unwrap(),
+                    CONFIG_DIR.to_string_lossy()
+                );
+            }
         }
         None => (),
     };
+    match errmsg {
+        Some(s) => println!("{}", s),
+        None => (),
+    }
     std::process::exit(errcode.unwrap_or(0));
 }
-
 
 pub fn first_letter_to_upper_case(s1: String) -> String {
     let mut c = s1.chars();
@@ -1775,9 +1778,9 @@ pub fn floating_humanizer(
     short: bool,
 ) -> String {
     let mut out: String = String::default();
-    let mut mult: f64 = if bit { 8.0 } else { 1.0 };
+    let mult: f64 = if bit { 8.0 } else { 1.0 };
     let mut selector: usize = start;
-    let mut unit: Vec<String> = if bit {
+    let unit: Vec<String> = if bit {
         UNITS.to_owned().get(&"bit".to_owned()).unwrap().to_owned()
     } else {
         UNITS.to_owned().get(&"byte".to_owned()).unwrap().to_owned()
@@ -1855,11 +1858,16 @@ pub fn units_to_bytes(value: String) -> u64 {
     if value.len() == 0 {
         return 0;
     }
-    let mut out: u64 = 0;
     let mut mult: u32 = 0;
     let mut bit: bool = false;
     let mut value_i: u64 = 0;
-    let mut units: HashMap<String, u32> = HashMap::<String, u32>::new();
+    let units: HashMap<String, u32> = vec![
+        ("k", 1),
+        ("m", 2),
+        ("g", 3),
+    ].iter()
+    .map(|(s, i)| (s.to_owned().to_owned(), i.to_owned()))
+    .collect();
 
     let mut mutable_value: String = value.clone();
     if mutable_value.to_ascii_lowercase().ends_with('s') {
@@ -1910,9 +1918,8 @@ pub fn units_to_bytes(value: String) -> u64 {
     if bit {
         value_i = value_i / 8;
     }
-    out = value_i << (10 * mult);
 
-    out
+    value_i << (10 * mult)
 }
 
 pub fn process_keys_mutex(
@@ -1955,7 +1962,7 @@ pub fn process_keys_mutex(
     let mut init = init_mutex.lock().unwrap();
     let mut cpucollector = cpucollector_mutex.lock().unwrap();
     let mut netbox = netbox_mutex.lock().unwrap();
-    let mut update_checker = update_checker_mutex.lock().unwrap();
+    let update_checker = update_checker_mutex.lock().unwrap();
     let mut timer = timer_mutex.lock().unwrap();
     let mut graphs = graphs_mutex.lock().unwrap();
     let mut mem_box = mem_box_mutex.lock().unwrap();
@@ -2346,7 +2353,7 @@ pub fn process_keys_mutex(
                 };
                 match psutil::process::Process::new(pid).unwrap().send_signal(sig) {
                     Ok(_) => (),
-                    Err(e) => errlog(format!(
+                    Err(_) => errlog(format!(
                         "Execption when sending signal {} to pid {}",
                         sig, pid
                     )),

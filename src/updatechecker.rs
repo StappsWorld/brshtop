@@ -73,7 +73,7 @@ impl<'a> UpdateChecker {
             }
         {
 
-            match Command::new("notify_send").args(&vec!["-u", "normal", "BpyTop Update!", format!("New version of BpyTop available!\nCurrent version: {}\nNew version: {}\nDownload at github.com/aristocratos/bpytop", VERSION.to_owned(), self_checker.version).as_str(), "-i", "update-notifier", "-t", "10000"]).output() {
+            match Command::new("notify-send").args(&vec!["-a", "bRShtop", "-u", "normal", "bRShtop Update!", format!("New version of BpyTop available!\nCurrent version: {}\nNew version: {}\nDownload at github.com/aristocratos/bpytop", VERSION.to_owned(), self_checker.version).as_str(), "-i", "update-notifier", "-t", "10000"]).output() {
                 Ok(_) => (),
                 Err(e) => errlog(format!("Unable to execute notify_send (error {})", e)),
             };
