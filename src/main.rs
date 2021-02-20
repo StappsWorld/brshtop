@@ -1185,7 +1185,7 @@ pub fn run(
     graphs_mutex: Arc<Mutex<Graphs>>,
     mem_box_mutex: Arc<Mutex<MemBox>>,
 ) {
-    let mut count : u64 = 0;
+    let mut count: u64 = 0;
     loop {
         let mut term = match term_mutex.try_lock() {
             Ok(m) => m,
@@ -1557,7 +1557,7 @@ pub fn clean_quit_mutex(
         Err(_) => {
             emergency_quit(errcode, errmsg);
             unreachable!()
-        },
+        }
     };
     let mut key = key_mutex.lock().unwrap();
     let mut collector = collector_mutex.lock().unwrap();
@@ -1713,22 +1713,17 @@ pub fn clean_quit(
     std::process::exit(errcode.unwrap_or(0));
 }
 
-pub fn emergency_quit(
-    errcode: Option<i32>,
-    errmsg: Option<String>,
-) {
+pub fn emergency_quit(errcode: Option<i32>, errmsg: Option<String>) {
     let mut draw = Draw::new();
     let mut term = Term::new();
-    draw.now_without_key(
-        vec![
-            term.get_clear(),
-            term.get_normal_screen(),
-            term.get_show_cursor(),
-            term.get_mouse_off(),
-            term.get_mouse_direct_off(),
-            Term::title(String::default()),
-        ]
-    );
+    draw.now_without_key(vec![
+        term.get_clear(),
+        term.get_normal_screen(),
+        term.get_show_cursor(),
+        term.get_mouse_off(),
+        term.get_mouse_direct_off(),
+        Term::title(String::default()),
+    ]);
     Term::echo(true);
     let now = SystemTime::now();
     match errcode {
@@ -1756,7 +1751,6 @@ pub fn emergency_quit(
     };
     std::process::exit(errcode.unwrap_or(0));
 }
-
 
 pub fn first_letter_to_upper_case(s1: String) -> String {
     let mut c = s1.chars();

@@ -39,7 +39,7 @@ impl BannerMeta {
             for (char_num, c) in line.chars().enumerate() {
                 let mut to_push: String = c.into();
                 if c == '█' && c_color != line_color {
-                    c_color = if 5 < char_num && char_num < 25 {
+                    c_color = if 5 < char_num && char_num < 23 {
                         line_color2
                     } else {
                         line_color

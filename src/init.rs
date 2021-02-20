@@ -266,7 +266,6 @@ impl Init {
         term: &Term,
         key: &mut Key,
     ) {
-        let mut draw = draw;
         for _ in 0..times {
             thread::sleep(time::Duration::from_secs_f32(0.05));
             let mut rng = rand::thread_rng();
