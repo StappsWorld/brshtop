@@ -1,7 +1,7 @@
 use {
     crate::{
         draw::Draw,
-        error::throw_error,
+        error::{errlog, throw_error},
         event::{Event, EventEnum},
         menu::Menu,
         nonblocking::Nonblocking,
@@ -104,7 +104,7 @@ impl Key {
         }
     }
 
-    pub fn start(_self : Arc<Mutex<Key>>, draw: Arc<Mutex<Draw>>, menu: Arc<Mutex<Menu>>) {
+    pub fn start(_self: Arc<Mutex<Key>>, draw: Arc<Mutex<Draw>>, menu: Arc<Mutex<Menu>>) {
         let mut initial_changes = _self.lock().unwrap();
         initial_changes.stopping = false;
         drop(initial_changes);
@@ -168,23 +168,14 @@ impl Key {
     }
 
     /// Returns true if key is detected else waits out timer and returns false, defaults sec: float = 0.0, mouse: bool = False
-    pub fn input_wait(
-        &mut self,
-        sec: f64,
-        mouse: bool,
-        draw: &mut Draw,
-        term: &Term,
-    ) -> bool {
-
+    pub fn input_wait(&mut self, sec: f64, mouse: bool, draw: &mut Draw, term: &Term) -> bool {
         if self.list.len() > 0 {
             return true;
         }
         if mouse {
             draw.now(vec![term.get_mouse_direct_on()], self);
         }
-        self.new.replace_self(EventEnum::Flag(false));
-        self.new.wait(if sec > 0.0 { sec } else { 0.0 });
-        self.new.replace_self(EventEnum::Flag(false));
+        thread::sleep(Duration::from_secs_f64(sec));
         if mouse {
             draw.now(vec![term.get_mouse_direct_off(), term.get_mouse_on()], self);
         }
@@ -206,9 +197,11 @@ impl Key {
     }
 
     /// Get a key or escape sequence from stdin, convert to readable format and save to keys list. Meant to be run in it's own thread
-    pub fn get_key(_self : Arc<Mutex<Key>>, draw_mutex: Arc<Mutex<Draw>>, menu_mutex: Arc<Mutex<Menu>>) {
-
-
+    pub fn get_key(
+        _self: Arc<Mutex<Key>>,
+        draw_mutex: Arc<Mutex<Draw>>,
+        menu_mutex: Arc<Mutex<Menu>>,
+    ) {
         let mut input_key: String = String::default();
         let mut clean_key: String = String::default();
 
@@ -217,10 +210,20 @@ impl Key {
         drop(initial_self);
 
         while !stopping {
-
-            let mut self_key = _self.lock().unwrap();
-            let mut draw = draw_mutex.lock().unwrap();
-            let mut menu = menu_mutex.lock().unwrap();
+            thread::sleep(Duration::from_millis(10));
+            let mut self_key = match _self.try_lock() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let mut draw = match draw_mutex.try_lock() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let mut menu = match menu_mutex.try_lock() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            errlog("Locked all modules in Key::get_key()".to_owned());
 
             let mut raw = Raw::new();
             raw.enter();
@@ -239,8 +242,6 @@ impl Key {
                             Ok(_) => {
                                 if input_key == String::from("\x1b") {
                                     self_key.idle.replace_self(EventEnum::Flag(false));
-                                    draw.idle.replace_self(EventEnum::Wait);
-                                    draw.idle.wait(1.0);
 
                                     let mut nonblocking = Nonblocking::new();
                                     nonblocking.enter();
@@ -291,8 +292,10 @@ impl Key {
                                         } else {
                                             let mut broke: bool = false;
                                             for (key_name, positions) in self_key.mouse.clone() {
-                                                let check_inside: Vec<i32> =
-                                                    vec![self_key.mouse_pos.0, self_key.mouse_pos.1];
+                                                let check_inside: Vec<i32> = vec![
+                                                    self_key.mouse_pos.0,
+                                                    self_key.mouse_pos.1,
+                                                ];
                                                 if positions.contains(&check_inside) {
                                                     clean_key = key_name;
                                                     broke = true;

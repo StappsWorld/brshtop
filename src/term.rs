@@ -230,9 +230,6 @@ impl Term {
                     ],
                     key,
                 );
-                self.winch.replace_self(EventEnum::Wait);
-                self.winch.wait(0.3);
-                self.winch.replace_self(EventEnum::Flag(false));
 
                 let term_size_check = terminal_size();
                 match term_size_check {
@@ -243,9 +240,6 @@ impl Term {
                     None => error::throw_error("Unable to get size of terminal!"),
                 };
             }
-            self.winch.replace_self(EventEnum::Wait);
-            self.winch.wait(0.3);
-            self.winch.replace_self(EventEnum::Flag(false));
 
             let term_size_check = terminal_size();
             match term_size_check {

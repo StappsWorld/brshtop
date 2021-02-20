@@ -87,7 +87,6 @@ impl Color {
             return Ok(Color::Null());
         } 
         else {
-            panic!();
             errlog(format!("Unable to parse color from {:?}", s));
             return Err(format!("Unable to parse color from {:?}", s));
         }

@@ -50,7 +50,7 @@ impl Timer {
                 .checked_add(Duration::from_millis(CONFIG.update_ms as u64))
                 .unwrap()
                 .duration_since(SystemTime::now())
-                .unwrap(),
+                .unwrap_or(Duration::from_nanos(10)),
         }
     }
 

@@ -1,5 +1,6 @@
 use {
     crate::{
+        error::errlog,
         event::{Event, EventEnum},
         key::Key,
     },
@@ -34,7 +35,9 @@ impl Draw {
 
     /// Wait for input reader and self to be idle then print to screen
     pub fn now(&mut self, args: Vec<String>, key: &mut Key) {
-        
+        if args.len() == 1 && args[0] == String::default() {
+            panic!();
+        }
 
         key.idle.replace_self(EventEnum::Wait);
         //key.idle.wait(-1.0);
@@ -45,10 +48,9 @@ impl Draw {
 
         self.idle.replace_self(EventEnum::Flag(false));
 
-
         print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
         for s in args.clone() {
-            print!("{}", s);
+            io::stdout().write_all(s.as_bytes()).unwrap();
             io::stdout().flush().unwrap();
         }
 
@@ -61,7 +63,6 @@ impl Draw {
         //self.idle.wait(-1.0);
 
         self.idle.replace_self(EventEnum::Flag(false));
-
 
         print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
         for s in args.clone() {
@@ -104,7 +105,9 @@ impl Draw {
             self.z_order.insert(mutable_name.clone(), z);
         }
         if args.len() > 0 {
-            args.iter().map(|s| string.push_str(s));
+            for s in args.clone() {
+                string.push_str(s.as_str());
+            }
         }
         if only_save {
             if !self.saved.contains_key(&mutable_name.clone()) || !append_mut {
@@ -118,10 +121,13 @@ impl Draw {
             if !self.strings.contains_key(&mutable_name.clone()) || !append_mut {
                 self.strings.insert(mutable_name.clone(), String::default());
             }
-            self.strings
-                .get_mut(&mutable_name.clone())
-                .unwrap()
-                .push_str(string.as_str());
+            let mut inserter: String = self
+                .strings
+                .get(&mutable_name.clone())
+                .unwrap_or(&String::default())
+                .clone();
+            inserter.push_str(string.as_str());
+            self.strings.insert(mutable_name.clone(), inserter.clone());
             if now_mut {
                 self.out(vec![mutable_name.clone()], false, key);
             }

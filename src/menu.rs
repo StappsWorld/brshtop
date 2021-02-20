@@ -406,9 +406,6 @@ impl Menu {
                     false,
                     false,
                 );
-                collector.set_collect_done(EventEnum::Wait);
-                collector.get_collect_done_reference().wait(2.0);
-                collector.set_collect_done(EventEnum::Flag(false));
                 if CONFIG.background_update {
                     self.background = format!(
                         "{}{}{}",
@@ -750,9 +747,6 @@ impl Menu {
                         false,
                         false,
                     );
-                    collector.set_collect_done(EventEnum::Wait);
-                    collector.get_collect_done_reference().wait(2.0);
-                    collector.set_collect_done(EventEnum::Flag(false));
                     if CONFIG.background_update {
                         self.background = format!(
                             "{}{}{}",
@@ -1832,8 +1826,6 @@ impl Menu {
                             color_i = 0;
                         }
                     }
-                    collector.set_collect_idle(EventEnum::Wait);
-                    collector.get_collect_idle_reference().wait(1.0);
                     CONFIG.color_theme =
                         THEME.themes.keys().cloned().collect::<Vec<String>>()[color_i].clone();
                     THEME.replace_self(
@@ -1912,8 +1904,6 @@ impl Menu {
                             cpu_sensor_i = 0;
                         }
                     }
-                    collector.set_collect_idle(EventEnum::Wait);
-                    collector.get_collect_idle_reference().wait(1.0);
                     cpucollector.set_sensor_swap(true);
                     CONFIG.cpu_sensor = CONFIG.cpu_sensors[cpu_sensor_i].clone();
                     if CONFIG.check_temp
@@ -2035,8 +2025,6 @@ impl Menu {
                     false,
                     false,
                 );
-                collector.set_collect_done(EventEnum::Wait);
-                collector.get_collect_done_reference().wait(2.0);
                 if CONFIG.background_update {
                     self.background = format!(
                         "{}{}{}",

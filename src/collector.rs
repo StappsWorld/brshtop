@@ -7,6 +7,7 @@ use {
         cpubox::CpuBox,
         cpucollector::CpuCollector,
         draw::Draw,
+        error::errlog,
         event::{Event, EventEnum},
         graph::Graphs,
         key::Key,
@@ -97,8 +98,6 @@ impl Collector {
     ) {
         self.set_collect_interrupt(interrupt.clone());
         self.set_proc_interrupt(proc_interrupt.clone());
-        self.set_collect_idle(EventEnum::Wait);
-        self.get_collect_idle_reference().wait(1.0);
         self.set_collect_interrupt(false);
         self.set_proc_interrupt(false);
         self.set_use_draw_list(false);
@@ -224,33 +223,90 @@ impl Collector {
         drop(initial_check);
 
         while !stopping {
-            let mut CONFIG = CONFIG_mutex.lock().unwrap();
-            let mut brshtop_box = brshtop_box_mutex.lock().unwrap();
-            let mut timeit = timeit_mutex.lock().unwrap();
-            let mut menu = menu_mutex.lock().unwrap();
-            let mut draw = draw_mutex.lock().unwrap();
-            let mut term = term_mutex.lock().unwrap();
-            let mut cpu_box = cpu_box_mutex.lock().unwrap();
-            let mut key = key_mutex.lock().unwrap();
-            let mut THEME = THEME_mutex.lock().unwrap();
-            let mut graphs = graphs_mutex.lock().unwrap();
-            let mut meters = meters_mutex.lock().unwrap();
-            let mut netbox = netbox_mutex.lock().unwrap();
-            let mut procbox = procbox_mutex.lock().unwrap();
-            let mut membox = membox_mutex.lock().unwrap();
-            let mut cpu_collector = cpu_collector_mutex.lock().unwrap();
-            let mut net_collector = net_collector_mutex.lock().unwrap();
-            let mut proc_collector = proc_collector_mutex.lock().unwrap();
-            let mut mem_collector = mem_collector_mutex.lock().unwrap();
-            let mut self_collector = _self.lock().unwrap();
+            thread::sleep(Duration::from_millis(10));
+            let mut CONFIG = match CONFIG_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut brshtop_box = match brshtop_box_mutex.try_lock() {
+                Ok(b) => b,
+                Err(_) => continue,
+            };
+            let mut timeit = match timeit_mutex.try_lock() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let mut menu = match menu_mutex.try_lock() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let mut draw = match draw_mutex.try_lock() {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+            let mut term = match term_mutex.try_lock() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let mut cpu_box = match cpu_box_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut key = match key_mutex.try_lock() {
+                Ok(k) => k,
+                Err(_) => continue,
+            };
+            let mut THEME = match THEME_mutex.try_lock() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let mut graphs = match graphs_mutex.try_lock() {
+                Ok(g) => g,
+                Err(_) => continue,
+            };
+            let mut meters = match meters_mutex.try_lock() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let mut netbox = match netbox_mutex.try_lock() {
+                Ok(n) => n,
+                Err(_) => continue,
+            };
+            let mut procbox = match procbox_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut membox = match membox_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut cpu_collector = match cpu_collector_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut net_collector = match net_collector_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut proc_collector = match proc_collector_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut mem_collector = match mem_collector_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut self_collector = match _self.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            errlog("Locked all modules in Collector::runner()".to_owned());
 
             if CONFIG.draw_clock != String::default() && CONFIG.update_ms != 1000 {
                 brshtop_box.draw_clock(
                     false, &term, &CONFIG, &THEME, &menu, &cpu_box, &mut draw, &mut key,
                 );
             }
-            self_collector.set_collect_run(EventEnum::Wait);
-            self_collector.get_collect_run_reference().wait(0.1);
             if !self_collector.get_collect_run().is_set() {
                 continue;
             }
@@ -376,6 +432,7 @@ impl Collector {
             self_collector.set_collect_idle(EventEnum::Flag(true));
             self_collector.set_collect_done(EventEnum::Flag(true));
             stopping = self_collector.get_stopping();
+
         }
     }
 

@@ -758,7 +758,23 @@ pub fn main() {
         errlog("Finished showing init".to_owned());
     }
 
-    let mut signals = match Signals::new(&[SIGTSTP, SIGCONT, SIGINT, SIGWINCH]) {
+    let mut signals_unimportant = match Signals::new(&[SIGTSTP, SIGCONT, SIGWINCH]) {
+        //Handling ctrl-z, resume, ctrl-c, terminal resized
+        Ok(s) => s,
+        Err(e) => {
+            Init::fail(
+                e.to_string(),
+                &CONFIG,
+                &mut draw,
+                &mut collector,
+                &mut key,
+                &term,
+            );
+            return;
+        }
+    };
+
+    let mut signals_important = match Signals::new(&[SIGINT]) {
         //Handling ctrl-z, resume, ctrl-c, terminal resized
         Ok(s) => s,
         Err(e) => {
@@ -801,7 +817,7 @@ pub fn main() {
     let mut DEBUG_signal = DEBUG.clone();
 
     thread::spawn(move || {
-        for sig in signals.forever() {
+        for sig in signals_unimportant.forever() {
             match sig {
                 SIGTSTP => {
                     match now_sleeping(
@@ -852,15 +868,6 @@ pub fn main() {
                         proc_collector_signal.clone(),
                     );
                 }
-                SIGINT => clean_quit_mutex(
-                    None,
-                    None,
-                    key_signal.clone(),
-                    collector_signal.clone(),
-                    draw_signal.clone(),
-                    term_signal.clone(),
-                    CONFIG_signal.clone(),
-                ),
                 SIGWINCH => {
                     let mut term_signal_clone = term_signal.clone();
                     let mut collector_signal_clone = collector_signal.clone();
@@ -912,6 +919,29 @@ pub fn main() {
                         &mut proc_box_winch,
                     );
                 }
+                _ => unreachable!(),
+            }
+        }
+    });
+
+    let mut key_signal_important = Arc::clone(&key_parent);
+    let mut collector_signal_important = Arc::clone(&collector_parent);
+    let mut draw_signal_important = Arc::clone(&draw_parent);
+    let mut term_signal_important = Arc::clone(&term_parent);
+    let mut CONFIG_signal_important = Arc::clone(&CONFIG_parent);
+
+    thread::spawn(move || {
+        for sig in signals_important.forever() {
+            match sig {
+                SIGINT => clean_quit_mutex(
+                    None,
+                    Some("SIGINT received".to_owned()),
+                    key_signal_important.clone(),
+                    collector_signal_important.clone(),
+                    draw_signal_important.clone(),
+                    term_signal_important.clone(),
+                    CONFIG_signal_important.clone(),
+                ),
                 _ => unreachable!(),
             }
         }
@@ -1051,8 +1081,6 @@ pub fn main() {
             &mut key,
         );
     }
-    collector.set_collect_done(EventEnum::Wait);
-    collector.get_collect_done_reference().wait(1.0);
     init.success(&CONFIG, &mut draw, &term, &mut key);
 
     init.done(&CONFIG, &mut draw, &term, &mut key);
@@ -1086,6 +1114,26 @@ pub fn main() {
     errlog("Main finished successfully! Moving to main loop.".to_owned());
 
     // Main loop ------------------------------------------------------------------------------------->
+
+    drop(term);
+    drop(key);
+    drop(timer);
+    drop(collector);
+    drop(init);
+    drop(cpu_box);
+    drop(draw);
+    drop(menu);
+    drop(brshtop_box);
+    drop(CONFIG);
+    drop(THEME);
+    drop(ARG_MODE);
+    drop(proc_box);
+    drop(proc_collector);
+    drop(net_collector);
+    drop(cpu_collector);
+    drop(net_box);
+    drop(graphs);
+    drop(mem_box);
 
     run(
         boxes.clone(),
@@ -1137,27 +1185,91 @@ pub fn run(
     graphs_mutex: Arc<Mutex<Graphs>>,
     mem_box_mutex: Arc<Mutex<MemBox>>,
 ) {
+    let mut count : u64 = 0;
     loop {
-        let mut term = term_mutex.lock().unwrap();
-        let mut key = key_mutex.lock().unwrap();
-        let mut timer = timer_mutex.lock().unwrap();
-        let mut collector = collector_mutex.lock().unwrap();
-        let mut init = init_mutex.lock().unwrap();
-        let mut cpu_box = cpu_box_mutex.lock().unwrap();
-        let mut draw = draw_mutex.lock().unwrap();
-        let mut menu = menu_mutex.lock().unwrap();
-        let mut brshtop_box = brshtop_box_mutex.lock().unwrap();
-        let mut CONFIG = CONFIG_mutex.lock().unwrap();
-        let mut THEME = THEME_mutex.lock().unwrap();
-        let mut ARG_MODE = ARG_MODE_mutex.lock().unwrap();
-        let mut procbox = procbox_mutex.lock().unwrap();
-        let mut proccollector = proccollector_mutex.lock().unwrap();
-        let mut netcollector = netcollector_mutex.lock().unwrap();
-        let mut cpucollector = cpucollector_mutex.lock().unwrap();
-        let mut netbox = netbox_mutex.lock().unwrap();
-        let mut update_checker = update_checker_mutex.lock().unwrap();
-        let mut graphs = graphs_mutex.lock().unwrap();
-        let mut mem_box = mem_box_mutex.lock().unwrap();
+        let mut term = match term_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut key = match key_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut timer = match timer_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut collector = match collector_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut init = match init_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut cpu_box = match cpu_box_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut draw = match draw_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut menu = match menu_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut brshtop_box = match brshtop_box_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut CONFIG = match CONFIG_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut THEME = match THEME_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut ARG_MODE = match ARG_MODE_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut procbox = match procbox_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut proccollector = match proccollector_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut netcollector = match netcollector_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut cpucollector = match cpucollector_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut netbox = match netbox_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut update_checker = match update_checker_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut graphs = match graphs_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut mem_box = match mem_box_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        errlog("Locked all modules in main loop successfully...".to_owned());
+        count += 1;
+        errlog(format!("Successfully locked {} times!", count));
 
         term.refresh(
             vec![],
@@ -1436,94 +1548,20 @@ pub fn clean_quit_mutex(
     let mut term = match term_mutex.try_lock() {
         Ok(t) => t,
         Err(_) => {
-            let mut draw = match draw_mutex.try_lock() {
-                Ok(d) => d,
-                Err(_) => {
-                    let mut usable_draw = Draw::new();
-                    let term = Term::new();
-                    usable_draw.now_without_key(vec![
-                        term.get_clear(),
-                        term.get_normal_screen(),
-                        term.get_show_cursor(),
-                        term.get_mouse_off(),
-                        term.get_mouse_direct_off(),
-                        Term::title(String::default()),
-                    ]);
-                    Term::echo(true);
-                    let now = SystemTime::now();
-                    match errcode {
-                        Some(0) => errlog(format!(
-                            "Exiting, Runtime {} \n",
-                            now.duration_since(SELF_START.to_owned())
-                                .unwrap()
-                                .as_secs_f64()
-                        )),
-                        Some(n) => {
-                            errlog(format!(
-                                "Exiting with errorcode {}, Runtime {} \n",
-                                n,
-                                now.duration_since(SELF_START.to_owned())
-                                    .unwrap()
-                                    .as_secs_f64()
-                            ));
-                            print!(
-                                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
-                                errcode.unwrap(),
-                                CONFIG_DIR.to_string_lossy()
-                            );
-                        }
-                        None => (),
-                    };
-                    std::process::exit(errcode.unwrap_or(0));
-                }
-            };
+            emergency_quit(errcode, errmsg);
             unreachable!()
         }
     };
-    let mut draw = match draw_mutex.try_lock() {
+    let mut draw: MutexGuard<Draw> = match draw_mutex.try_lock() {
         Ok(d) => d,
         Err(_) => {
-            let mut usable_draw = Draw::new();
-            usable_draw.now_without_key(vec![
-                term.get_clear(),
-                term.get_normal_screen(),
-                term.get_show_cursor(),
-                term.get_mouse_off(),
-                term.get_mouse_direct_off(),
-                Term::title(String::default()),
-            ]);
-            Term::echo(true);
-            let now = SystemTime::now();
-            match errcode {
-                Some(0) => errlog(format!(
-                    "Exiting, Runtime {} \n",
-                    now.duration_since(SELF_START.to_owned())
-                        .unwrap()
-                        .as_secs_f64()
-                )),
-                Some(n) => {
-                    errlog(format!(
-                        "Exiting with errorcode {}, Runtime {} \n",
-                        n,
-                        now.duration_since(SELF_START.to_owned())
-                            .unwrap()
-                            .as_secs_f64()
-                    ));
-                    print!(
-                        "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
-                        errcode.unwrap(),
-                        CONFIG_DIR.to_string_lossy()
-                    );
-                }
-                None => (),
-            };
-            std::process::exit(errcode.unwrap_or(0));
-        }
+            emergency_quit(errcode, errmsg);
+            unreachable!()
+        },
     };
-
     let mut key = key_mutex.lock().unwrap();
     let mut collector = collector_mutex.lock().unwrap();
-    let mut CONFIG = CONFIG_mutex.lock().unwrap();
+    let CONFIG = CONFIG_mutex.lock().unwrap();
 
     key.stop();
     collector.stop();
@@ -1674,6 +1712,51 @@ pub fn clean_quit(
     };
     std::process::exit(errcode.unwrap_or(0));
 }
+
+pub fn emergency_quit(
+    errcode: Option<i32>,
+    errmsg: Option<String>,
+) {
+    let mut draw = Draw::new();
+    let mut term = Term::new();
+    draw.now_without_key(
+        vec![
+            term.get_clear(),
+            term.get_normal_screen(),
+            term.get_show_cursor(),
+            term.get_mouse_off(),
+            term.get_mouse_direct_off(),
+            Term::title(String::default()),
+        ]
+    );
+    Term::echo(true);
+    let now = SystemTime::now();
+    match errcode {
+        Some(0) => errlog(format!(
+            "Exiting, Runtime {} \n",
+            now.duration_since(SELF_START.to_owned())
+                .unwrap()
+                .as_secs_f64()
+        )),
+        Some(n) => {
+            errlog(format!(
+                "Exiting with errorcode {}, Runtime {} \n",
+                n,
+                now.duration_since(SELF_START.to_owned())
+                    .unwrap()
+                    .as_secs_f64()
+            ));
+            print!(
+                "Brshtop exted with errorcode ({}). See {}/error.log for more information!",
+                errcode.unwrap(),
+                CONFIG_DIR.to_string_lossy()
+            );
+        }
+        None => (),
+    };
+    std::process::exit(errcode.unwrap_or(0));
+}
+
 
 pub fn first_letter_to_upper_case(s1: String) -> String {
     let mut c = s1.chars();
@@ -1943,11 +2026,7 @@ pub fn process_keys_mutex(
                 true,
                 false,
             );
-            if filtered {
-                collector.set_collect_done(EventEnum::Wait);
-                collector.get_collect_done_reference().wait(0.1);
-                collector.set_collect_done(EventEnum::Flag(false));
-            }
+            if filtered {}
             filtered = true;
             continue;
         }
@@ -2180,8 +2259,6 @@ pub fn process_keys_mutex(
                 false,
             );
         } else if key == "s".to_owned() {
-            collector.set_collect_idle(EventEnum::Wait);
-            collector.get_collect_idle_reference().wait(1.0);
             let switch = CONFIG.swap_disk;
             CONFIG.swap_disk = !switch;
             collector.collect(
@@ -2438,11 +2515,7 @@ pub fn process_keys_mutex_guard(
                 true,
                 false,
             );
-            if filtered {
-                collector.set_collect_done(EventEnum::Wait);
-                collector.get_collect_done_reference().wait(0.1);
-                collector.set_collect_done(EventEnum::Flag(false));
-            }
+            if filtered {}
             filtered = true;
             continue;
         }
@@ -2649,8 +2722,6 @@ pub fn process_keys_mutex_guard(
                 false,
             );
         } else if key == "s".to_owned() {
-            collector.set_collect_idle(EventEnum::Wait);
-            collector.get_collect_idle_reference().wait(1.0);
             let switch = CONFIG.swap_disk;
             CONFIG.swap_disk = !switch;
             collector.collect(
