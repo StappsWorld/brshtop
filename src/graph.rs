@@ -349,16 +349,15 @@ impl Graph {
         };
         for h in 0..self.height {
             let h_high = if self.height > 1 {
-                (100. * (1. - (h as f32 / self.height as f32))).round() as i32
+                100. * (self.height - h) as f32 / self.height as f32
             } else {
-                100
-            };
-
+                100.
+            }.round() as i32;
             let h_low = if self.height > 1 {
-                (100. * (1. - ((h as f32 + 1.) / self.height as f32))).round() as i32
+                100. * (self.height - (h + 1)) as f32 / self.height as f32
             } else {
-                0
-            };
+                0.
+            }.round() as i32;
 
             for (v, item) in self._data.iter().enumerate() {
                 if new {
@@ -382,7 +381,7 @@ impl Graph {
                                 (val as f32 * 4.0 / 100.0 + 0.5).round() as usize
                             } else {
                                 let _final: usize =
-                                    (((val - h_low) * 4) as f32 / (h_high - h_low) as f32 + 0.1)
+                                    ((val - h_low) as f32 * 4. / (h_high - h_low) as f32 + 0.1)
                                         .round() as usize;
                                 //errlog(format!("(({} - {}) * 4 / ({} - {}) + 0.1 == {} (rounded)", val, h_low, h_high, h_low, _final));
                                 _final

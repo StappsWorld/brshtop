@@ -270,7 +270,7 @@ impl Init {
         for _ in 0..times {
             thread::sleep(time::Duration::from_secs_f32(0.05));
             let mut rng = rand::thread_rng();
-            let x: u32 = rng.gen_range(0..100);
+            let x: u32 = rng.gen_range(0..20);
             let inserter = term.get_height();
             draw.buffer(
                 "initbg".to_owned(),
