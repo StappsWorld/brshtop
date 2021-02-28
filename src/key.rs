@@ -104,14 +104,14 @@ impl Key {
         }
     }
 
-    pub fn start(_self: Arc<Mutex<Key>>, draw: Arc<Mutex<Draw>>, menu: Arc<Mutex<Menu>>) {
+    pub fn start(_self: Arc<Mutex<Key>>, menu: Arc<Mutex<Menu>>) {
         let mut initial_changes = _self.lock().unwrap();
         initial_changes.stopping = false;
         drop(initial_changes);
 
         let mut self_clone = _self.clone();
         thread::spawn(move || {
-            Key::get_key(self_clone, draw, menu);
+            Key::get_key(self_clone, menu);
         });
 
         let mut after_changes = _self.lock().unwrap();
@@ -199,7 +199,6 @@ impl Key {
     /// Get a key or escape sequence from stdin, convert to readable format and save to keys list. Meant to be run in it's own thread
     pub fn get_key(
         _self: Arc<Mutex<Key>>,
-        draw_mutex: Arc<Mutex<Draw>>,
         menu_mutex: Arc<Mutex<Menu>>,
     ) {
         let mut input_key: String = String::default();
@@ -212,10 +211,6 @@ impl Key {
         while !stopping {
             thread::sleep(Duration::from_millis(10));
             let mut self_key = match _self.try_lock() {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-            let mut draw = match draw_mutex.try_lock() {
                 Ok(m) => m,
                 Err(_) => continue,
             };

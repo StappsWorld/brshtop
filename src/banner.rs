@@ -37,7 +37,7 @@ impl BannerMeta {
             let line_color2 = Color::fg(col2).unwrap();
             let line_dark = Color::fg(format!("#{}", 80 - line_num * 6)).unwrap();
             for (char_num, c) in line.chars().enumerate() {
-                let mut to_push: String = c.into();
+                let mut to_push: String = c.to_string();
                 if c == '█' && c_color != line_color {
                     c_color = if 5 < char_num && char_num < 23 {
                         line_color2

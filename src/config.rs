@@ -3,6 +3,7 @@ use {
         error::{errlog, throw_error},
         VERSION,
     },
+    expanduser::expanduser,
     lenient_bool::LenientBool,
     psutil::sensors::*,
     std::{
@@ -474,6 +475,8 @@ impl Config {
             self.config_file.clone()
         } else if PathBuf::from("/etc/brshtop.conf").is_file() {
             PathBuf::from("/etc/brshtop.conf")
+        } else if PathBuf::from(expanduser("~").unwrap().to_str().unwrap().to_owned() + "/.config/brshtop/brshtop.conf").is_file() {
+            PathBuf::from(expanduser("~").unwrap().to_str().unwrap().to_owned() + "/.config/brshtop/brshtop.conf")
         } else {
             return Err("Could not find config file.");
         };

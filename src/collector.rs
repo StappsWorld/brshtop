@@ -224,44 +224,49 @@ impl Collector {
 
         while !stopping {
             thread::sleep(Duration::from_millis(10));
-            let mut CONFIG = match CONFIG_mutex.try_lock() {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
+            
             let mut brshtop_box = match brshtop_box_mutex.try_lock() {
                 Ok(b) => b,
-                Err(_) => continue,
-            };
-            let mut timeit = match timeit_mutex.try_lock() {
-                Ok(t) => t,
-                Err(_) => continue,
-            };
-            let mut menu = match menu_mutex.try_lock() {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-            let mut draw = match draw_mutex.try_lock() {
-                Ok(d) => d,
-                Err(_) => continue,
-            };
-            let mut term = match term_mutex.try_lock() {
-                Ok(t) => t,
                 Err(_) => continue,
             };
             let mut cpu_box = match cpu_box_mutex.try_lock() {
                 Ok(c) => c,
                 Err(_) => continue,
             };
-            let mut key = match key_mutex.try_lock() {
-                Ok(k) => k,
+            let mut cpu_collector = match cpu_collector_mutex.try_lock() {
+                Ok(c) => c,
                 Err(_) => continue,
             };
-            let mut THEME = match THEME_mutex.try_lock() {
-                Ok(t) => t,
+            let mut CONFIG = match CONFIG_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut self_collector = match _self.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut draw = match draw_mutex.try_lock() {
+                Ok(d) => d,
                 Err(_) => continue,
             };
             let mut graphs = match graphs_mutex.try_lock() {
                 Ok(g) => g,
+                Err(_) => continue,
+            };
+            let mut key = match key_mutex.try_lock() {
+                Ok(k) => k,
+                Err(_) => continue,
+            };
+            let mut membox = match membox_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut mem_collector = match mem_collector_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut menu = match menu_mutex.try_lock() {
+                Ok(m) => m,
                 Err(_) => continue,
             };
             let mut meters = match meters_mutex.try_lock() {
@@ -272,19 +277,11 @@ impl Collector {
                 Ok(n) => n,
                 Err(_) => continue,
             };
-            let mut procbox = match procbox_mutex.try_lock() {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-            let mut membox = match membox_mutex.try_lock() {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-            let mut cpu_collector = match cpu_collector_mutex.try_lock() {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
             let mut net_collector = match net_collector_mutex.try_lock() {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let mut procbox = match procbox_mutex.try_lock() {
                 Ok(c) => c,
                 Err(_) => continue,
             };
@@ -292,12 +289,16 @@ impl Collector {
                 Ok(c) => c,
                 Err(_) => continue,
             };
-            let mut mem_collector = match mem_collector_mutex.try_lock() {
-                Ok(c) => c,
+            let mut term = match term_mutex.try_lock() {
+                Ok(t) => t,
                 Err(_) => continue,
             };
-            let mut self_collector = match _self.try_lock() {
-                Ok(c) => c,
+            let mut timeit = match timeit_mutex.try_lock() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let mut THEME = match THEME_mutex.try_lock() {
+                Ok(t) => t,
                 Err(_) => continue,
             };
             errlog("Locked all modules in Collector::runner()".to_owned());

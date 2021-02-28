@@ -337,7 +337,7 @@ pub fn main() {
         }
     }
 
-    let CONFIG_FILE = CONFIG_DIR.join("bpytop.conf");
+    let CONFIG_FILE = CONFIG_DIR.join("brshtop.conf");
 
     let mut MENUS = HashMap::new();
 
@@ -417,9 +417,19 @@ pub fn main() {
         Ok(c) => c,
         Err(e) => {
             throw_error(e);
-            Config::new(CONFIG_FILE.clone()).unwrap() //Never reached, but compiler is unhappy, so I bend
+            unreachable!()
         }
     };
+    if CONFIG_raw.info.len() > 0 {
+        for s in CONFIG_raw.info.clone() {
+            errlog(s);
+        }
+    }
+    if CONFIG_raw.warnings.len() > 0 {
+        for s in CONFIG_raw.warnings.clone() {
+            errlog(s);
+        }
+    }
     let CONFIG_parent: Arc<Mutex<Config>> = Arc::new(Mutex::new(CONFIG_raw));
     let CONFIG_mutex: Arc<Mutex<Config>> = Arc::clone(&CONFIG_parent);
     let CONFIG: MutexGuard<Config> = CONFIG_mutex.lock().unwrap();
@@ -966,7 +976,6 @@ pub fn main() {
     drop(menu);
     Key::start(
         Arc::clone(&key_parent),
-        Arc::clone(&draw_parent),
         Arc::clone(&menu_parent),
     );
     key = key_mutex.lock().unwrap();
@@ -1176,35 +1185,7 @@ pub fn run(
 ) {
     //let mut count: u64 = 0;
     loop {
-        let mut term = match term_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut key = match key_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut timer = match timer_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut collector = match collector_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut init = match init_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut cpu_box = match cpu_box_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut draw = match draw_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut menu = match menu_mutex.try_lock() {
+        let mut ARG_MODE = match ARG_MODE_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
         };
@@ -1212,15 +1193,51 @@ pub fn run(
             Ok(m) => m,
             _ => continue,
         };
+        let mut collector = match collector_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
         let mut CONFIG = match CONFIG_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
         };
-        let mut THEME = match THEME_mutex.try_lock() {
+        let mut cpu_box = match cpu_box_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
         };
-        let mut ARG_MODE = match ARG_MODE_mutex.try_lock() {
+        let mut cpucollector = match cpucollector_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut draw = match draw_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut graphs = match graphs_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut init = match init_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut key = match key_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut mem_box = match mem_box_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut menu = match menu_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut netbox = match netbox_mutex.try_lock() {
+            Ok(m) => m,
+            _ => continue,
+        };
+        let mut netcollector = match netcollector_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
         };
@@ -1232,27 +1249,19 @@ pub fn run(
             Ok(m) => m,
             _ => continue,
         };
-        let mut netcollector = match netcollector_mutex.try_lock() {
+        let mut term = match term_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
         };
-        let mut cpucollector = match cpucollector_mutex.try_lock() {
+        let mut THEME = match THEME_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
         };
-        let mut netbox = match netbox_mutex.try_lock() {
+        let mut timer = match timer_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
         };
         let mut update_checker = match update_checker_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut graphs = match graphs_mutex.try_lock() {
-            Ok(m) => m,
-            _ => continue,
-        };
-        let mut mem_box = match mem_box_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
         };
@@ -3040,7 +3049,6 @@ pub fn now_awake(
     drop(menu);
     Key::start(
         Arc::clone(&key_mutex),
-        Arc::clone(&draw_mutex),
         Arc::clone(&menu_mutex),
     );
     key = key_mutex.lock().unwrap();
