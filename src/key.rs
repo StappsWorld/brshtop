@@ -208,7 +208,7 @@ impl Key {
         let mut stopping = initial_self.stopping.clone();
         drop(initial_self);
 
-        while !stopping {
+        while false {
             thread::sleep(Duration::from_millis(10));
             let mut self_key = match _self.try_lock() {
                 Ok(m) => m,

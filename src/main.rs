@@ -79,7 +79,7 @@ use {
         process,
         sync::{Arc, Mutex, MutexGuard},
         thread,
-        time::SystemTime,
+        time::{Duration, SystemTime},
     },
     terminal_size::{terminal_size, Height, Width},
     theme::{Color, Theme},
@@ -1185,6 +1185,8 @@ pub fn run(
 ) {
     //let mut count: u64 = 0;
     loop {
+        thread::sleep(Duration::from_millis(10));
+
         let mut ARG_MODE = match ARG_MODE_mutex.try_lock() {
             Ok(m) => m,
             _ => continue,
