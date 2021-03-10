@@ -17,6 +17,8 @@ Please see the official release [here](https://github.com/aristocratos/bpytop)
 
 This program only works in Linux right now.
 
+In order to compile this program, you will need Cargo, Rust's compiler. It should be included with the Rust language found [here](https://www.rust-lang.org/tools/install)
+
 ```bash
 git clone https://github.com/StappsWorld/brshtop.git
 cd brshtop
