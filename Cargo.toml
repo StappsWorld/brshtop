@@ -1,5 +1,6 @@
 [package]
 name = "brshtop"
+authors = ["Aristocratos <jakob@qvantnet.com>","Samuel Rembisz <sjrembisz07@gmail.com>", "Charlie Thomson <charliecthomson@gmail.com>"]
 version = "0.2.0"
 edition = "2018"
 
