@@ -1,45 +1,8 @@
 [package]
 name = "brshtop"
-version = "0.0.1"
-authors = ["Aristocratos <jakob@qvantnet.com>","Samuel Rembisz <sjrembisz07@gmail.com>", "Charlie Thomson <charliecthomson@gmail.com>"]
+version = "0.2.0"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "3.0.0-beta.2"
-psutil = "3.2.0"
-string_template = "0.2.1"
-expanduser = "1.2.1"
-log = "0.4.11"
-simple-logging = "2.0.2"
-lenient_bool = "0.1.1"
-terminal_size = "0.1.15"
-lazy_static = "1.4.0"
-regex = "1.4.2"
-from_map = { version = '0.1.0', path = "./from_map" }
-which = "4.0.2"
-gradient = { version = '0.1.0', path = "./gradient" }
-maplit = "1.0.2"
-thread-control = "0.1.2"
-subprocess = "0.2.6"
-sys-info = "0.7.0"
-hhmmss = "0.1.0"
-termios = "0.3.3"
-nix = "0.11.0"
-ascii_utils = "0.9.3"
-pancurses = "0.16.1"
-uname = "0.1.1"
-libc = "0.2.81"
-battery = "0.7.8"
-chrono = "0.4.19"
-libmath = "0.2.1"
-users = "0.11.0"
-Inflector = "0.11.4"
-cpuid = "0.1.1"
-heim = { version = "*", features = ["net", "disk", "memory"]}
-reqwest = {version = "0.11.0", features = ["blocking"]}
-rand = "0.8.2"
-futures = "0.3.11"
-signal-hook = "0.3.3"
-error-chain = "0.12.4"
