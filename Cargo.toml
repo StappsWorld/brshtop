@@ -4,6 +4,17 @@ authors = ["Aristocratos <jakob@qvantnet.com>","Samuel Rembisz <sjrembisz07@gmai
 version = "0.2.0"
 edition = "2018"
 
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+heim = '0.0.11'
+sysinfo = "0.20.4"
+
+tokio = { version = "1", features = ["full"] }
+tokio-stream = '0.1.7'
+tokio-rayon = "2.1.0"
+rayon = "1.5.1"
+ascii_table = '3.0.2'
+indicatif = "0.16.2"
+rand = "0.8.4"
