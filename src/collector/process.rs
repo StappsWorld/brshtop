@@ -83,9 +83,6 @@ impl ProcessTreeNode {
     }
 }
 
-// TODO: This is really slow, because it's waiting for everything all the time, pls fix
-// FIXME: Implement parallelization of process data gathering
-
 #[derive(Debug)]
 pub struct ProcessTree {
     // TODO(Charlie): Remove pub
@@ -134,6 +131,42 @@ impl ProcessTree {
     }
 }
 
-pub fn collect() -> ProcessTree {
-    ProcessTree::new()
+pub fn collect(system: &System) -> HashMap<Pid, ProcessTreeNode> {
+    let mut missing_parents: HashMap<Pid, Vec<Pid>> = HashMap::new();
+
+    let processes = system.processes().clone();
+
+    let mut tree: HashMap<Pid, ProcessTreeNode> = HashMap::new();
+
+    for (pid, process) in processes.iter() {
+        let parent_pid = process.parent();
+
+        // Skip duplicates
+        if tree.contains_key(pid) {
+            continue;
+        }
+
+        let mut process_node = ProcessTreeNode::new(process.into());
+
+        if let Some(parent_pid) = parent_pid {
+            if let Some(parent) = tree.get_mut(&parent_pid) {
+                parent.push_child(*pid);
+            } else {
+                missing_parents
+                    .entry(parent_pid)
+                    .or_insert_with(Vec::new)
+                    .push(*pid);
+            }
+
+            process_node = process_node.with_parent(parent_pid);
+        }
+
+        if let Some(children) = missing_parents.remove(&pid) {
+            process_node.children = children;
+        }
+
+        tree.insert(*pid, process_node);
+    }
+
+    tree
 }

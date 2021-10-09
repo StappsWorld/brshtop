@@ -14,7 +14,7 @@ macro_rules! build_column {
     ($header:expr) => {{
         let mut column = ascii_table::Column::default();
         column.header = $header.into();
-        column.align = ascii_table::Align::Left;
+        column.align = ascii_table::Align::Right;
         column
     }};
 }
@@ -32,7 +32,7 @@ macro_rules! timeit {
         bar.set_style(
             ProgressStyle::default_bar()
                 .template(&format!(
-                    "{:<5} : [{{msg:^9}}] |{{bar:40.cyan/blue}}| {{pos:^5}}/{{len:^5}}",
+                    "{:<8} : [{{msg:^9}}] |{{bar:40.cyan/blue}}| {{pos:^5}}/{{len:^5}}",
                     $name
                 ))
                 .progress_chars("##-"),
@@ -66,16 +66,6 @@ macro_rules! timeit {
     }};
 }
 
-#[macro_export]
-macro_rules! time_standard_collector {
-    ($name:literal, $collector_path:path) => {{
-        time_standard_collector!($name, $collector_path, NUMRUNS)
-    }};
-    ($name:literal, $collector_path:path, $numruns:expr) => {{
-        timeit!($name, $collector_path().await.unwrap(), $numruns)
-    }};
-}
-
 pub fn fmt_time(num_nanos: u128) -> String {
     let power = ((num_nanos as f64).log10().floor() as u128 / 3) + 1;
 
@@ -83,7 +73,7 @@ pub fn fmt_time(num_nanos: u128) -> String {
         1 => "ns",
         2 => "µs",
         3 => "ms",
-        x if x >= 4 => "s",
+        x if x >= 4 => "s ",
         _ => unreachable!(),
     };
 
@@ -96,7 +86,7 @@ pub async fn bench() -> heim::Result<()> {
     use ascii_table::{Align, AsciiTable, Column};
     let mut table = AsciiTable::default();
     let mut table_data: Vec<Vec<String>> = Vec::new();
-    const NUMRUNS: u64 = 1000;
+    const NUMRUNS: u64 = 150;
 
     // Insert column headers
     [
@@ -113,40 +103,32 @@ pub async fn bench() -> heim::Result<()> {
         table.columns.insert(i, build_column!(n.to_string()));
     });
 
-    table_data.push(time_standard_collector!("mem", collector::memory::collect));
-    table_data.push(time_standard_collector!("disk", collector::disk::collect));
-    table_data.push(time_standard_collector!("cpu", collector::cpu::collect));
     let mut system = System::new_all();
-    table_data.push(timeit!("proc", collector::process::collect()));
-
-    fn build_dots_str(n: usize) -> String {
-        let spinner_chars = "⠁⠂⠄⡀⢀⠠⠐⠈";
-        let mut s: String = "".into();
-
-        let mut rng = rand::thread_rng();
-
-        for _ in (0..n) {
-            s.push(spinner_chars.chars().choose(&mut rng).unwrap());
-        }
-
-        s
-    }
+    table_data.push(timeit!("mem", collector::memory::collect().await.unwrap()));
+    table_data.push(timeit!("disk", collector::disk::collect().await.unwrap()));
+    table_data.push(timeit!("cpu", collector::cpu::collect().await.unwrap()));
+    table_data.push(timeit!("cpu(s)", collector::cpu::collect_sync(&system)));
+    table_data.push(timeit!("cpu(s/u)", {
+        system.refresh_cpu();
+        collector::cpu::collect_sync(&system)
+    }));
+    table_data.push(timeit!("upd", system.refresh_all()));
+    table_data.push(timeit!("sys", System::new_all()));
+    table_data.push(timeit!("net", collector::network::collect(&system)));
+    table_data.push(timeit!("proc", collector::process::collect(&system)));
+    table_data.push(timeit!("proc(u)", {
+        system.refresh_processes();
+        collector::process::collect(&system)
+    }));
 
     let table = table.format(table_data);
     let mut lines = table.lines();
-    println!("{}", build_dots_str(73));
     while let Some(line) = lines.next() {
         let box_width = line.chars().count();
         let padding_f = ((73 - box_width) as f32) / 2.;
         let padding_l = padding_f.ceil() as usize;
         let padding_r = padding_f.floor() as usize;
-        println!(
-            "{}{}{}",
-            build_dots_str(padding_l),
-            line,
-            build_dots_str(padding_r),
-        );
+        println!("{:^73}", line,);
     }
-    println!("{}", build_dots_str(73));
     Ok(())
 }

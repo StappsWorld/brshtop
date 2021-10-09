@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use heim::{
     cpu::{logical_count, physical_count, CpuFrequency, CpuTime},
     units::{frequency::megahertz, time::second},
 };
+use sysinfo::{ProcessorExt, System, SystemExt};
 
 #[derive(Debug)]
 pub struct CpuData {
@@ -62,4 +65,30 @@ pub async fn collect() -> heim::Result<CpuData> {
         logical_count,
         physical_count,
     })
+}
+
+pub struct CpuDataSync {
+    freq_mhz: u64,
+    // Percent
+    usage: f32,
+    vendor: String,
+    brand: String,
+}
+
+pub fn collect_sync(system: &System) -> HashMap<String, CpuDataSync> {
+    system
+        .processors()
+        .into_iter()
+        .map(|processor| {
+            (
+                processor.name().to_string(),
+                CpuDataSync {
+                    freq_mhz: processor.frequency(),
+                    usage: processor.cpu_usage(),
+                    vendor: processor.vendor_id().into(),
+                    brand: processor.brand().into(),
+                },
+            )
+        })
+        .collect()
 }
