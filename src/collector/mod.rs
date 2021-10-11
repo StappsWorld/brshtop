@@ -3,11 +3,7 @@ use std::collections::HashMap;
 use sysinfo::{Pid, System, SystemExt};
 
 use self::{
-    cpu::CpuData,
-    disk::DiskData,
-    memory::MemoryData,
-    network::Network,
-    process::{ProcessTree, ProcessTreeNode},
+    cpu::CpuData, disk::DiskData, memory::MemoryData, network::Network, process::ProcessTreeNode,
 };
 
 pub mod cpu;
@@ -28,10 +24,12 @@ pub struct Collector {
 impl Collector {
     pub async fn new() -> heim::Result<Self> {
         let system = System::new_all();
+
         let process_tree = process::collect(&system);
+        let networks = network::collect(&system);
+
         let (cpu, memory, disk) =
             tokio::try_join!(cpu::collect(), memory::collect(), disk::collect())?;
-        let networks = network::collect(&system);
 
         Ok(Self {
             process_tree,
@@ -41,5 +39,23 @@ impl Collector {
             networks,
             system,
         })
+    }
+
+    pub async fn update(&mut self) -> heim::Result<()> {
+        self.system.refresh_all();
+
+        let process_tree = process::collect(&self.system);
+        let networks = network::collect(&self.system);
+
+        let (cpu, memory, disk) =
+            tokio::try_join!(cpu::collect(), memory::collect(), disk::collect())?;
+
+        self.process_tree = process_tree;
+        self.cpu = cpu;
+        self.memory = memory;
+        self.disk = disk;
+        self.networks = networks;
+
+        Ok(())
     }
 }

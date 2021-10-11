@@ -13,8 +13,5 @@ sysinfo = "0.20.4"
 
 tokio = { version = "1", features = ["full"] }
 tokio-stream = '0.1.7'
-tokio-rayon = "2.1.0"
-rayon = "1.5.1"
 ascii_table = '3.0.2'
 indicatif = "0.16.2"
-rand = "0.8.4"

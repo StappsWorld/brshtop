@@ -78,7 +78,7 @@ pub struct CpuDataSync {
 pub fn collect_sync(system: &System) -> HashMap<String, CpuDataSync> {
     system
         .processors()
-        .into_iter()
+        .iter()
         .map(|processor| {
             (
                 processor.name().to_string(),

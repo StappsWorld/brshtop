@@ -1,16 +1,16 @@
-use heim::net::Nic;
-use sysinfo::{NetworkExt, System, SystemExt};
-use tokio_stream::StreamExt;
-
-mod collector;
+#![allow(dead_code, unused_attributes)]
 
 mod bench;
+mod collector;
 
 #[tokio::main]
 async fn main() -> heim::Result<()> {
-    // let system = System::new_all();
+    // let mut collector = Collector::new().await?;
+    // println!("Running");
     // loop {
-    //     println!("{:#?}", collector::network::collect(&system));
+    //     let start = std::time::Instant::now();
+    //     collector.update();
+    //     tokio::time::sleep_until((start + std::time::Duration::from_millis(10)).into()).await;
     // }
     bench::bench().await?;
     Ok(())

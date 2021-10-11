@@ -1,9 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use sysinfo::{DiskUsage, Pid, Process, ProcessExt, ProcessStatus, System, SystemExt};
-
-use crate::{build_column, timeit};
 
 #[derive(Debug, Clone)]
 pub struct ProcessT {
@@ -94,7 +91,7 @@ impl ProcessTree {
         let system = System::new_all();
         let mut missing_parents: HashMap<Pid, Vec<Pid>> = HashMap::new();
 
-        let processes = system.processes().clone();
+        let processes = system.processes();
 
         let mut tree: HashMap<Pid, ProcessTreeNode> = HashMap::new();
 
@@ -121,7 +118,7 @@ impl ProcessTree {
                 process_node = process_node.with_parent(parent_pid);
             }
 
-            if let Some(children) = missing_parents.remove(&pid) {
+            if let Some(children) = missing_parents.remove(pid) {
                 process_node.children = children;
             }
 
@@ -134,7 +131,7 @@ impl ProcessTree {
 pub fn collect(system: &System) -> HashMap<Pid, ProcessTreeNode> {
     let mut missing_parents: HashMap<Pid, Vec<Pid>> = HashMap::new();
 
-    let processes = system.processes().clone();
+    let processes = system.processes();
 
     let mut tree: HashMap<Pid, ProcessTreeNode> = HashMap::new();
 
@@ -161,7 +158,7 @@ pub fn collect(system: &System) -> HashMap<Pid, ProcessTreeNode> {
             process_node = process_node.with_parent(parent_pid);
         }
 
-        if let Some(children) = missing_parents.remove(&pid) {
+        if let Some(children) = missing_parents.remove(pid) {
             process_node.children = children;
         }
 
