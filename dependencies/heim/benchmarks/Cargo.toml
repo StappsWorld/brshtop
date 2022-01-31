@@ -1,0 +1,16 @@
+[package]
+name = "benchmarks"
+version = "0.0.0"
+edition = "2018"
+publish = false
+
+[dependencies]
+heim = { path = "../heim", features = ["full"] }
+futures = "^0.3"
+criterion = "^0.3"
+smol = "^1.2"
+
+[[bench]]
+name = "benchmark"
+path = "main.rs"
+harness = false

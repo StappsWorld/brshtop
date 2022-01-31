@@ -1,0 +1,20 @@
+[package]
+name = "darwin-libproc"
+version = "0.2.0"
+authors = ["svartalf <self@svartalf.info>"]
+edition = "2018"
+documentation = "https://docs.rs/darwin-libproc/*/x86_64-apple-darwin/darwin_libproc/"
+description = "Safe and idiomatic wrappers for macOS libproc"
+keywords = ["libproc", "proc", "darwin", "macos"]
+categories = ["os::macos-apis", "api-bindings"]
+repository = "https://github.com/heim-rs/darwin-libproc"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+
+[badges]
+maintenance = { status = "experimental" }
+
+[dependencies]
+darwin-libproc-sys = { version = "0.2", path = "../darwin-libproc-sys" }
+libc = "0.2.116"
+memchr = "2.3.4"

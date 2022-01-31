@@ -1,0 +1,24 @@
+[package]
+name = "heim-runtime"
+version = "0.1.0-rc.1"
+authors = ["svartalf <self@svartalf.info>"]
+edition = "2018"
+description = "Runtime shims for heim crate"
+keywords = ["heim", "runtime", "shim", "sync"]
+categories = ["asynchronous", "os", "api-bindings"]
+repository = "https://github.com/heim-rs/heim"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+futures = { version = "^0.3", default-features = false, features = ["std"] }
+#futures-lite = "^1.11"
+futures-timer = "^3.0"
+once_cell = "^1.7"
+smol = "^1.2"
+
+[dev-dependencies]
+version-sync = "0.9"
+rusty-fork = "0.3.0"
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]

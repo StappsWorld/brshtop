@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "darwin-libproc-sys",
+    "darwin-libproc",
+]

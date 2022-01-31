@@ -1,0 +1,17 @@
+[package]
+name = "darwin-libproc-sys"
+version = "0.2.0"
+authors = ["svartalf <self@svartalf.info>"]
+edition = "2018"
+documentation = "https://docs.rs/darwin-libproc-sys/*/x86_64-apple-darwin/darwin_libproc_sys/"
+description = "FFI bindings for macOS libproc"
+keywords = ["libproc", "proc", "darwin", "macos"]
+categories = ["os::macos-apis", "external-ffi-bindings"]
+repository = "https://github.com/heim-rs/darwin-libproc"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+links = "proc"
+build = "build.rs"
+
+[badges]
+maintenance = { status = "experimental" }

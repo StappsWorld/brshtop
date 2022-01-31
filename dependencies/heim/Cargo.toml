@@ -1,0 +1,37 @@
+[workspace]
+default-members = [
+    "heim",
+    "heim-common",
+    "heim-derive",
+    "heim-runtime",
+    "heim-host",
+    "heim-cpu",
+    "heim-memory",
+    "heim-disk",
+    "heim-net",
+    "heim-process",
+    "heim-virt",
+    "heim-sensors",
+]
+
+# Internal members should be skipped from the `default-members` list,
+# as they might break the compilation
+
+members = [
+    "heim",
+    "heim-common",
+    "heim-derive",
+    "heim-runtime",
+    "heim-host",
+    "heim-cpu",
+    "heim-memory",
+    "heim-disk",
+    "heim-net",
+    "heim-process",
+    "heim-virt",
+    "heim-sensors",
+
+    # Internal
+    "benchmarks",
+    "examples",
+]

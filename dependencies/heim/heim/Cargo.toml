@@ -1,0 +1,53 @@
+[package]
+name = "heim"
+version = "0.1.0-rc.1"
+authors = ["svartalf <self@svartalf.info>"]
+edition = "2018"
+description = "Cross-platform framework for system information"
+keywords = ["heim", "system", "information", "sysinfo", "psutil"]
+categories = ["asynchronous", "os", "api-bindings"]
+repository = "https://github.com/heim-rs/heim"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+
+[badges]
+maintenance = { status = "actively-developed" }
+github-actions = { repository = "heim-rs/heim", workflow = "Tier 1 CI" }
+is-it-maintained-issue-resolution = { repository = "heim-rs/heim" }
+is-it-maintained-open-issues = { repository = "heim-rs/heim" }
+
+[dependencies]
+heim-common = { version = "0.1.0-rc.1", path = "../heim-common" }
+heim-runtime = { version = "0.1.0-rc.1", path = "../heim-runtime" }
+heim-cpu = {version = "0.1.0-rc.1", path = "../heim-cpu", optional = true }
+heim-disk = {version = "0.1.0-rc.1", path = "../heim-disk", optional = true }
+heim-host = { version = "0.1.0-rc.1", path = "../heim-host", optional = true }
+heim-memory = {version = "0.1.0-rc.1", path = "../heim-memory", optional = true }
+heim-net = {version = "0.1.0-rc.1", path = "../heim-net", optional = true }
+heim-process = { version = "0.1.1-rc.1", path = "../heim-process", optional = true }
+heim-virt = { version = "0.1.0-rc.1", path = "../heim-virt", optional = true }
+heim-sensors = { version = "0.1.0-rc.1", path = "../heim-sensors", optional = true }
+
+[dev-dependencies]
+heim-derive = { version = "0.1.0-rc.1", path = "../heim-derive" }
+version-sync = "0.9"
+
+[features]
+default = []
+full = ["host", "cpu", "memory", "disk", "net", "process", "virt", "sensors"]
+unstable = []
+backtrace = ["unstable", "heim-common/backtrace"]
+
+# Modules
+host = ["heim-host"]
+cpu = ["heim-cpu"]
+memory = ["heim-memory"]
+disk = ["heim-disk"]
+net = ["heim-net"]
+process = ["heim-process"]
+virt = ["heim-virt"]
+sensors = ["heim-sensors"]
+
+[package.metadata.docs.rs]
+features = ["full"]
+rustdoc-args = ["--cfg", "docsrs"]

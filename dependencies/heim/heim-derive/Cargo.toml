@@ -1,0 +1,22 @@
+[package]
+name = "heim-derive"
+version = "0.1.0-rc.1"
+authors = ["svartalf <self@svartalf.info>"]
+edition = "2018"
+description = "Derive macros for heim crates"
+keywords = ["heim", "system", "information", "sysinfo", "psutil"]
+categories = ["asynchronous", "os", "api-bindings"]
+repository = "https://github.com/heim-rs/heim"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "^1.0"
+quote = "^1.0"
+syn = { version = "^1.0", default-features = false, features = ["derive", "full", "parsing", "printing", "proc-macro"] }
+
+[dev-dependencies]
+version-sync = "0.9"
