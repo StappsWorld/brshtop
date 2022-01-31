@@ -1,7 +1,8 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
+use futures::stream::StreamExt;
 use heim::disk::{FileSystem, Usage};
-use tokio_stream::StreamExt;
+use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct DiskData {
@@ -9,7 +10,7 @@ pub struct DiskData {
     // TODO(Charlie): Figure out how to get partition names on windows :)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Partition {
     mount_point: String,
     file_system: FileSystem,
@@ -26,19 +27,35 @@ async fn get_usage<P: AsRef<Path>>(path: P) -> heim::Result<Usage> {
 }
 
 pub async fn collect() -> heim::Result<DiskData> {
-    let mut partitions_stream = heim::disk::partitions();
+    let mut partitions_stream = heim::disk::partitions().await?;
 
-    let mut partitions = vec![];
-    while let Some(partition) = partitions_stream.try_next().await? {
-        let mount_point = get_mount_point(&partition);
-        let usage = get_usage(&mount_point).await?;
+    let mut partitions_arc = Arc::new(Mutex::new(vec![]));
 
-        partitions.push(Partition {
-            mount_point,
-            usage,
-            file_system: partition.file_system().clone(),
+    partitions_stream
+        .for_each(|r| {
+            let partitions = partitions_arc.clone();
+            async move {
+                match r {
+                    Ok(partition) => {
+                        let mount_point = get_mount_point(&partition);
+                        let usage = match get_usage(&mount_point).await {
+                            Ok(u) => u,
+                            Err(_) => return,
+                        };
+
+                        let mut partitions = partitions.lock().await;
+                        partitions.push(Partition {
+                            mount_point,
+                            usage,
+                            file_system: partition.file_system().clone(),
+                        })
+                    }
+                    Err(_) => ()
+                }
+            }
         })
-    }
+        .await;
 
+    let partitions: Vec<Partition> = partitions_arc.lock_owned().await.to_vec();
     Ok(DiskData { partitions })
 }

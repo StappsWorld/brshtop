@@ -1,14 +1,5 @@
 use crate::collector;
 use sysinfo::{System, SystemExt};
-#[macro_export]
-macro_rules! build_column {
-    ($header:expr) => {{
-        let mut column = ascii_table::Column::default();
-        column.header = $header.into();
-        column.align = ascii_table::Align::Right;
-        column
-    }};
-}
 
 #[macro_export]
 macro_rules! timeit {
@@ -100,7 +91,7 @@ pub async fn bench() -> heim::Result<()> {
     .iter()
     .enumerate()
     .for_each(|(i, n)| {
-        table.columns.insert(i, build_column!(n.to_string()));
+        table.column(i).set_header(n.to_string()).set_align(ascii_table::Align::Right);
     });
 
     let mut system = System::new_all();
